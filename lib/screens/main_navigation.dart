@@ -3,7 +3,7 @@ import '../theme/app_theme.dart';
 import '../widgets/modern_bottom_navigation.dart';
 import 'modern_home_screen.dart';
 import 'modern_cringe_deposit_screen.dart';
-import 'modern_profile_screen.dart';
+import 'simple_profile_screen.dart';
 import 'modern_competitions_screen.dart';
 import 'modern_search_screen.dart';
 
@@ -22,7 +22,7 @@ class _MainNavigationState extends State<MainNavigation> {
     const ModernSearchScreen(), // Arama/Keşfet
     const ModernCringeDepositScreen(), // Yeni krep ekle
     const ModernCompetitionsScreen(), // Yarışmalar (Aktivite)
-    const ModernProfileScreen(), // Profil
+    const SimpleProfileScreen(), // Profil
   ];
 
   void _onItemTapped(int index) {

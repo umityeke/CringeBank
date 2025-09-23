@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../theme/app_theme.dart';
-import 'main_navigation.dart';
+import '../services/user_service.dart';
 
 class ModernLoginScreen extends StatefulWidget {
   const ModernLoginScreen({super.key});
@@ -16,17 +16,26 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
   late AnimationController _controller;
   late AnimationController _floatingController;
   late AnimationController _pulseController;
+  late AnimationController _particlesController;
+  late AnimationController _staggerController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
   late Animation<double> _floatingAnimation;
   late Animation<double> _pulseAnimation;
+  late Animation<double> _particlesAnimation;
+  late Animation<double> _slideAnimation;
+  late Animation<double> _staggerAnimation;
 
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
+  final TextEditingController _fullNameController = TextEditingController();
+
   bool _isLoading = false;
   bool _obscurePassword = true;
-  String _selectedLoginType = 'email';
+  bool _obscureConfirmPassword = true;
+  bool _isLoginMode = true;
 
   @override
   void initState() {
@@ -43,42 +52,56 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
       duration: const Duration(milliseconds: 2000),
       vsync: this,
     );
+    _particlesController = AnimationController(
+      duration: const Duration(seconds: 8),
+      vsync: this,
+    );
+    _staggerController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
 
     _scaleAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.elasticOut,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
 
-    _opacityAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.3, 1.0, curve: Curves.easeInOut),
-    ));
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.3, 1.0, curve: Curves.easeInOut),
+      ),
+    );
 
-    _floatingAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _floatingController,
-      curve: Curves.easeInOut,
-    ));
+    _floatingAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _floatingController, curve: Curves.easeInOut),
+    );
 
-    _pulseAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.2,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
+    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _particlesAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _particlesController, curve: Curves.linear),
+    );
+
+    _slideAnimation = Tween<double>(begin: -50.0, end: 0.0).animate(
+      CurvedAnimation(parent: _staggerController, curve: Curves.easeOutCubic),
+    );
+
+    _staggerAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _staggerController, curve: Curves.easeOutQuart),
+    );
 
     _controller.forward();
     _floatingController.repeat(reverse: true);
     _pulseController.repeat(reverse: true);
+    _particlesController.repeat();
+
+    // Staggered animation delay
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) _staggerController.forward();
+    });
   }
 
   @override
@@ -86,43 +109,53 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
     _controller.dispose();
     _floatingController.dispose();
     _pulseController.dispose();
+    _particlesController.dispose();
+    _staggerController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _fullNameController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.primaryColor,
+      backgroundColor: const Color(0xFF1A1A1A),
       body: Stack(
         children: [
           // Animated Background
           _buildAnimatedBackground(),
-          
+
           // Content
-          SafeArea(
+          Expanded(
             child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 60),
-                    _buildLogo(),
-                    const SizedBox(height: 40),
-                    _buildWelcomeText(),
-                    const SizedBox(height: 40),
-                    _buildLoginTypeSelector(),
-                    const SizedBox(height: 30),
-                    _buildLoginForm(),
-                    const SizedBox(height: 30),
-                    _buildLoginButton(),
-                    const SizedBox(height: 20),
-                    _buildSocialLogin(),
-                    const SizedBox(height: 30),
-                    _buildSignUpSection(),
-                  ],
+              physics: const ClampingScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height - 
+                           MediaQuery.of(context).padding.top - 
+                           MediaQuery.of(context).padding.bottom,
+                ),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    MediaQuery.of(context).size.width * 0.05,
+                    0,
+                    MediaQuery.of(context).size.width * 0.05,
+                    MediaQuery.of(context).size.height * 0.02,
+                  ),
+                  child: Column(
+                    children: [
+                  _buildStaggeredItem(_buildWelcomeText(), 0),
+                  _buildStaggeredItem(_buildLoginForm(), 2),
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+                  _buildStaggeredItem(_buildLoginButton(), 3),
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.01),
+                  _buildStaggeredItem(_buildSocialLogin(), 4),
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.01),
+                  _buildStaggeredItem(_buildSignUpSection(), 5),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -134,83 +167,94 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
 
   Widget _buildAnimatedBackground() {
     return AnimatedBuilder(
-      animation: _floatingAnimation,
+      animation: Listenable.merge([
+        _floatingAnimation,
+        _particlesAnimation,
+        _pulseAnimation,
+      ]),
       builder: (context, child) {
         return Stack(
           children: [
+            // Enhanced gradient background
             Container(
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF2A2A2A),
+                    Color(0xFF1A1A1A),
+                    Color(0xFF0F0F0F),
+                    Color(0xFF000000),
+                  ],
+                  stops: [0.0, 0.3, 0.7, 1.0],
+                ),
               ),
             ),
-            ...List.generate(12, (index) {
+
+            // Floating bubbles
+            ...List.generate(20, (index) {
               final offset = _floatingAnimation.value * 2 * math.pi;
-              final x = (index % 4) * 0.25 + 0.125;
-              final y = (index ~/ 4) * 0.33 + 0.16;
+              final particleOffset = _particlesAnimation.value * 2 * math.pi;
+              final x = (index % 5) * 0.2 + 0.1;
+              final y = (index ~/ 5) * 0.25 + 0.1;
+              final size = 40 + (index % 4) * 15;
+              final opacity =
+                  (0.1 + (index % 3) * 0.05) * _pulseAnimation.value;
+
               return Positioned(
-                left: MediaQuery.of(context).size.width * x + 
-                      30 * math.sin(offset + index * 0.7),
-                top: MediaQuery.of(context).size.height * y + 
-                     25 * math.cos(offset + index * 0.5),
+                left:
+                    MediaQuery.of(context).size.width * x +
+                    40 * math.sin(offset + index * 0.8),
+                top:
+                    MediaQuery.of(context).size.height * y +
+                    35 * math.cos(particleOffset + index * 0.6),
+                child: Transform.scale(
+                  scale: 0.8 + 0.4 * math.sin(offset + index),
+                  child: Container(
+                    width: size.toDouble(),
+                    height: size.toDouble(),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          Colors.white.withValues(alpha: opacity),
+                          AppTheme.accentColor.withValues(alpha: opacity * 0.7),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+
+            // Flowing particles
+            ...List.generate(15, (index) {
+              final particleProgress =
+                  (_particlesAnimation.value + index * 0.1) % 1.0;
+              final x = particleProgress;
+              final y =
+                  0.1 +
+                  (index % 3) * 0.3 +
+                  0.1 * math.sin(particleProgress * 2 * math.pi);
+
+              return Positioned(
+                left: MediaQuery.of(context).size.width * x,
+                top: MediaQuery.of(context).size.height * y,
                 child: Container(
-                  width: 60 + (index % 3) * 20,
-                  height: 60 + (index % 3) * 20,
+                  width: 8 + (index % 3) * 4,
+                  height: 8 + (index % 3) * 4,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        AppTheme.accentColor.withValues(alpha: 0.15),
-                        AppTheme.accentColor.withValues(alpha: 0.08),
-                        Colors.transparent,
-                      ],
+                    color: Colors.white.withValues(
+                      alpha: 0.3 * (1 - particleProgress),
                     ),
                   ),
                 ),
               );
             }),
           ],
-        );
-      },
-    );
-  }
-
-  Widget _buildLogo() {
-    return AnimatedBuilder(
-      animation: _scaleAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _scaleAnimation.value,
-          child: FadeTransition(
-            opacity: _opacityAnimation,
-            child: AnimatedBuilder(
-              animation: _pulseAnimation,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: _pulseAnimation.value,
-                  child: Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: AppTheme.primaryGradient,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.accentColor.withValues(alpha: 0.4),
-                          blurRadius: 30,
-                          spreadRadius: 5,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.emoji_emotions_outlined,
-                      size: 60,
-                      color: Colors.white,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
         );
       },
     );
@@ -226,21 +270,13 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
             opacity: _opacityAnimation,
             child: Column(
               children: [
-                const Text(
-                  'Hoş Geldin! 👋',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Krep Bankası\'na giriş yap ve\nutanç verici anlarını paylaş!',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white.withValues(alpha: 0.8),
+                // Logo
+                Container(
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    width: MediaQuery.of(context).size.width * 0.75,
+                    height: MediaQuery.of(context).size.width * 0.75,
+                    fit: BoxFit.cover,
                   ),
                 ),
               ],
@@ -248,82 +284,6 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
           ),
         );
       },
-    );
-  }
-
-  Widget _buildLoginTypeSelector() {
-    return AnimatedBuilder(
-      animation: _scaleAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _scaleAnimation.value,
-          child: FadeTransition(
-            opacity: _opacityAnimation,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: Colors.white.withValues(alpha: 0.1),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  width: 1,
-                ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Row(
-                    children: [
-                      _buildLoginTypeTab('Email', 'email', Icons.email_outlined),
-                      _buildLoginTypeTab('Telefon', 'phone', Icons.phone_outlined),
-                      _buildLoginTypeTab('Sosyal', 'social', Icons.share_outlined),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildLoginTypeTab(String title, String type, IconData icon) {
-    final isSelected = _selectedLoginType == type;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedLoginType = type),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            color: isSelected 
-                ? AppTheme.accentColor.withValues(alpha: 0.8)
-                : Colors.transparent,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                color: Colors.white,
-                size: 18,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -336,64 +296,129 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
           child: FadeTransition(
             opacity: _opacityAnimation,
             child: Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                color: Colors.white.withValues(alpha: 0.1),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  width: 1,
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.25),
+                    Colors.white.withValues(alpha: 0.1),
+                    Colors.white.withValues(alpha: 0.05),
+                  ],
                 ),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                  BoxShadow(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(16),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Column(
-                    children: [
-                      _buildTextField(
-                        controller: _usernameController,
-                        label: _getFieldLabel(),
-                        hint: _getFieldHint(),
-                        icon: _getFieldIcon(),
-                        keyboardType: _selectedLoginType == 'phone' 
-                            ? TextInputType.phone 
-                            : TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 20),
-                      _buildTextField(
-                        controller: _passwordController,
-                        label: 'Şifre',
-                        hint: 'Şifrenizi girin',
-                        icon: Icons.lock_outline,
-                        obscureText: _obscurePassword,
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword 
-                                ? Icons.visibility_off_outlined 
-                                : Icons.visibility_outlined,
-                            color: Colors.white.withValues(alpha: 0.7),
+                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: MediaQuery.of(context).size.width * 0.05,
+                      vertical: MediaQuery.of(context).size.height * 0.03,
+                    ),
+                    child: Column(
+                      children: [
+                        // Ad Soyad alanı (sadece kayıt modunda)
+                        if (!_isLoginMode) ...[
+                          _buildTextField(
+                            controller: _fullNameController,
+                            label: 'Ad Soyad',
+                            hint: 'Adınız ve soyadınız',
+                            icon: Icons.person_outline,
                           ),
-                          onPressed: () {
-                            setState(() => _obscurePassword = !_obscurePassword);
-                          },
+                          SizedBox(height: MediaQuery.of(context).size.height * 0.025),
+                        ],
+                        _buildTextField(
+                          controller: _usernameController,
+                          label: 'Kullanıcı Adı',
+                          hint: 'Kullanıcı adı',
+                          icon: Icons.person_outline,
+                          keyboardType: TextInputType.text,
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () {},
-                          child: Text(
-                            'Şifremi Unuttum',
-                            style: TextStyle(
-                              color: AppTheme.accentColor,
-                              fontWeight: FontWeight.w600,
+                        SizedBox(height: MediaQuery.of(context).size.height * 0.025),
+                        _buildTextField(
+                          controller: _passwordController,
+                          label: 'Şifre',
+                          hint: _isLoginMode
+                              ? 'Şifrenizi girin'
+                              : 'En az 6 karakter',
+                          icon: Icons.lock_outline,
+                          obscureText: _obscurePassword,
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: Colors.white.withValues(alpha: 0.7),
+                            ),
+                            onPressed: () {
+                              setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              );
+                            },
+                          ),
+                        ),
+                        // Şifre tekrar alanı (sadece kayıt modunda)
+                        if (!_isLoginMode) ...[
+                          const SizedBox(height: 20),
+                          _buildTextField(
+                            controller: _confirmPasswordController,
+                            label: 'Şifre Tekrar',
+                            hint: 'Şifrenizi tekrar girin',
+                            icon: Icons.lock_outline,
+                            obscureText: _obscureConfirmPassword,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureConfirmPassword
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                                color: Colors.white.withValues(alpha: 0.7),
+                              ),
+                              onPressed: () {
+                                setState(
+                                  () => _obscureConfirmPassword =
+                                      !_obscureConfirmPassword,
+                                );
+                              },
                             ),
                           ),
-                        ),
-                      ),
-                    ],
+                        ],
+                        const SizedBox(height: 16),
+                        // Şifremi Unuttum butonu (sadece giriş modunda)
+                        if (_isLoginMode)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () {},
+                              child: Text(
+                                'Şifremi Unuttum',
+                                style: TextStyle(
+                                  color: AppTheme.accentColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -414,14 +439,24 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
     TextInputType? keyboardType,
   }) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
+        Padding(
+          padding: const EdgeInsets.only(left: 12),
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 15,
+              shadows: [
+                Shadow(
+                  color: Colors.black26,
+                  offset: Offset(0, 1),
+                  blurRadius: 2,
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 8),
@@ -429,37 +464,43 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
           controller: controller,
           obscureText: obscureText,
           keyboardType: keyboardType,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
-            ),
-            prefixIcon: Icon(
-              icon,
               color: Colors.white.withValues(alpha: 0.7),
+              fontSize: 15,
+            ),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 16),
+              child: Icon(icon, color: Colors.white.withValues(alpha: 0.7)),
             ),
             suffixIcon: suffixIcon,
             filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.1),
+            fillColor: Colors.white.withValues(alpha: 0.15),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: MediaQuery.of(context).size.width * 0.05,
+              vertical: MediaQuery.of(context).size.height * 0.022,
+            ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withValues(alpha: 0.3),
               ),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withValues(alpha: 0.3),
               ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: AppTheme.accentColor,
-                width: 2,
-              ),
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppTheme.accentColor, width: 2),
             ),
           ),
         ),
@@ -475,42 +516,66 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
           scale: _scaleAnimation.value,
           child: FadeTransition(
             opacity: _opacityAnimation,
-            child: SizedBox(
+            child: Container(
               width: double.infinity,
-              height: 56,
+              height: 60,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppTheme.accentColor,
+                    AppTheme.accentColor.withValues(alpha: 0.8),
+                    AppTheme.primaryColor.withValues(alpha: 0.9),
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.accentColor.withValues(alpha: 0.4),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                    spreadRadius: 2,
+                  ),
+                  BoxShadow(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _handleLogin,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accentColor,
+                  backgroundColor: Colors.transparent,
                   foregroundColor: Colors.white,
+                  shadowColor: Colors.transparent,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   elevation: 0,
-                  shadowColor: AppTheme.accentColor.withValues(alpha: 0.3),
                 ),
                 child: _isLoading
                     ? const SizedBox(
-                        width: 24,
-                        height: 24,
+                        width: 28,
+                        height: 28,
                         child: CircularProgressIndicator(
                           color: Colors.white,
-                          strokeWidth: 2,
+                          strokeWidth: 3,
                         ),
                       )
                     : Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            _getLoginIcon(),
-                            size: 24,
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'Giriş Yap',
-                            style: TextStyle(
-                              fontSize: 18,
+                          const Icon(Icons.login, size: 26),
+                          const SizedBox(width: 14),
+                          Text(
+                            _isLoginMode ? 'Giriş Yap' : 'Kayıt Ol',
+                            style: const TextStyle(
+                              fontSize: 20,
                               fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ],
@@ -597,48 +662,80 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
     Color color,
     VoidCallback onPressed,
   ) {
-    return Container(
-      width: 80,
-      height: 56,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: Colors.white.withValues(alpha: 0.1),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onPressed,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    icon,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: 0.95 + 0.05 * _pulseAnimation.value,
+          child: Container(
+            width: 85,
+            height: 65,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: 0.2),
+                  Colors.white.withValues(alpha: 0.1),
+                  color.withValues(alpha: 0.1),
+                ],
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.3),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.2),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: onPressed,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withValues(alpha: 0.2),
+                          ),
+                          child: Icon(icon, color: Colors.white, size: 22),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -654,18 +751,26 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Hesabın yok mu? ',
+                  _isLoginMode ? 'Hesabın yok mu? ' : 'Zaten hesabın var mı? ',
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.7),
                     fontSize: 16,
                   ),
                 ),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    setState(() {
+                      _isLoginMode = !_isLoginMode;
+                      _usernameController.clear();
+                      _passwordController.clear();
+                      _confirmPasswordController.clear();
+                      _fullNameController.clear();
+                    });
+                  },
                   child: Text(
-                    'Kayıt Ol',
-                    style: TextStyle(
-                      color: AppTheme.accentColor,
+                    _isLoginMode ? 'Kayıt Ol' : 'Giriş Yap',
+                    style: const TextStyle(
+                      color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -679,71 +784,112 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
     );
   }
 
-  String _getFieldLabel() {
-    switch (_selectedLoginType) {
-      case 'email':
-        return 'E-posta';
-      case 'phone':
-        return 'Telefon Numarası';
-      case 'social':
-        return 'Kullanıcı Adı';
-      default:
-        return 'E-posta';
-    }
-  }
-
-  String _getFieldHint() {
-    switch (_selectedLoginType) {
-      case 'email':
-        return 'ornek@email.com';
-      case 'phone':
-        return '+90 555 123 45 67';
-      case 'social':
-        return '@kullaniciadi';
-      default:
-        return 'ornek@email.com';
-    }
-  }
-
-  IconData _getFieldIcon() {
-    switch (_selectedLoginType) {
-      case 'email':
-        return Icons.email_outlined;
-      case 'phone':
-        return Icons.phone_outlined;
-      case 'social':
-        return Icons.alternate_email;
-      default:
-        return Icons.email_outlined;
-    }
-  }
-
-  IconData _getLoginIcon() {
-    switch (_selectedLoginType) {
-      case 'email':
-        return Icons.login;
-      case 'phone':
-        return Icons.sms;
-      case 'social':
-        return Icons.connect_without_contact;
-      default:
-        return Icons.login;
-    }
-  }
-
   void _handleLogin() async {
-    setState(() => _isLoading = true);
-    
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
-    
-    setState(() => _isLoading = false);
-    
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MainNavigation()),
-      );
+    // Alanların dolu olup olmadığını kontrol et
+    if (_usernameController.text.trim().isEmpty ||
+        _passwordController.text.trim().isEmpty) {
+      _showError('Lütfen tüm alanları doldurun');
+      return;
     }
+
+    // Kayıt modunda ek kontroller
+    if (!_isLoginMode) {
+      if (_fullNameController.text.trim().isEmpty) {
+        _showError('Lütfen ad soyad alanını doldurun');
+        return;
+      }
+
+      if (_passwordController.text.length < 6) {
+        _showError('Şifre en az 6 karakter olmalıdır');
+        return;
+      }
+
+      if (_passwordController.text != _confirmPasswordController.text) {
+        _showError('Şifreler eşleşmiyor');
+        return;
+      }
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      bool success = false;
+
+      if (_isLoginMode) {
+        // Giriş yap
+        success = await UserService.instance.login(
+          _usernameController.text.trim(),
+          _passwordController.text.trim(),
+        );
+
+        if (!success) {
+          _showError('Kullanıcı adı veya şifre hatalı!');
+        }
+      } else {
+        // Kayıt ol
+        success = await UserService.instance.register(
+          _usernameController.text.trim(),
+          _passwordController.text.trim(),
+          fullName: _fullNameController.text.trim(),
+        );
+
+        if (!success) {
+          _showError('Bu kullanıcı adı zaten alınmış!');
+        } else {
+          _showSuccess('Hesabınız başarıyla oluşturuldu!');
+        }
+      }
+
+      // Firebase Auth state changes otomatik olarak kullanıcıyı yönlendirecek
+      // Navigator işlemi main.dart'taki StreamBuilder tarafından halledilecek
+    } catch (e) {
+      _showError('Bir hata oluştu: $e');
+    }
+
+    setState(() => _isLoading = false);
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Widget _buildStaggeredItem(Widget child, int index) {
+    return AnimatedBuilder(
+      animation: _staggerAnimation,
+      builder: (context, _) {
+        final itemDelay = index * 0.1;
+        final animProgress = (_staggerAnimation.value - itemDelay).clamp(
+          0.0,
+          1.0,
+        );
+
+        return Transform.translate(
+          offset: Offset(0, _slideAnimation.value * (1 - animProgress)),
+          child: Opacity(
+            opacity: animProgress,
+            child: Transform.scale(
+              scale: 0.5 + 0.5 * animProgress,
+              child: child,
+            ),
+          ),
+        );
+      },
+    );
   }
 }

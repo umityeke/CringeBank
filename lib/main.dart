@@ -6,6 +6,7 @@ import 'services/advanced_ai_service.dart';
 import 'services/cringe_notification_service.dart';
 import 'services/competition_service.dart';
 import 'services/cringe_search_service.dart';
+import 'services/user_service.dart';
 
 import 'screens/modern_login_screen.dart';
 import 'screens/main_navigation.dart';
@@ -25,17 +26,18 @@ void main() async {
   CringeNotificationService.initialize();
   CompetitionService.initialize();
   CringeSearchService.initialize();
+  await UserService.instance.initialize();
 
-  runApp(const CringeBankasiApp());
+  runApp(const CringeBankApp());
 }
 
-class CringeBankasiApp extends StatelessWidget {
-  const CringeBankasiApp({super.key});
+class CringeBankApp extends StatelessWidget {
+  const CringeBankApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Cringe Bankası',
+      title: 'CringeBank',
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
       home: StreamBuilder<User?>(

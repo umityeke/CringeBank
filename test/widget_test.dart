@@ -12,7 +12,7 @@ import 'package:cringe_bankasi/main.dart';
 void main() {
   testWidgets('Cringe Bankası app smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const CringeBankasiApp());
+    await tester.pumpWidget(const CringeBankApp());
 
     // Verify that our app loads with login screen
     expect(find.text('CRINGE BANKASI'), findsOneWidget);

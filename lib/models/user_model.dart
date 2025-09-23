@@ -85,6 +85,53 @@ class User {
     );
   }
 
+  // Firebase Firestore serialization
+  factory User.fromMap(Map<String, dynamic> map) {
+    return User(
+      id: map['id'] ?? '',
+      username: map['username'] ?? '',
+      email: map['email'] ?? '',
+      fullName: map['fullName'] ?? '',
+      avatar: map['avatar'] ?? '👤',
+      bio: map['bio'] ?? '',
+      krepScore: map['krepScore'] ?? 0,
+      krepLevel: map['krepLevel'] ?? 1,
+      followersCount: map['followersCount'] ?? 0,
+      followingCount: map['followingCount'] ?? 0,
+      entriesCount: map['entriesCount'] ?? 0,
+      joinDate: map['joinDate'] != null 
+          ? (map['joinDate'] as dynamic).toDate() 
+          : DateTime.now(),
+      lastActive: map['lastActive'] != null 
+          ? (map['lastActive'] as dynamic).toDate()
+          : DateTime.now(),
+      rozetler: List<String>.from(map['rozetler'] ?? []),
+      isPremium: map['isPremium'] ?? false,
+      isVerified: map['isVerified'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'username': username,
+      'email': email,
+      'fullName': fullName,
+      'avatar': avatar,
+      'bio': bio,
+      'krepScore': krepScore,
+      'krepLevel': krepLevel,
+      'followersCount': followersCount,
+      'followingCount': followingCount,
+      'entriesCount': entriesCount,
+      'joinDate': joinDate,
+      'lastActive': lastActive,
+      'rozetler': rozetler,
+      'isPremium': isPremium,
+      'isVerified': isVerified,
+    };
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

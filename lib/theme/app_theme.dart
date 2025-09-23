@@ -7,15 +7,15 @@ class AppTheme {
   static const Color warningColor = Color(0xFFFBBC04); // Google Yellow
 
   // Neutral Colors
-  static const Color backgroundColor = Color(0xFFFAFAFA);
-  static const Color surfaceColor = Color(0xFFFFFFFF);
-  static const Color cardColor = Color(0xFFFFFFFF);
-  static const Color dividerColor = Color(0xFFE5E5E5);
+  static const Color backgroundColor = Color(0xFF000000); // Siyah arkaplan
+  static const Color surfaceColor = Color(0xFF1A1A1A); // Koyu gri yüzey
+  static const Color cardColor = Color(0xFF2A2A2A); // Koyu gri kartlar
+  static const Color dividerColor = Color(0xFF404040);
 
   // Text Colors
-  static const Color textPrimary = Color(0xFF202124);
-  static const Color textSecondary = Color(0xFF5F6368);
-  static const Color textTertiary = Color(0xFF9AA0A6);
+  static const Color textPrimary = Color(0xFFFFFFFF); // Beyaz text
+  static const Color textSecondary = Color(0xFFBBBBBB); // Açık gri text
+  static const Color textTertiary = Color(0xFF888888); // Orta gri text
 
   // Brand Colors
   static const Color cringeRed = Color(0xFFFF4444);
@@ -84,7 +84,7 @@ class AppTheme {
 
       // AppBar Theme
       appBarTheme: const AppBarTheme(
-        backgroundColor: surfaceColor,
+        backgroundColor: Color.fromARGB(255, 43, 41, 41),
         foregroundColor: textPrimary,
         elevation: 0,
         scrolledUnderElevation: 1,
@@ -100,7 +100,12 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: cardColor,
         elevation: 0,
-        shadowColor: Colors.black.withValues(alpha: 0.08),
+        shadowColor: const Color.fromARGB(
+          255,
+          31,
+          29,
+          29,
+        ).withValues(alpha: 0.08),
         shape: const RoundedRectangleBorder(borderRadius: cardRadius),
       ),
 

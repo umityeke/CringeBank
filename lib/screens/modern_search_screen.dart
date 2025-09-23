@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../services/cringe_search_service.dart';
 import '../models/cringe_entry.dart';
 import '../widgets/modern_cringe_card.dart';
+import '../widgets/animated_bubble_background.dart';
 
 class ModernSearchScreen extends StatefulWidget {
   const ModernSearchScreen({super.key});
@@ -41,14 +42,7 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
     const Color(0xFF00f2fe),
   ];
 
-  final List<String> _trendingSearches = [
-    '🔥 Hocaya anne dedim',
-    '💔 Crush friendzone',
-    '😅 Zoom fail',
-    '🤡 İş görüşmesi',
-    '📱 Instagram story',
-    '🍻 Sarhoş mesaj',
-  ];
+  final List<String> _trendingSearches = [];
 
   @override
   void initState() {
@@ -131,12 +125,16 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: _buildGlassAppBar(),
-      body: Stack(
-        children: [
-          _buildAnimatedBackground(),
-          _buildContent(),
-          if (_showSearchSuggestions) _buildSearchSuggestions(),
-        ],
+      body: AnimatedBubbleBackground(
+        bubbleCount: 20,
+        bubbleColor: const Color(0xFF333333),
+        child: Stack(
+          children: [
+            _buildAnimatedBackground(),
+            _buildContent(),
+            if (_showSearchSuggestions) _buildSearchSuggestions(),
+          ],
+        ),
       ),
     );
   }

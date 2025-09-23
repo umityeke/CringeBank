@@ -56,15 +56,16 @@ class DrUtanmazService {
   ) {
     // Random motivational response seç
     final motivational = (_motivationalResponses..shuffle()).first;
-    
+
     // Random benzer deneyim seç
     final similar = (_similarExperiences..shuffle()).first;
-    
+
     // Kategori bazlı özel tavsiye
     final categoryKey = category.split('.').last;
-    final categoryAdvices = _categoryAdvice[categoryKey] ?? _categoryAdvice['fizikselRezillik']!;
+    final categoryAdvices =
+        _categoryAdvice[categoryKey] ?? _categoryAdvice['fizikselRezillik']!;
     final advice = (categoryAdvices..shuffle()).first;
-    
+
     // Krep seviyesine göre özel mesaj
     String levelResponse;
     if (krepLevel <= 3) {
@@ -76,10 +77,10 @@ class DrUtanmazService {
     } else {
       levelResponse = "Efsane krep! Bu hikayen kitaplarda yer alır 📚";
     }
-    
+
     // Öneriler listesi
     final suggestions = _generateSuggestions(krepLevel, category);
-    
+
     return DrUtanmazResponse(
       motivationalMessage: motivational,
       similarExperience: similar,
@@ -100,7 +101,7 @@ class DrUtanmazService {
     ];
 
     final levelSuggestions = <String>[];
-    
+
     if (krepLevel > 7) {
       levelSuggestions.addAll([
         "🕰️ Zaman geçsin, bu çok büyük gelecek ama geçer",

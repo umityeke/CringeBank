@@ -9,7 +9,8 @@ class TradeScreen extends StatefulWidget {
   State<TradeScreen> createState() => _TradeScreenState();
 }
 
-class _TradeScreenState extends State<TradeScreen> with SingleTickerProviderStateMixin {
+class _TradeScreenState extends State<TradeScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   // Mock data
@@ -137,9 +138,9 @@ class _TradeScreenState extends State<TradeScreen> with SingleTickerProviderStat
         children: [
           Text(
             'Gelen Takas Teklifleri',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
           if (_incomingTrades.isEmpty)
@@ -159,9 +160,9 @@ class _TradeScreenState extends State<TradeScreen> with SingleTickerProviderStat
         children: [
           Text(
             'Gönderilen Takas Teklifleri',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
           if (_outgoingTrades.isEmpty)
@@ -217,9 +218,9 @@ class _TradeScreenState extends State<TradeScreen> with SingleTickerProviderStat
           children: [
             Text(
               'Filtrele',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -227,8 +228,8 @@ class _TradeScreenState extends State<TradeScreen> with SingleTickerProviderStat
               runSpacing: 8,
               children: [
                 _buildFilterChip('Tüm Kategoriler', true),
-                ...CringeCategory.values.map((category) => 
-                  _buildFilterChip(category.displayName, false)
+                ...CringeCategory.values.map(
+                  (category) => _buildFilterChip(category.displayName, false),
                 ),
               ],
             ),
@@ -245,7 +246,9 @@ class _TradeScreenState extends State<TradeScreen> with SingleTickerProviderStat
       onSelected: (selected) {
         // Filtre logic
       },
-      selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+      selectedColor: Theme.of(
+        context,
+      ).colorScheme.primary.withValues(alpha: 0.3),
     );
   }
 
@@ -255,9 +258,9 @@ class _TradeScreenState extends State<TradeScreen> with SingleTickerProviderStat
       children: [
         Text(
           'Takas Edilebilir Krepler',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
         ..._availableCringes.map((cringe) => _buildTradeCringeCard(cringe)),
@@ -286,9 +289,8 @@ class _TradeScreenState extends State<TradeScreen> with SingleTickerProviderStat
                     children: [
                       Text(
                         cringe.baslik,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       Text(
                         cringe.kategori.displayName,
@@ -315,7 +317,9 @@ class _TradeScreenState extends State<TradeScreen> with SingleTickerProviderStat
                       child: Text(
                         '${cringe.krepSeviyesi}',
                         style: TextStyle(
-                          color: cringe.isPremiumCringe ? Colors.black : Colors.white,
+                          color: cringe.isPremiumCringe
+                              ? Colors.black
+                              : Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -347,22 +351,14 @@ class _TradeScreenState extends State<TradeScreen> with SingleTickerProviderStat
               children: [
                 Row(
                   children: [
-                    Icon(
-                      Icons.thumb_up,
-                      size: 16,
-                      color: Colors.grey[600],
-                    ),
+                    Icon(Icons.thumb_up, size: 16, color: Colors.grey[600]),
                     const SizedBox(width: 4),
                     Text(
                       cringe.begeniSayisi.toString(),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(width: 16),
-                    Icon(
-                      Icons.comment,
-                      size: 16,
-                      color: Colors.grey[600],
-                    ),
+                    Icon(Icons.comment, size: 16, color: Colors.grey[600]),
                     const SizedBox(width: 4),
                     Text(
                       cringe.yorumSayisi.toString(),
@@ -413,9 +409,8 @@ class _TradeScreenState extends State<TradeScreen> with SingleTickerProviderStat
                     children: [
                       Text(
                         '@${trade.gonderen}',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       Text(
                         '${DateTime.now().difference(trade.createdAt).inHours} saat önce',
@@ -576,18 +571,16 @@ class _TradeScreenState extends State<TradeScreen> with SingleTickerProviderStat
             const SizedBox(height: 12),
             Text(
               '${DateTime.now().difference(trade.createdAt).inHours} saat önce gönderildi',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey[600],
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
             ),
             const SizedBox(height: 16),
             TextButton.icon(
               onPressed: () => _cancelTrade(trade),
               icon: const Icon(Icons.cancel),
               label: const Text('Teklifi İptal Et'),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.grey[600],
-              ),
+              style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
             ),
           ],
         ),
@@ -600,17 +593,13 @@ class _TradeScreenState extends State<TradeScreen> with SingleTickerProviderStat
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.inbox_outlined,
-            size: 64,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             message,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Colors.grey[600],
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
             textAlign: TextAlign.center,
           ),
         ],
@@ -672,10 +661,10 @@ class _TradeScreenState extends State<TradeScreen> with SingleTickerProviderStat
   }
 
   void _handleTradeResponse(TakasOnerisi trade, bool accept) {
-    final message = accept 
+    final message = accept
         ? 'Takas kabul edildi! Yeni krebin hesabına eklendi.'
         : 'Takas reddedildi.';
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),

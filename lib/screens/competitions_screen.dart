@@ -30,7 +30,10 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Yarışmalar', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Yarışmalar',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
@@ -110,7 +113,7 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
       stream: CompetitionService.competitionsStream,
       builder: (context, snapshot) {
         final activeCompetitions = CompetitionService.getActiveCompetitions();
-        
+
         if (activeCompetitions.isEmpty) {
           return _buildEmptyState(
             icon: Icons.timer_off,
@@ -136,8 +139,9 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
     return StreamBuilder<List<Competition>>(
       stream: CompetitionService.competitionsStream,
       builder: (context, snapshot) {
-        final upcomingCompetitions = CompetitionService.getUpcomingCompetitions();
-        
+        final upcomingCompetitions =
+            CompetitionService.getUpcomingCompetitions();
+
         if (upcomingCompetitions.isEmpty) {
           return _buildEmptyState(
             icon: Icons.event_available,
@@ -166,7 +170,7 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
         final votingCompetitions = CompetitionService.getAllCompetitions()
             .where((c) => c.status == CompetitionStatus.voting)
             .toList();
-        
+
         if (votingCompetitions.isEmpty) {
           return _buildEmptyState(
             icon: Icons.ballot,
@@ -195,7 +199,7 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
         final finishedCompetitions = CompetitionService.getAllCompetitions()
             .where((c) => c.status == CompetitionStatus.results)
             .toList();
-        
+
         if (finishedCompetitions.isEmpty) {
           return _buildEmptyState(
             icon: Icons.military_tech,
@@ -217,7 +221,10 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
     );
   }
 
-  Widget _buildCompetitionCard(Competition competition, {bool isActive = false}) {
+  Widget _buildCompetitionCard(
+    Competition competition, {
+    bool isActive = false,
+  }) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: isActive ? 8 : 4,
@@ -239,7 +246,10 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: _getCompetitionTypeColor(competition.type),
                       borderRadius: BorderRadius.circular(12),
@@ -256,7 +266,10 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
                   if (isActive) ...[
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.red.shade600,
                         borderRadius: BorderRadius.circular(12),
@@ -279,33 +292,33 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               // Title
               Text(
                 competition.title,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              
+
               const SizedBox(height: 8),
-              
+
               // Description
               Text(
                 competition.description,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey.shade700,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700),
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Info row - Wrap ile taşma koruması
               Wrap(
                 spacing: 8,
@@ -318,7 +331,8 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
                   ),
                   _buildInfoChip(
                     icon: Icons.people,
-                    label: '\${competition.entries.length}/\${competition.maxEntries}',
+                    label:
+                        '\${competition.entries.length}/\${competition.maxEntries}',
                     color: Colors.green,
                   ),
                   _buildInfoChip(
@@ -328,9 +342,9 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Action buttons
               Row(
                 children: [
@@ -370,7 +384,7 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
 
   Widget _buildVotingCompetitionCard(Competition competition) {
     final leaderboard = CompetitionService.getLeaderboard(competition.id);
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
@@ -380,31 +394,35 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
           children: [
             Text(
               competition.title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-            
+
             const SizedBox(height: 8),
-            
+
             Text(
               'Oylama \${_formatDate(competition.votingEndDate)} tarihine kadar devam ediyor',
               style: TextStyle(color: Colors.purple.shade700),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Top entries for voting
-            ...leaderboard.take(3).map((entry) => _buildVotingEntryTile(
-              competition.id,
-              entry.key,
-              entry.value,
-            )),
-            
+            ...leaderboard
+                .take(3)
+                .map(
+                  (entry) => _buildVotingEntryTile(
+                    competition.id,
+                    entry.key,
+                    entry.value,
+                  ),
+                ),
+
             const SizedBox(height: 16),
-            
+
             ElevatedButton.icon(
               onPressed: () => _showFullLeaderboard(competition),
               icon: const Icon(Icons.leaderboard),
@@ -423,7 +441,7 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
   Widget _buildResultsCompetitionCard(Competition competition) {
     final leaderboard = CompetitionService.getLeaderboard(competition.id);
     final winner = leaderboard.isNotEmpty ? leaderboard.first : null;
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
@@ -445,9 +463,9 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             if (winner != null) ...[
               Container(
                 padding: const EdgeInsets.all(12),
@@ -488,10 +506,10 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
                   ],
                 ),
               ),
-              
+
               const SizedBox(height: 16),
             ],
-            
+
             ElevatedButton.icon(
               onPressed: () => _showFullLeaderboard(competition),
               icon: const Icon(Icons.leaderboard),
@@ -507,7 +525,11 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
     );
   }
 
-  Widget _buildVotingEntryTile(String competitionId, CringeEntry entry, int votes) {
+  Widget _buildVotingEntryTile(
+    String competitionId,
+    CringeEntry entry,
+    int votes,
+  ) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
@@ -515,11 +537,7 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
           backgroundColor: _getCategoryColor(entry.kategori),
           child: Text(entry.kategori.emoji),
         ),
-        title: Text(
-          entry.baslik,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        title: Text(entry.baslik, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: Text('\$votes oy • Krep: \${entry.krepSeviyesi}/10'),
         trailing: ElevatedButton(
           onPressed: () => _voteForEntry(competitionId, entry.id),
@@ -545,7 +563,7 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 64, color: color.withOpacity(0.5)),
+            Icon(icon, size: 64, color: color.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text(
               title,
@@ -558,9 +576,9 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey.shade600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
             ),
           ],
         ),
@@ -576,9 +594,9 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -665,7 +683,7 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = date.difference(now);
-    
+
     if (difference.isNegative) {
       return 'Sona erdi';
     } else if (difference.inDays > 0) {
@@ -722,7 +740,7 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
 
   void _showFullLeaderboard(Competition competition) {
     final leaderboard = CompetitionService.getLeaderboard(competition.id);
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -735,10 +753,10 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
             itemBuilder: (context, index) {
               final entry = leaderboard[index];
               final position = index + 1;
-              
+
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: position <= 3 
+                  backgroundColor: position <= 3
                       ? [Colors.amber, Colors.grey, Colors.brown][position - 1]
                       : Colors.grey.shade400,
                   child: Text(
@@ -770,8 +788,11 @@ class _CompetitionsScreenState extends State<CompetitionsScreen>
   }
 
   Future<void> _voteForEntry(String competitionId, String entryId) async {
-    final success = await CompetitionService.voteForEntry(competitionId, entryId);
-    
+    final success = await CompetitionService.voteForEntry(
+      competitionId,
+      entryId,
+    );
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

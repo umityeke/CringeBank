@@ -11,11 +11,7 @@ class ClassicCringeLogo extends StatefulWidget {
   final double size;
   final bool animate;
 
-  const ClassicCringeLogo({
-    super.key,
-    this.size = 150,
-    this.animate = true,
-  });
+  const ClassicCringeLogo({super.key, this.size = 150, this.animate = true});
 
   @override
   State<ClassicCringeLogo> createState() => _ClassicCringeLogoState();
@@ -49,29 +45,18 @@ class _ClassicCringeLogoState extends State<ClassicCringeLogo>
       vsync: this,
     )..repeat();
 
-    _pulseAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.05,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
 
-    _blinkAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.1,
-    ).animate(CurvedAnimation(
-      parent: _blinkController,
-      curve: Curves.easeInOut,
-    ));
+    _blinkAnimation = Tween<double>(begin: 1.0, end: 0.1).animate(
+      CurvedAnimation(parent: _blinkController, curve: Curves.easeInOut),
+    );
 
     _sweatAnimation = Tween<double>(
       begin: 0.0,
       end: 20.0,
-    ).animate(CurvedAnimation(
-      parent: _sweatController,
-      curve: Curves.easeIn,
-    ));
+    ).animate(CurvedAnimation(parent: _sweatController, curve: Curves.easeIn));
   }
 
   @override
@@ -113,10 +98,7 @@ class ClassicCringePainter extends CustomPainter {
   final double blinkValue;
   final double sweatOffset;
 
-  ClassicCringePainter({
-    required this.blinkValue,
-    required this.sweatOffset,
-  });
+  ClassicCringePainter({required this.blinkValue, required this.sweatOffset});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -134,7 +116,7 @@ class ClassicCringePainter extends CustomPainter {
 
     // Face shadow
     final shadowPaint = Paint()
-      ..color = Color(0xFFFF4444).withOpacity(0.3)
+      ..color = Color(0xFFFF4444).withValues(alpha: 0.3)
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, 15);
 
     canvas.drawCircle(center.translate(0, 5), radius, shadowPaint);
@@ -149,11 +131,7 @@ class ClassicCringePainter extends CustomPainter {
     final rightEyeCenter = center.translate(radius * 0.25, -radius * 0.15);
 
     canvas.drawOval(
-      Rect.fromCenter(
-        center: leftEyeCenter,
-        width: 8,
-        height: 20 * blinkValue,
-      ),
+      Rect.fromCenter(center: leftEyeCenter, width: 8, height: 20 * blinkValue),
       eyePaint,
     );
 
@@ -187,7 +165,7 @@ class ClassicCringePainter extends CustomPainter {
     // Sweat drops
     if (sweatOffset < 15) {
       final sweatPaint = Paint()
-        ..color = Color(0xFF74B9FF).withOpacity(1 - sweatOffset / 20)
+        ..color = Color(0xFF74B9FF).withValues(alpha: 1 - sweatOffset / 20)
         ..style = PaintingStyle.fill;
 
       final sweatCenter = center.translate(radius * 0.6, -radius * 0.4);
@@ -221,11 +199,7 @@ class SafeCringeLogo extends StatefulWidget {
   final double size;
   final bool animate;
 
-  const SafeCringeLogo({
-    super.key,
-    this.size = 150,
-    this.animate = true,
-  });
+  const SafeCringeLogo({super.key, this.size = 150, this.animate = true});
 
   @override
   State<SafeCringeLogo> createState() => _SafeCringeLogoState();
@@ -261,13 +235,9 @@ class _SafeCringeLogoState extends State<SafeCringeLogo>
       TweenSequenceItem(tween: Tween(begin: 5, end: 0), weight: 2),
     ]).animate(_shakeController);
 
-    _floatAnimation = Tween<double>(
-      begin: 0,
-      end: -10,
-    ).animate(CurvedAnimation(
-      parent: _floatController,
-      curve: Curves.easeInOut,
-    ));
+    _floatAnimation = Tween<double>(begin: 0, end: -10).animate(
+      CurvedAnimation(parent: _floatController, curve: Curves.easeInOut),
+    );
   }
 
   @override
@@ -298,12 +268,12 @@ class _SafeCringeLogoState extends State<SafeCringeLogo>
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 15,
                   offset: Offset(0, 10),
                 ),
                 BoxShadow(
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                   blurRadius: 10,
                   offset: Offset(-5, -5),
                   blurStyle: BlurStyle.inner,
@@ -329,7 +299,7 @@ class _SafeCringeLogoState extends State<SafeCringeLogo>
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.3),
+                          color: Colors.black.withValues(alpha: 0.3),
                           blurRadius: 10,
                         ),
                       ],
@@ -372,11 +342,7 @@ class ModernCBLogo extends StatefulWidget {
   final double size;
   final bool animate;
 
-  const ModernCBLogo({
-    super.key,
-    this.size = 150,
-    this.animate = true,
-  }) ;
+  const ModernCBLogo({super.key, this.size = 150, this.animate = true});
 
   @override
   State<ModernCBLogo> createState() => _ModernCBLogoState();
@@ -405,10 +371,7 @@ class _ModernCBLogoState extends State<ModernCBLogo>
     _lineAnimation = Tween<double>(
       begin: 100.0,
       end: 120.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -467,7 +430,7 @@ class _ModernCBLogoState extends State<ModernCBLogo>
                     borderRadius: BorderRadius.circular(2),
                     boxShadow: [
                       BoxShadow(
-                        color: Color(0xFFFF6B6B).withOpacity(0.5),
+                        color: Color(0xFFFF6B6B).withValues(alpha: 0.5),
                         blurRadius: 10,
                         spreadRadius: 2,
                       ),
@@ -488,11 +451,7 @@ class PiggyBankLogo extends StatefulWidget {
   final double size;
   final bool animate;
 
-  const PiggyBankLogo({
-    super.key,
-    this.size = 150,
-    this.animate = true,
-  }) ;
+  const PiggyBankLogo({super.key, this.size = 150, this.animate = true});
 
   @override
   State<PiggyBankLogo> createState() => _PiggyBankLogoState();
@@ -512,13 +471,9 @@ class _PiggyBankLogoState extends State<PiggyBankLogo>
       vsync: this,
     )..repeat(reverse: true);
 
-    _blushAnimation = Tween<double>(
-      begin: 0.3,
-      end: 0.6,
-    ).animate(CurvedAnimation(
-      parent: _blushController,
-      curve: Curves.easeInOut,
-    ));
+    _blushAnimation = Tween<double>(begin: 0.3, end: 0.6).animate(
+      CurvedAnimation(parent: _blushController, curve: Curves.easeInOut),
+    );
   }
 
   @override
@@ -557,28 +512,34 @@ class PiggyBankPainter extends CustomPainter {
 
     // Body
     final bodyPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFFFFAAAA), Color(0xFFFF7979)],
-      ).createShader(
-        Rect.fromCenter(center: center, width: size.width * 0.7, height: size.height * 0.5),
-      );
+      ..shader =
+          LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFFFAAAA), Color(0xFFFF7979)],
+          ).createShader(
+            Rect.fromCenter(
+              center: center,
+              width: size.width * 0.7,
+              height: size.height * 0.5,
+            ),
+          );
 
     final bodyRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: center, width: size.width * 0.7, height: size.height * 0.5),
+      Rect.fromCenter(
+        center: center,
+        width: size.width * 0.7,
+        height: size.height * 0.5,
+      ),
       Radius.circular(50),
     );
 
     // Shadow
     final shadowPaint = Paint()
-      ..color = Color(0xFFFF7979).withOpacity(0.3)
+      ..color = Color(0xFFFF7979).withValues(alpha: 0.3)
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, 15);
 
-    canvas.drawRRect(
-      bodyRect.shift(Offset(0, 8)),
-      shadowPaint,
-    );
+    canvas.drawRRect(bodyRect.shift(Offset(0, 8)), shadowPaint);
     canvas.drawRRect(bodyRect, bodyPaint);
 
     // Snout
@@ -613,7 +574,7 @@ class PiggyBankPainter extends CustomPainter {
 
     // Blush cheeks
     final blushPaint = Paint()
-      ..color = Colors.red.withOpacity(blushOpacity);
+      ..color = Colors.red.withValues(alpha: blushOpacity);
     canvas.drawCircle(center.translate(-30, 5), 12, blushPaint);
     canvas.drawCircle(center.translate(30, 5), 12, blushPaint);
 
@@ -645,11 +606,7 @@ class EmojiGalaxyLogo extends StatefulWidget {
   final double size;
   final bool animate;
 
-  const EmojiGalaxyLogo({
-    super.key,
-    this.size = 150,
-    this.animate = true,
-  }) ;
+  const EmojiGalaxyLogo({super.key, this.size = 150, this.animate = true});
 
   @override
   State<EmojiGalaxyLogo> createState() => _EmojiGalaxyLogoState();
@@ -728,7 +685,7 @@ class _EmojiGalaxyLogoState extends State<EmojiGalaxyLogo>
                     : delay;
                 final x = math.cos(angle) * widget.size * 0.35;
                 final y = math.sin(angle) * widget.size * 0.35;
-                
+
                 return Transform.translate(
                   offset: Offset(x, y),
                   child: Transform.rotate(
@@ -759,7 +716,7 @@ class CringeBankLogo extends StatelessWidget {
     this.type = LogoType.classic,
     this.size = 150,
     this.animate = true,
-  }) ;
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -778,16 +735,12 @@ class CringeBankLogo extends StatelessWidget {
   }
 }
 
-enum LogoType {
-  classic,
-  safe,
-  modern,
-  piggy,
-  galaxy,
-}
+enum LogoType { classic, safe, modern, piggy, galaxy }
 
 // Kullanım örneği için demo sayfa
 class LogoDemo extends StatelessWidget {
+  const LogoDemo({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -795,10 +748,7 @@ class LogoDemo extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           'Logo Galerisi',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
         ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
@@ -814,10 +764,7 @@ class LogoDemo extends StatelessWidget {
               CringeBankLogo(type: LogoType.classic),
             ),
             SizedBox(height: 20),
-            _buildLogoCard(
-              'Krep Kasası',
-              CringeBankLogo(type: LogoType.safe),
-            ),
+            _buildLogoCard('Krep Kasası', CringeBankLogo(type: LogoType.safe)),
             SizedBox(height: 20),
             _buildLogoCard(
               'Modern Minimal',
@@ -906,6 +853,8 @@ class LogoDemo extends StatelessWidget {
 
 // Splash Screen örneği
 class CringeSplashScreen extends StatefulWidget {
+  const CringeSplashScreen({super.key});
+
   @override
   State<CringeSplashScreen> createState() => _CringeSplashScreenState();
 }
@@ -919,9 +868,7 @@ class _CringeSplashScreenState extends State<CringeSplashScreen> {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (context) => MainNavigation(),
-          ),
+          MaterialPageRoute(builder: (context) => MainNavigation()),
         );
       }
     });
@@ -936,11 +883,7 @@ class _CringeSplashScreenState extends State<CringeSplashScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // Animasyonlu logo
-            CringeBankLogo(
-              type: LogoType.modern,
-              size: 120,
-              animate: true,
-            ),
+            CringeBankLogo(type: LogoType.modern, size: 120, animate: true),
             SizedBox(height: 40),
             // Uygulama adı (Instagram tarzı siyah)
             Text(

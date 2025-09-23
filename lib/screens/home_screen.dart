@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/cringe_entry.dart';
-import '../models/user.dart';
+import '../models/user_model.dart';
 import '../widgets/cringe_logos.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -16,9 +16,10 @@ class _HomeScreenState extends State<HomeScreen> {
     id: '1',
     username: 'KrepLord123',
     email: 'test@example.com',
-    password: 'mock123',
-    utancPuani: 2750,
-    createdAt: DateTime.now().subtract(const Duration(days: 30)),
+    fullName: 'Krep Lord',
+    krepScore: 2750,
+    joinDate: DateTime.now().subtract(const Duration(days: 30)),
+    lastActive: DateTime.now(),
     rozetler: ['İlk Krep', 'Aşk Acısı Uzmanı'],
     isPremium: true,
   );
@@ -31,7 +32,8 @@ class _HomeScreenState extends State<HomeScreen> {
       authorName: 'Mehmet K.',
       authorHandle: '@mehmetk',
       baslik: 'Hocaya "Anne" Dedim',
-      aciklama: 'Matematik dersinde hocaya yanlışlıkla "anne" dedim. Tüm sınıf güldü...',
+      aciklama:
+          'Matematik dersinde hocaya yanlışlıkla "anne" dedim. Tüm sınıf güldü...',
       kategori: CringeCategory.fizikselRezillik,
       krepSeviyesi: 7.5,
       createdAt: DateTime.now().subtract(const Duration(hours: 2)),
@@ -45,7 +47,8 @@ class _HomeScreenState extends State<HomeScreen> {
       authorName: 'Ayşe Y.',
       authorHandle: '@ayseyilmaz',
       baslik: 'Crushımın Sevgilisine Kardeşim Dedim',
-      aciklama: 'Kafede oturuyorduk, o geldi yanımıza. Tanıştırırken "bu da kardeşim" dedi...',
+      aciklama:
+          'Kafede oturuyorduk, o geldi yanımıza. Tanıştırırken "bu da kardeşim" dedi...',
       kategori: CringeCategory.askAcisiKrepligi,
       krepSeviyesi: 9.2,
       createdAt: DateTime.now().subtract(const Duration(hours: 5)),
@@ -59,7 +62,8 @@ class _HomeScreenState extends State<HomeScreen> {
       authorName: 'Can D.',
       authorHandle: '@candemir',
       baslik: 'Zoom\'da Mikrofon Açık Kaldı',
-      aciklama: 'Online derste mikrofon açık kaldı, annemle kavga ettim herkes duydu...',
+      aciklama:
+          'Online derste mikrofon açık kaldı, annemle kavga ettim herkes duydu...',
       kategori: CringeCategory.sosyalMedyaIntihari,
       krepSeviyesi: 6.8,
       createdAt: DateTime.now().subtract(const Duration(days: 1)),
@@ -85,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
               // Instagram tarzı story bar (kullanıcı profili)
               _buildUserProfileHeader(),
               const Divider(height: 1, color: Color(0xFFE0E0E0)),
-              
+
               // Instagram tarzı post feed
               _buildCringeFeed(),
             ],
@@ -102,11 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(
         children: [
           // Profil fotoğrafı yerine logo
-          CringeBankLogo(
-            type: LogoType.classic,
-            size: 35,
-            animate: false,
-          ),
+          CringeBankLogo(type: LogoType.classic, size: 35, animate: false),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -121,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 Text(
-                  '${mockUser.utancPuani} Krep Puanı • ${mockUser.seviye}. Seviye',
+                  '${mockUser.krepScore} Krep Puanı • ${mockUser.krepLevel}. Seviye',
                   style: const TextStyle(
                     fontSize: 12,
                     color: Color(0xFF8E8E8E),
@@ -210,15 +210,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               // Üç nokta menü
-              const Icon(
-                Icons.more_horiz,
-                color: Colors.black,
-                size: 24,
-              ),
+              const Icon(Icons.more_horiz, color: Colors.black, size: 24),
             ],
           ),
         ),
-        
+
         // Post content (cringe hikayesi)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -245,9 +241,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-        
+
         const SizedBox(height: 12),
-        
+
         // Post actions (Instagram tarzı)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -297,7 +293,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-        
+
         // Beğeni sayısı
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -310,20 +306,17 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-        
+
         // Yorum sayısı
         if (cringe.yorumSayisi > 0)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Text(
               '${cringe.yorumSayisi} yorumun tümünü gör',
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF8E8E8E),
-              ),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF8E8E8E)),
             ),
           ),
-        
+
         const SizedBox(height: 8),
         const Divider(height: 1, color: Color(0xFFE0E0E0)),
       ],
@@ -333,7 +326,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _formatTime(DateTime time) {
     final now = DateTime.now();
     final difference = now.difference(time);
-    
+
     if (difference.inMinutes < 1) {
       return 'şimdi';
     } else if (difference.inHours < 1) {

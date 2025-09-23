@@ -40,9 +40,14 @@ dependencies:
   dart_openai: ^5.1.0
   google_generative_ai: ^0.4.3
   
-  # Push Notifications (Firebase geçici olarak devre dışı - web compatibility)
-  # firebase_messaging: ^14.7.10
-  # firebase_core: ^2.24.2
+  # Firebase & Cloud Services
+  firebase_core: ^3.8.0
+  firebase_auth: ^5.3.3
+  cloud_firestore: ^5.5.0
+  firebase_storage: ^12.3.7
+  firebase_messaging: ^15.1.5
+  firebase_analytics: ^11.3.7
+  google_sign_in: ^6.2.1
   flutter_local_notifications: ^16.3.2
   
   # Location Services (for Cringe Radar)

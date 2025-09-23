@@ -12,7 +12,7 @@ class _CringeDepositScreenState extends State<CringeDepositScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  
+
   CringeCategory _selectedCategory = CringeCategory.fizikselRezillik;
   double _krepSeviyesi = 5.0;
   bool _isAnonim = false;
@@ -75,10 +75,7 @@ class _CringeDepositScreenState extends State<CringeDepositScreen> {
           children: [
             const Text(
               '💪 Cesaretin İçin Tebrikler!',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
@@ -98,9 +95,9 @@ class _CringeDepositScreenState extends State<CringeDepositScreen> {
       children: [
         Text(
           'Krep Başlığı',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         TextFormField(
@@ -131,9 +128,9 @@ class _CringeDepositScreenState extends State<CringeDepositScreen> {
       children: [
         Text(
           'Krep Kategorisi',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         Wrap(
@@ -163,10 +160,7 @@ class _CringeDepositScreenState extends State<CringeDepositScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      category.emoji,
-                      style: const TextStyle(fontSize: 16),
-                    ),
+                    Text(category.emoji, style: const TextStyle(fontSize: 16)),
                     const SizedBox(width: 4),
                     Text(
                       category.displayName,
@@ -192,9 +186,9 @@ class _CringeDepositScreenState extends State<CringeDepositScreen> {
       children: [
         Text(
           'Krep Hikayesi',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         TextFormField(
@@ -229,15 +223,12 @@ class _CringeDepositScreenState extends State<CringeDepositScreen> {
           children: [
             Text(
               'Krep Seviyesi',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 6,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: _krepSeviyesi >= 8
                     ? Theme.of(context).colorScheme.secondary
@@ -297,9 +288,9 @@ class _CringeDepositScreenState extends State<CringeDepositScreen> {
                   ),
                   Text(
                     'Kullanıcı adın gizli kalır',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.grey[600],
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -324,9 +315,9 @@ class _CringeDepositScreenState extends State<CringeDepositScreen> {
       children: [
         Text(
           'Önizleme',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         Card(
@@ -344,8 +335,8 @@ class _CringeDepositScreenState extends State<CringeDepositScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        _titleController.text.isEmpty 
-                            ? 'Başlık yazılmadı' 
+                        _titleController.text.isEmpty
+                            ? 'Başlık yazılmadı'
                             : _titleController.text,
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.bold,
@@ -366,7 +357,9 @@ class _CringeDepositScreenState extends State<CringeDepositScreen> {
                       child: Text(
                         _krepSeviyesi.toStringAsFixed(1),
                         style: TextStyle(
-                          color: _krepSeviyesi >= 8 ? Colors.black : Colors.white,
+                          color: _krepSeviyesi >= 8
+                              ? Colors.black
+                              : Colors.white,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),
@@ -518,14 +511,20 @@ class _CringeDepositScreenState extends State<CringeDepositScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('📝 İpuçları:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                '📝 İpuçları:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               SizedBox(height: 8),
               Text('• Dürüst ol ve gerçek bir deneyim paylaş'),
               Text('• Diğer insanları incitmeyecek şekilde anlat'),
               Text('• Detaylı hikaye daha çok beğeni alır'),
               Text('• Yüksek krep seviyesi daha çok puan verir'),
               SizedBox(height: 12),
-              Text('🎭 Anonim Mod:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                '🎭 Anonim Mod:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               SizedBox(height: 8),
               Text('• Kullanıcı adın gizlenir'),
               Text('• Sadece şehir ve yaş gösterilir'),

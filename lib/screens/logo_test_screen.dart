@@ -3,7 +3,7 @@ import '../widgets/cringe_logos.dart';
 
 class LogoTestScreen extends StatefulWidget {
   const LogoTestScreen({super.key});
-  
+
   @override
   State<LogoTestScreen> createState() => _LogoTestScreenState();
 }
@@ -20,10 +20,7 @@ class _LogoTestScreenState extends State<LogoTestScreen> {
       appBar: AppBar(
         title: Text(
           'Logo Test Alanı',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
         ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
@@ -43,7 +40,7 @@ class _LogoTestScreenState extends State<LogoTestScreen> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 20,
                     offset: Offset(0, 10),
                   ),
@@ -57,9 +54,9 @@ class _LogoTestScreenState extends State<LogoTestScreen> {
                 ),
               ),
             ),
-            
+
             SizedBox(height: 30),
-            
+
             // Kontroller
             Card(
               child: Padding(
@@ -75,9 +72,12 @@ class _LogoTestScreenState extends State<LogoTestScreen> {
                       ),
                     ),
                     SizedBox(height: 15),
-                    
+
                     // Logo Tipi Seçimi
-                    Text('Logo Tipi:', style: TextStyle(fontWeight: FontWeight.w500)),
+                    Text(
+                      'Logo Tipi:',
+                      style: TextStyle(fontWeight: FontWeight.w500),
+                    ),
                     SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
@@ -89,7 +89,7 @@ class _LogoTestScreenState extends State<LogoTestScreen> {
                           LogoType.piggy: 'Kumbara',
                           LogoType.galaxy: 'Galaksi',
                         };
-                        
+
                         return ChoiceChip(
                           label: Text(names[type]!),
                           selected: _selectedType == type,
@@ -103,13 +103,16 @@ class _LogoTestScreenState extends State<LogoTestScreen> {
                         );
                       }).toList(),
                     ),
-                    
+
                     SizedBox(height: 20),
-                    
+
                     // Animasyon Toggle
                     Row(
                       children: [
-                        Text('Animasyon:', style: TextStyle(fontWeight: FontWeight.w500)),
+                        Text(
+                          'Animasyon:',
+                          style: TextStyle(fontWeight: FontWeight.w500),
+                        ),
                         Spacer(),
                         Switch(
                           value: _animate,
@@ -121,11 +124,14 @@ class _LogoTestScreenState extends State<LogoTestScreen> {
                         ),
                       ],
                     ),
-                    
+
                     SizedBox(height: 15),
-                    
+
                     // Boyut Slider
-                    Text('Boyut: ${_size.toInt()}px', style: TextStyle(fontWeight: FontWeight.w500)),
+                    Text(
+                      'Boyut: ${_size.toInt()}px',
+                      style: TextStyle(fontWeight: FontWeight.w500),
+                    ),
                     Slider(
                       value: _size,
                       min: 50,
@@ -142,9 +148,9 @@ class _LogoTestScreenState extends State<LogoTestScreen> {
                 ),
               ),
             ),
-            
+
             SizedBox(height: 20),
-            
+
             // Hızlı Örnekler
             Card(
               child: Padding(
@@ -160,12 +166,22 @@ class _LogoTestScreenState extends State<LogoTestScreen> {
                       ),
                     ),
                     SizedBox(height: 15),
-                    
+
                     Row(
                       children: [
-                        _buildQuickExample('App Bar', LogoType.modern, 30, false),
+                        _buildQuickExample(
+                          'App Bar',
+                          LogoType.modern,
+                          30,
+                          false,
+                        ),
                         SizedBox(width: 15),
-                        _buildQuickExample('Avatar', LogoType.classic, 40, false),
+                        _buildQuickExample(
+                          'Avatar',
+                          LogoType.classic,
+                          40,
+                          false,
+                        ),
                         SizedBox(width: 15),
                         _buildQuickExample('Hero', LogoType.galaxy, 100, true),
                       ],
@@ -174,9 +190,9 @@ class _LogoTestScreenState extends State<LogoTestScreen> {
                 ),
               ),
             ),
-            
+
             SizedBox(height: 20),
-            
+
             // Kod Örneği
             Card(
               child: Padding(
@@ -206,10 +222,7 @@ class _LogoTestScreenState extends State<LogoTestScreen> {
                         '  size: ${_size.toInt()},\n'
                         '  animate: $_animate,\n'
                         ')',
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(fontFamily: 'monospace', fontSize: 14),
                       ),
                     ),
                   ],
@@ -221,8 +234,13 @@ class _LogoTestScreenState extends State<LogoTestScreen> {
       ),
     );
   }
-  
-  Widget _buildQuickExample(String label, LogoType type, double size, bool animate) {
+
+  Widget _buildQuickExample(
+    String label,
+    LogoType type,
+    double size,
+    bool animate,
+  ) {
     return Expanded(
       child: GestureDetector(
         onTap: () {
@@ -238,24 +256,19 @@ class _LogoTestScreenState extends State<LogoTestScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: _selectedType == type ? Colors.purple : Colors.grey.shade300,
+              color: _selectedType == type
+                  ? Colors.purple
+                  : Colors.grey.shade300,
               width: _selectedType == type ? 2 : 1,
             ),
           ),
           child: Column(
             children: [
-              CringeBankLogo(
-                type: type,
-                size: size,
-                animate: animate,
-              ),
+              CringeBankLogo(type: type, size: size, animate: animate),
               SizedBox(height: 8),
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
                 textAlign: TextAlign.center,
               ),
             ],

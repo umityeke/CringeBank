@@ -5,11 +5,7 @@ class CringeCard extends StatelessWidget {
   final CringeEntry entry;
   final VoidCallback? onTap;
 
-  const CringeCard({
-    super.key,
-    required this.entry,
-    this.onTap,
-  });
+  const CringeCard({super.key, required this.entry, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -22,13 +18,13 @@ class CringeCard extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Colors.white.withOpacity(0.1),
-              Colors.white.withOpacity(0.05),
+              Colors.white.withValues(alpha: 0.1),
+              Colors.white.withValues(alpha: 0.05),
             ],
           ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: Colors.white.withOpacity(0.1),
+            color: Colors.white.withValues(alpha: 0.1),
             width: 1,
           ),
         ),
@@ -59,19 +55,16 @@ class CringeCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: _getCategoryColor().withOpacity(0.2),
+            color: _getCategoryColor().withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: _getCategoryColor().withOpacity(0.5),
+              color: _getCategoryColor().withValues(alpha: 0.5),
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                entry.kategori.emoji,
-                style: const TextStyle(fontSize: 12),
-              ),
+              Text(entry.kategori.emoji, style: const TextStyle(fontSize: 12)),
               const SizedBox(width: 4),
               Text(
                 entry.kategori.displayName,
@@ -89,9 +82,7 @@ class CringeCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.amber, Colors.orange],
-              ),
+              gradient: LinearGradient(colors: [Colors.amber, Colors.orange]),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Text(
@@ -114,19 +105,13 @@ class CringeCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: _getKrepGradient(),
-        ),
+        gradient: LinearGradient(colors: _getKrepGradient()),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.local_fire_department,
-            size: 12,
-            color: Colors.white,
-          ),
+          Icon(Icons.local_fire_department, size: 12, color: Colors.white),
           const SizedBox(width: 4),
           Text(
             entry.krepSeviyesi.toStringAsFixed(1),
@@ -158,7 +143,7 @@ class CringeCard extends StatelessWidget {
     return Text(
       entry.aciklama,
       style: TextStyle(
-        color: Colors.white.withOpacity(0.8),
+        color: Colors.white.withValues(alpha: 0.8),
         fontSize: 14,
         height: 1.4,
       ),
@@ -169,7 +154,7 @@ class CringeCard extends StatelessWidget {
 
   Widget _buildTags() {
     if (entry.etiketler.isEmpty) return const SizedBox.shrink();
-    
+
     return Wrap(
       spacing: 6,
       runSpacing: 4,
@@ -177,11 +162,9 @@ class CringeCard extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.purple.withOpacity(0.2),
+            color: Colors.purple.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: Colors.purple.withOpacity(0.3),
-            ),
+            border: Border.all(color: Colors.purple.withValues(alpha: 0.3)),
           ),
           child: Text(
             '#$tag',
@@ -203,13 +186,13 @@ class CringeCard extends StatelessWidget {
           Icon(
             Icons.visibility_off,
             size: 14,
-            color: Colors.white.withOpacity(0.6),
+            color: Colors.white.withValues(alpha: 0.6),
           ),
           const SizedBox(width: 4),
           Text(
             'Anonim',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
               fontSize: 12,
             ),
           ),
@@ -218,13 +201,13 @@ class CringeCard extends StatelessWidget {
         Icon(
           Icons.access_time,
           size: 14,
-          color: Colors.white.withOpacity(0.6),
+          color: Colors.white.withValues(alpha: 0.6),
         ),
         const SizedBox(width: 4),
         Text(
           _formatTimeAgo(entry.createdAt),
           style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
+            color: Colors.white.withValues(alpha: 0.6),
             fontSize: 12,
           ),
         ),
@@ -240,16 +223,12 @@ class CringeCard extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          icon,
-          size: 14,
-          color: Colors.white.withOpacity(0.6),
-        ),
+        Icon(icon, size: 14, color: Colors.white.withValues(alpha: 0.6)),
         const SizedBox(width: 4),
         Text(
           count.toString(),
           style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
+            color: Colors.white.withValues(alpha: 0.6),
             fontSize: 12,
             fontWeight: FontWeight.w500,
           ),

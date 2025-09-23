@@ -6,11 +6,12 @@ import 'package:permission_handler/permission_handler.dart';
 import '../models/cringe_entry.dart';
 
 class CringeNotificationService {
-  static final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  static final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
   static bool _isInitialized = false;
   static Timer? _radarTimer;
   static Timer? _dailyMotivationTimer;
-  
+
   // Bildirim kategorileri
   static const String cringeRadarChannel = 'cringe_radar';
   static const String dailyMotivationChannel = 'daily_motivation';
@@ -22,8 +23,10 @@ class CringeNotificationService {
     if (_isInitialized) return;
 
     // Android initialization
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
+
     // iOS initialization
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -43,9 +46,9 @@ class CringeNotificationService {
 
     await _createNotificationChannels();
     await _requestPermissions();
-    
+
     _isInitialized = true;
-    
+
     // Otomatik servisleri başlat
     _startCringeRadar();
     _startDailyMotivation();
@@ -82,7 +85,9 @@ class CringeNotificationService {
 
     for (final channel in channels) {
       await _notifications
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
           ?.createNotificationChannel(channel);
     }
   }
@@ -91,25 +96,22 @@ class CringeNotificationService {
   static Future<void> _requestPermissions() async {
     // Location permission
     await Permission.location.request();
-    
+
     // Notification permission
     await Permission.notification.request();
-    
+
     // iOS için ek permissions
     await _notifications
-        .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
-        ?.requestPermissions(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
+        .resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin
+        >()
+        ?.requestPermissions(alert: true, badge: true, sound: true);
   }
 
   // Notification tapped handler
   static void _onNotificationTapped(NotificationResponse response) {
-
     // Debug: 'Notification tapped: \$payload'
-    
+
     // TODO: Navigator ile ilgili sayfaya yönlendir
   }
 
@@ -125,16 +127,16 @@ class CringeNotificationService {
     try {
       // Location permission check
       final permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied || 
+      if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
         return;
       }
 
       final position = await Geolocator.getCurrentPosition();
-      
+
       // Mock cringe activity detection (gerçek uygulamada backend API'den alınır)
       final cringeActivities = _generateMockCringeActivities(position);
-      
+
       for (final activity in cringeActivities) {
         await _showCringeRadarNotification(activity);
       }
@@ -143,16 +145,19 @@ class CringeNotificationService {
     }
   }
 
-  static List<CringeRadarActivity> _generateMockCringeActivities(Position position) {
+  static List<CringeRadarActivity> _generateMockCringeActivities(
+    Position position,
+  ) {
     final random = Random();
     final activities = <CringeRadarActivity>[];
-    
+
     // %30 ihtimalle cringe activity tespit et
     if (random.nextDouble() < 0.3) {
       final mockActivities = [
         CringeRadarActivity(
           title: 'Üniversite kantininde büyük rezillik!',
-          description: 'Bir öğrenci tüm kantinin önünde aşk itirafı yaptı ve ret yedi 😬',
+          description:
+              'Bir öğrenci tüm kantinin önünde aşk itirafı yaptı ve ret yedi 😬',
           distance: '${random.nextInt(500) + 50}m',
           category: CringeCategory.askAcisiKrepligi,
           krepLevel: 8.0 + (random.nextDouble() * 2.0),
@@ -166,20 +171,23 @@ class CringeNotificationService {
         ),
         CringeRadarActivity(
           title: 'Kafede utanç verici an!',
-          description: 'Müşteri garsonun adını yanlış söyleyip büyük sıkıntı yaşıyor',
+          description:
+              'Müşteri garsonun adını yanlış söyleyip büyük sıkıntı yaşıyor',
           distance: '${random.nextInt(300) + 30}m',
           category: CringeCategory.fizikselRezillik,
           krepLevel: 6.5 + (random.nextDouble() * 2.0),
         ),
       ];
-      
+
       activities.add(mockActivities[random.nextInt(mockActivities.length)]);
     }
-    
+
     return activities;
   }
 
-  static Future<void> _showCringeRadarNotification(CringeRadarActivity activity) async {
+  static Future<void> _showCringeRadarNotification(
+    CringeRadarActivity activity,
+  ) async {
     const androidDetails = AndroidNotificationDetails(
       cringeRadarChannel,
       '🔍 Cringe Radar',
@@ -214,7 +222,7 @@ class CringeNotificationService {
   // Günlük motivasyon sistemi
   static void _startDailyMotivation() {
     _dailyMotivationTimer?.cancel();
-    
+
     // Her gün saat 09:00'da motivasyon mesajı
     _scheduleDailyNotification(
       hour: 9,
@@ -224,7 +232,7 @@ class CringeNotificationService {
       channel: dailyMotivationChannel,
       payload: 'daily_motivation',
     );
-    
+
     // Akşam 20:00'de terapi hatırlatıcısı
     _scheduleDailyNotification(
       hour: 20,
@@ -246,7 +254,7 @@ class CringeNotificationService {
   }) async {
     final now = DateTime.now();
     var scheduledDate = DateTime(now.year, now.month, now.day, hour, minute);
-    
+
     // Eğer bugünkü saat geçmişse, yarına ayarla
     if (scheduledDate.isBefore(now)) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
@@ -290,7 +298,7 @@ class CringeNotificationService {
       'En büyük cesaret kendini olduğun gibi kabul etmektir 🦋',
       'Bu gün yeni bir başlangıç! 🌅',
     ];
-    
+
     final random = Random();
     return motivations[random.nextInt(motivations.length)];
   }

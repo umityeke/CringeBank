@@ -27,7 +27,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           // Bildirim Ayarları Section
           _buildSectionHeader('📱 Bildirim Ayarları'),
-          
+
           _buildNotificationTile(
             title: '🔍 Cringe Radar',
             subtitle: 'Yakındaki cringe aktiviteleri için bildirimler',
@@ -40,7 +40,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.radar,
             color: Colors.red,
           ),
-          
+
           _buildNotificationTile(
             title: '💖 Günlük Motivasyon',
             subtitle: 'Pozitif mesajlar ve hatırlatmalar',
@@ -53,7 +53,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.favorite,
             color: Colors.pink,
           ),
-          
+
           _buildNotificationTile(
             title: '🏆 Yarışma Bildirimleri',
             subtitle: 'Yeni yarışmalar ve sonuç duyuruları',
@@ -66,7 +66,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.emoji_events,
             color: Colors.amber,
           ),
-          
+
           _buildNotificationTile(
             title: '🧠 Terapi Hatırlatıcısı',
             subtitle: 'Dr. Utanmaz seansı hatırlatmaları',
@@ -79,13 +79,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.psychology,
             color: Colors.purple,
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Test Bildirimi Butonu
           Card(
             child: ListTile(
-              leading: Icon(Icons.notification_add, color: Colors.blue.shade600),
+              leading: Icon(
+                Icons.notification_add,
+                color: Colors.blue.shade600,
+              ),
               title: const Text('Test Bildirimi Gönder'),
               subtitle: const Text('Bildirim sistemini test et'),
               trailing: ElevatedButton(
@@ -98,12 +101,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Uygulama Ayarları Section
           _buildSectionHeader('🎨 Uygulama Ayarları'),
-          
+
           Card(
             child: Column(
               children: [
@@ -131,12 +134,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Hakkında Section
           _buildSectionHeader('ℹ️ Hakkında'),
-          
+
           Card(
             child: Column(
               children: [
@@ -173,9 +176,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Developer Info
           Card(
             color: Colors.purple.shade50,
@@ -183,11 +186,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  Icon(
-                    Icons.code,
-                    size: 48,
-                    color: Colors.purple.shade600,
-                  ),
+                  Icon(Icons.code, size: 48, color: Colors.purple.shade600),
                   const SizedBox(height: 8),
                   Text(
                     '😬 CRINGE BANKASI',
@@ -249,7 +248,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         trailing: Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: color,
+          activeThumbColor: color,
         ),
       ),
     );
@@ -258,7 +257,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _sendTestNotification() async {
     try {
       await CringeNotificationService.sendTestNotification();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

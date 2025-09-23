@@ -48,7 +48,7 @@ class TakasOnerisi {
         orElse: () => TakasStatus.bekliyor,
       ),
       createdAt: DateTime.parse(json['createdAt']),
-      kapatilmaTarihi: json['kapatilmaTarihi'] != null 
+      kapatilmaTarihi: json['kapatilmaTarihi'] != null
           ? DateTime.parse(json['kapatilmaTarihi'])
           : null,
       mesaj: json['mesaj'],

@@ -14,7 +14,8 @@ void main() {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const CringeBankasiApp());
 
-    // Verify that our app loads
-    expect(find.text('😬 CRINGE BANKASI'), findsOneWidget);
+    // Verify that our app loads with login screen
+    expect(find.text('CRINGE BANKASI'), findsOneWidget);
+    expect(find.text('Giriş Yap'), findsOneWidget);
   });
 }

@@ -11,10 +11,11 @@ class SearchScreen extends StatefulWidget {
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMixin {
+class _SearchScreenState extends State<SearchScreen>
+    with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
-  
+
   SearchResult? _searchResult;
   SearchFilter _currentFilter = SearchFilter();
   SearchSortBy _currentSort = SearchSortBy.relevance;
@@ -22,11 +23,11 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
   bool _showFilters = false;
   bool _showSearchSuggestions = false;
   List<String> _currentSuggestions = [];
-  
+
   late AnimationController _filterAnimationController;
   late Animation<double> _filterSlideAnimation;
   late AnimationController _loadingAnimationController;
-  
+
   @override
   void initState() {
     super.initState();
@@ -40,15 +41,14 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
-    _filterSlideAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _filterAnimationController,
-      curve: Curves.easeInOut,
-    ));
-    
+
+    _filterSlideAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _filterAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
     _loadingAnimationController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
@@ -128,7 +128,7 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
       setState(() {
         _isLoading = false;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -146,13 +146,13 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
     setState(() {
       _showFilters = !_showFilters;
     });
-    
+
     if (_showFilters) {
       _filterAnimationController.forward();
     } else {
       _filterAnimationController.reverse();
     }
-    
+
     HapticFeedback.selectionClick();
   }
 
@@ -163,7 +163,7 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
       _currentFilter = SearchFilter();
       _showSearchSuggestions = false;
     });
-    
+
     HapticFeedback.selectionClick();
   }
 
@@ -198,8 +198,10 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
           children: [
             _buildSearchHeader(),
             if (_showFilters) _buildFiltersSection(),
-            if (_showSearchSuggestions) _buildSuggestionsSection()
-            else _buildResultsSection(),
+            if (_showSearchSuggestions)
+              _buildSuggestionsSection()
+            else
+              _buildResultsSection(),
           ],
         ),
       ),
@@ -214,8 +216,8 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF1A237E).withOpacity(0.9),
-            const Color(0xFF3F51B5).withOpacity(0.7),
+            const Color(0xFF1A237E).withValues(alpha: 0.9),
+            const Color(0xFF3F51B5).withValues(alpha: 0.7),
           ],
         ),
         borderRadius: const BorderRadius.only(
@@ -229,7 +231,7 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
             children: [
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: IconButton(
@@ -249,7 +251,7 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
               const Spacer(),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: IconButton(
@@ -273,10 +275,10 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
   Widget _buildSearchBar() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(25),
         border: Border.all(
-          color: Colors.white.withOpacity(0.3),
+          color: Colors.white.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -287,12 +289,12 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
         decoration: InputDecoration(
           hintText: 'Krep avcılığına başla...',
           hintStyle: TextStyle(
-            color: Colors.white.withOpacity(0.7),
+            color: Colors.white.withValues(alpha: 0.7),
             fontSize: 16,
           ),
           prefixIcon: Icon(
             Icons.search,
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha: 0.8),
           ),
           suffixIcon: _searchController.text.isNotEmpty
               ? Row(
@@ -305,7 +307,7 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white.withOpacity(0.8),
+                            Colors.white.withValues(alpha: 0.8),
                           ),
                         ),
                       )
@@ -313,14 +315,14 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
                       IconButton(
                         icon: Icon(
                           Icons.clear,
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                         ),
                         onPressed: _clearSearch,
                       ),
                     IconButton(
                       icon: Icon(
                         Icons.search,
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                       ),
                       onPressed: () => _performSearch(),
                     ),
@@ -340,7 +342,7 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
 
   Widget _buildSearchStats() {
     if (_searchResult == null) return const SizedBox.shrink();
-    
+
     return Container(
       margin: const EdgeInsets.only(top: 12),
       child: Row(
@@ -348,7 +350,7 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
           Text(
             '${_searchResult!.totalCount} sonuç',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               fontSize: 14,
               fontWeight: FontWeight.w500,
             ),
@@ -356,7 +358,7 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
           Text(
             ' • ${_searchResult!.searchDuration.inMilliseconds}ms',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
               fontSize: 12,
             ),
           ),
@@ -365,9 +367,12 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
             GestureDetector(
               onTap: _showSortBottomSheet,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: Row(
@@ -375,14 +380,14 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
                   children: [
                     Icon(
                       Icons.sort,
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                       size: 16,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       _currentSort.displayName,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                         fontSize: 12,
                       ),
                     ),
@@ -403,7 +408,7 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
       ).animate(_filterSlideAnimation),
       child: Container(
         padding: const EdgeInsets.all(16),
-        color: const Color(0xFF1A237E).withOpacity(0.1),
+        color: const Color(0xFF1A237E).withValues(alpha: 0.1),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -450,35 +455,44 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
             return GestureDetector(
               onTap: () {
                 setState(() {
-                  final newCategories = Set<CringeCategory>.from(_currentFilter.categories);
+                  final newCategories = Set<CringeCategory>.from(
+                    _currentFilter.categories,
+                  );
                   if (isSelected) {
                     newCategories.remove(category);
                   } else {
                     newCategories.add(category);
                   }
-                  _currentFilter = _currentFilter.copyWith(categories: newCategories);
+                  _currentFilter = _currentFilter.copyWith(
+                    categories: newCategories,
+                  );
                 });
                 HapticFeedback.selectionClick();
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? Colors.purple.withOpacity(0.8)
-                      : Colors.white.withOpacity(0.1),
+                      ? Colors.purple.withValues(alpha: 0.8)
+                      : Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: isSelected
                         ? Colors.purple
-                        : Colors.white.withOpacity(0.3),
+                        : Colors.white.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Text(
                   '${category.emoji} ${category.displayName}',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.w600
+                        : FontWeight.normal,
                   ),
                 ),
               ),
@@ -515,7 +529,7 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
             (_currentFilter.maxKrepLevel ?? 10.0).toStringAsFixed(0),
           ),
           activeColor: Colors.purple,
-          inactiveColor: Colors.white.withOpacity(0.3),
+          inactiveColor: Colors.white.withValues(alpha: 0.3),
           onChanged: (RangeValues values) {
             setState(() {
               _currentFilter = _currentFilter.copyWith(
@@ -545,27 +559,21 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
         Row(
           children: [
             Expanded(
-              child: _buildDateButton(
-                'Başlangıç',
-                _currentFilter.startDate,
-                (date) {
-                  setState(() {
-                    _currentFilter = _currentFilter.copyWith(startDate: date);
-                  });
-                },
-              ),
+              child: _buildDateButton('Başlangıç', _currentFilter.startDate, (
+                date,
+              ) {
+                setState(() {
+                  _currentFilter = _currentFilter.copyWith(startDate: date);
+                });
+              }),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildDateButton(
-                'Bitiş',
-                _currentFilter.endDate,
-                (date) {
-                  setState(() {
-                    _currentFilter = _currentFilter.copyWith(endDate: date);
-                  });
-                },
-              ),
+              child: _buildDateButton('Bitiş', _currentFilter.endDate, (date) {
+                setState(() {
+                  _currentFilter = _currentFilter.copyWith(endDate: date);
+                });
+              }),
             ),
           ],
         ),
@@ -573,7 +581,11 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
     );
   }
 
-  Widget _buildDateButton(String label, DateTime? date, Function(DateTime?) onDateChanged) {
+  Widget _buildDateButton(
+    String label,
+    DateTime? date,
+    Function(DateTime?) onDateChanged,
+  ) {
     return GestureDetector(
       onTap: () async {
         final selectedDate = await showDatePicker(
@@ -587,11 +599,9 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.3),
-          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -599,15 +609,13 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
                 fontSize: 12,
               ),
             ),
             const SizedBox(height: 4),
             Text(
-              date != null
-                  ? '${date.day}/${date.month}/${date.year}'
-                  : 'Seç',
+              date != null ? '${date.day}/${date.month}/${date.year}' : 'Seç',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 14,
@@ -642,7 +650,9 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
               _currentFilter.onlyAnonymous ?? false,
               (value) {
                 setState(() {
-                  _currentFilter = _currentFilter.copyWith(onlyAnonymous: value);
+                  _currentFilter = _currentFilter.copyWith(
+                    onlyAnonymous: value,
+                  );
                 });
               },
             ),
@@ -661,22 +671,26 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
     );
   }
 
-  Widget _buildToggleFilter(String label, bool value, Function(bool) onChanged) {
+  Widget _buildToggleFilter(
+    String label,
+    bool value,
+    Function(bool) onChanged,
+  ) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Switch(
           value: value,
-          activeColor: Colors.purple,
-          inactiveThumbColor: Colors.white.withOpacity(0.7),
-          inactiveTrackColor: Colors.white.withOpacity(0.3),
+          activeThumbColor: Colors.purple,
+          inactiveThumbColor: Colors.white.withValues(alpha: 0.7),
+          inactiveTrackColor: Colors.white.withValues(alpha: 0.3),
           onChanged: onChanged,
         ),
         const SizedBox(width: 8),
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
+            color: Colors.white.withValues(alpha: 0.9),
             fontSize: 14,
           ),
         ),
@@ -695,14 +709,16 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
               children: [
                 Icon(
                   Icons.lightbulb_outline,
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   size: 20,
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  _searchController.text.isEmpty ? 'Popüler Aramalar' : 'Öneriler',
+                  _searchController.text.isEmpty
+                      ? 'Popüler Aramalar'
+                      : 'Öneriler',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
@@ -721,10 +737,10 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.05),
+                        color: Colors.white.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                         ),
                       ),
                       child: Row(
@@ -733,7 +749,7 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
                             _searchController.text.isEmpty
                                 ? Icons.trending_up
                                 : Icons.search,
-                            color: Colors.white.withOpacity(0.6),
+                            color: Colors.white.withValues(alpha: 0.6),
                             size: 18,
                           ),
                           const SizedBox(width: 12),
@@ -741,14 +757,14 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
                             child: Text(
                               suggestion,
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.9),
+                                color: Colors.white.withValues(alpha: 0.9),
                                 fontSize: 14,
                               ),
                             ),
                           ),
                           Icon(
                             Icons.arrow_forward_ios,
-                            color: Colors.white.withOpacity(0.4),
+                            color: Colors.white.withValues(alpha: 0.4),
                             size: 14,
                           ),
                         ],
@@ -783,7 +799,7 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
               Text(
                 'Krep avında...',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   fontSize: 16,
                 ),
               ),
@@ -802,13 +818,13 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
               Icon(
                 Icons.search,
                 size: 64,
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
               ),
               const SizedBox(height: 16),
               Text(
                 'Arama yapmak için yukarıdaki çubuğu kullan',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 16,
                 ),
                 textAlign: TextAlign.center,
@@ -829,13 +845,13 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
               Icon(
                 Icons.search_off,
                 size: 64,
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
               ),
               const SizedBox(height: 16),
               Text(
                 'Hiç sonuç bulunamadı',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                 ),
@@ -844,7 +860,7 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
               Text(
                 'Farklı kelimeler veya filtreler deneyebilirsin',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 14,
                 ),
                 textAlign: TextAlign.center,
@@ -858,13 +874,13 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        Colors.purple.withOpacity(0.3),
-                        Colors.blue.withOpacity(0.2),
+                        Colors.purple.withValues(alpha: 0.3),
+                        Colors.blue.withValues(alpha: 0.2),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: Colors.purple.withOpacity(0.5),
+                      color: Colors.purple.withValues(alpha: 0.5),
                     ),
                   ),
                   child: Column(
@@ -891,7 +907,7 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
                       Text(
                         _searchResult!.aiSuggestion!,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha: 0.9),
                           fontSize: 14,
                         ),
                       ),
@@ -955,12 +971,16 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
             return ListTile(
               leading: Icon(
                 _getSortIcon(sortBy),
-                color: isSelected ? Colors.purple : Colors.white.withOpacity(0.7),
+                color: isSelected
+                    ? Colors.purple
+                    : Colors.white.withValues(alpha: 0.7),
               ),
               title: Text(
                 sortBy.displayName,
                 style: TextStyle(
-                  color: isSelected ? Colors.purple : Colors.white.withOpacity(0.9),
+                  color: isSelected
+                      ? Colors.purple
+                      : Colors.white.withValues(alpha: 0.9),
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
@@ -975,7 +995,7 @@ class _SearchScreenState extends State<SearchScreen> with TickerProviderStateMix
                 _performSearch();
               },
             );
-          }).toList(),
+          }),
           const SizedBox(height: 20),
         ],
       ),

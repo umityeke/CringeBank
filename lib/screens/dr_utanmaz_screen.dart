@@ -14,13 +14,13 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
-  
+
   DrUtanmazResponse? _currentResponse;
   AITherapyResponse? _aiResponse;
   bool _isThinking = false;
   bool _useAdvancedAI = false;
   String _dailyMotivation = '';
-  
+
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   CringeCategory _selectedCategory = CringeCategory.fizikselRezillik;
@@ -33,15 +33,11 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat(reverse: true);
-    
-    _scaleAnimation = Tween<double>(
-      begin: 0.9,
-      end: 1.1,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
-    
+
+    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.1).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+
     _initializeAI();
     _loadDailyMotivation();
   }
@@ -138,9 +134,9 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
             const SizedBox(height: 8),
             Text(
               'Uzman Krep Terapisti',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.purple.shade600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: Colors.purple.shade600),
             ),
             const SizedBox(height: 12),
             Text(
@@ -150,7 +146,7 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
-            
+
             // Günlük motivasyon
             if (_dailyMotivation.isNotEmpty) ...[
               const SizedBox(height: 16),
@@ -178,30 +174,40 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
                 ),
               ),
             ],
-            
+
             // AI Toggle Switch
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: _useAdvancedAI ? Colors.green.shade100 : Colors.grey.shade100,
+                color: _useAdvancedAI
+                    ? Colors.green.shade100
+                    : Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: _useAdvancedAI ? Colors.green.shade300 : Colors.grey.shade300,
+                  color: _useAdvancedAI
+                      ? Colors.green.shade300
+                      : Colors.grey.shade300,
                 ),
               ),
               child: Row(
                 children: [
                   Icon(
                     _useAdvancedAI ? Icons.smart_toy : Icons.psychology,
-                    color: _useAdvancedAI ? Colors.green.shade600 : Colors.grey.shade600,
+                    color: _useAdvancedAI
+                        ? Colors.green.shade600
+                        : Colors.grey.shade600,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      _useAdvancedAI ? '🔥 Gelişmiş AI Aktif (OpenAI/Gemini)' : '🧠 Temel AI Aktif (Mock)',
+                      _useAdvancedAI
+                          ? '🔥 Gelişmiş AI Aktif (OpenAI/Gemini)'
+                          : '🧠 Temel AI Aktif (Mock)',
                       style: TextStyle(
-                        color: _useAdvancedAI ? Colors.green.shade800 : Colors.grey.shade800,
+                        color: _useAdvancedAI
+                            ? Colors.green.shade800
+                            : Colors.grey.shade800,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -212,19 +218,19 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
                       setState(() {
                         _useAdvancedAI = value;
                       });
-                      
+
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            value 
-                              ? '🔥 Gelişmiş AI aktif edildi! (API key gereklidir)'
-                              : '🧠 Temel AI\'ya geçildi.',
+                            value
+                                ? '🔥 Gelişmiş AI aktif edildi! (API key gereklidir)'
+                                : '🧠 Temel AI\'ya geçildi.',
                           ),
                           backgroundColor: value ? Colors.green : Colors.grey,
                         ),
                       );
                     },
-                    activeColor: Colors.green,
+                    activeThumbColor: Colors.green,
                   ),
                 ],
               ),
@@ -241,12 +247,12 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
       children: [
         Text(
           'Utanç Verici Anını Anlat',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
-        
+
         // Başlık
         TextFormField(
           controller: _titleController,
@@ -258,13 +264,13 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
           ),
         ),
         const SizedBox(height: 16),
-        
+
         // Kategori seçimi
         Text(
           'Kategori',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         Wrap(
@@ -283,7 +289,9 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
                 decoration: BoxDecoration(
                   color: isSelected ? Colors.purple.shade100 : null,
                   border: Border.all(
-                    color: isSelected ? Colors.purple.shade600 : Colors.grey.shade300,
+                    color: isSelected
+                        ? Colors.purple.shade600
+                        : Colors.grey.shade300,
                   ),
                   borderRadius: BorderRadius.circular(20),
                 ),
@@ -306,7 +314,7 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
           }).toList(),
         ),
         const SizedBox(height: 16),
-        
+
         // Açıklama
         TextFormField(
           controller: _descriptionController,
@@ -319,13 +327,13 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
           maxLines: 4,
         ),
         const SizedBox(height: 16),
-        
+
         // Krep seviyesi
         Text(
           'Utanç Seviyesi: ${_krepLevel.toStringAsFixed(1)}/10',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         Slider(
           value: _krepLevel,
@@ -336,7 +344,7 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
           onChanged: (value) => setState(() => _krepLevel = value),
         ),
         const SizedBox(height: 24),
-        
+
         // Terapi başlat butonu
         SizedBox(
           width: double.infinity,
@@ -384,13 +392,14 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
   }
 
   Widget _buildTherapyResponse() {
-    if (_currentResponse == null && _aiResponse == null) return const SizedBox.shrink();
+    if (_currentResponse == null && _aiResponse == null)
+      return const SizedBox.shrink();
 
     // Eğer AI response varsa, onu göster
     if (_aiResponse != null) {
       return _buildAdvancedAIResponse();
     }
-    
+
     // Yoksa eski mock response'ı göster
     if (_currentResponse == null) return const SizedBox.shrink();
 
@@ -404,11 +413,7 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Icon(
-                  Icons.favorite,
-                  color: Colors.green.shade600,
-                  size: 32,
-                ),
+                Icon(Icons.favorite, color: Colors.green.shade600, size: 32),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -416,10 +421,11 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
                     children: [
                       Text(
                         'Terapi Puanı: ${_currentResponse!.therapyScore}/100',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green.shade800,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green.shade800,
+                            ),
                       ),
                       Text(
                         _getTherapyScoreMessage(_currentResponse!.therapyScore),
@@ -435,7 +441,7 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
           ),
         ),
         const SizedBox(height: 16),
-        
+
         // Motivasyon mesajı
         _buildResponseCard(
           '💬 Dr. Utanmaz\'ın Mesajı',
@@ -444,7 +450,7 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
           Colors.blue.shade600,
         ),
         const SizedBox(height: 12),
-        
+
         // Benzer deneyim
         _buildResponseCard(
           '👥 Sen Yalnız Değilsin',
@@ -453,7 +459,7 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
           Colors.orange.shade600,
         ),
         const SizedBox(height: 12),
-        
+
         // Kategori özel tavsiye
         _buildResponseCard(
           '🎯 Özel Tavsiye',
@@ -462,7 +468,7 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
           Colors.purple.shade600,
         ),
         const SizedBox(height: 12),
-        
+
         // Seviye değerlendirmesi
         _buildResponseCard(
           '📊 Seviye Değerlendirmesi',
@@ -471,7 +477,7 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
           Colors.teal.shade600,
         ),
         const SizedBox(height: 16),
-        
+
         // Öneriler
         Card(
           child: Padding(
@@ -486,29 +492,31 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
                   ),
                 ),
                 const SizedBox(height: 12),
-                ..._currentResponse!.suggestions.map((suggestion) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        margin: const EdgeInsets.only(top: 8, right: 12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
-                          shape: BoxShape.circle,
+                ..._currentResponse!.suggestions.map(
+                  (suggestion) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          margin: const EdgeInsets.only(top: 8, right: 12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          suggestion,
-                          style: Theme.of(context).textTheme.bodyMedium,
+                        Expanded(
+                          child: Text(
+                            suggestion,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                )),
+                ),
               ],
             ),
           ),
@@ -517,7 +525,12 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
     );
   }
 
-  Widget _buildResponseCard(String title, String content, Color backgroundColor, Color iconColor) {
+  Widget _buildResponseCard(
+    String title,
+    String content,
+    Color backgroundColor,
+    Color iconColor,
+  ) {
     return Card(
       color: backgroundColor,
       child: Padding(
@@ -536,7 +549,7 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
             Text(
               content,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: iconColor.withOpacity(0.8),
+                color: iconColor.withValues(alpha: 0.8),
               ),
             ),
           ],
@@ -586,10 +599,7 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
           ),
           child: Row(
             children: [
-              Icon(
-                Icons.lightbulb,
-                color: Colors.yellow.shade700,
-              ),
+              Icon(Icons.lightbulb, color: Colors.yellow.shade700),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -610,12 +620,13 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
     if (score >= 90) return 'Mükemmel! Çok iyi hissediyorsun 🌟';
     if (score >= 80) return 'Harika! Kendini çok daha iyi hissediyorsun 😊';
     if (score >= 70) return 'İyi! Biraz rahatladın gibi görünüyor 🙂';
-    if (score >= 60) return 'Fena değil, ama biraz daha çalışmamız gerekiyor 😐';
+    if (score >= 60)
+      return 'Fena değil, ama biraz daha çalışmamız gerekiyor 😐';
     return 'Zor bir durum, ama birlikte üstesinden geleceğiz 💪';
   }
 
   Future<void> _startTherapy() async {
-    if (_titleController.text.trim().isEmpty || 
+    if (_titleController.text.trim().isEmpty ||
         _descriptionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -636,9 +647,10 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
           description: _descriptionController.text,
           category: _selectedCategory,
           krepLevel: _krepLevel,
-          userHistory: 'Geçmiş kullanıcı hikayeleri', // TODO: Gerçek kullanıcı geçmişi
+          userHistory:
+              'Geçmiş kullanıcı hikayeleri', // TODO: Gerçek kullanıcı geçmişi
         );
-        
+
         setState(() {
           _aiResponse = aiResponse;
           _currentResponse = null;
@@ -647,7 +659,7 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
       } else {
         // Eski mock servis
         await Future.delayed(const Duration(seconds: 2));
-        
+
         final response = DrUtanmazService.generateResponse(
           _titleController.text,
           _descriptionController.text,
@@ -679,7 +691,9 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('AI servisi geçici olarak kullanılamıyor. Mock servis kullanılıyor.'),
+            content: Text(
+              'AI servisi geçici olarak kullanılamıyor. Mock servis kullanılıyor.',
+            ),
             backgroundColor: Colors.orange,
           ),
         );
@@ -700,7 +714,7 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
 
   Widget _buildAdvancedAIResponse() {
     if (_aiResponse == null) return const SizedBox.shrink();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -719,7 +733,7 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -753,9 +767,12 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
                 ),
                 if (_aiResponse!.isRealAI)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text(
@@ -771,9 +788,9 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
             ),
           ),
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         // Motivational Message
         _buildAIResponseCard(
           title: '💚 Motivasyon Mesajı',
@@ -783,9 +800,9 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
           borderColor: Colors.pink.shade200,
           iconColor: Colors.pink.shade600,
         ),
-        
+
         const SizedBox(height: 12),
-        
+
         // Psychological Analysis
         _buildAIResponseCard(
           title: '🧠 Psikolojik Analiz',
@@ -795,9 +812,9 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
           borderColor: Colors.blue.shade200,
           iconColor: Colors.blue.shade600,
         ),
-        
+
         const SizedBox(height: 12),
-        
+
         // Similar Experience
         _buildAIResponseCard(
           title: '👥 Benzer Deneyim',
@@ -807,9 +824,9 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
           borderColor: Colors.orange.shade200,
           iconColor: Colors.orange.shade600,
         ),
-        
+
         const SizedBox(height: 12),
-        
+
         // Coping Strategies
         Card(
           color: Colors.green.shade50,
@@ -836,36 +853,38 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
                   ],
                 ),
                 const SizedBox(height: 12),
-                ...(_aiResponse!.copingStrategies.map((strategy) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        margin: const EdgeInsets.only(top: 8, right: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade600,
-                          shape: BoxShape.circle,
+                ...(_aiResponse!.copingStrategies.map(
+                  (strategy) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          margin: const EdgeInsets.only(top: 8, right: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade600,
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          strategy,
-                          style: TextStyle(color: Colors.green.shade800),
+                        Expanded(
+                          child: Text(
+                            strategy,
+                            style: TextStyle(color: Colors.green.shade800),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ))).toList(),
+                )),
               ],
             ),
           ),
         ),
-        
+
         const SizedBox(height: 12),
-        
+
         // Next Steps
         _buildAIResponseCard(
           title: '➡️ Gelecek Adımlar',
@@ -875,9 +894,9 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
           borderColor: Colors.teal.shade200,
           iconColor: Colors.teal.shade600,
         ),
-        
+
         const SizedBox(height: 12),
-        
+
         // Personalized Advice
         _buildAIResponseCard(
           title: '⭐ Kişisel Tavsiye',
@@ -887,9 +906,9 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
           borderColor: Colors.amber.shade200,
           iconColor: Colors.amber.shade600,
         ),
-        
+
         const SizedBox(height: 24),
-        
+
         // Action Buttons
         Row(
           children: [
@@ -968,7 +987,7 @@ class _DrUtanmazScreenState extends State<DrUtanmazScreen>
             Text(
               content,
               style: TextStyle(
-                color: iconColor.withOpacity(0.8),
+                color: iconColor.withValues(alpha: 0.8),
                 height: 1.5,
               ),
             ),

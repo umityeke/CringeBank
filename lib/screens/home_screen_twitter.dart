@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/cringe_entry.dart';
-import '../models/user.dart';
 import '../widgets/cringe_logos.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -11,17 +10,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Mock kullanıcı verisi
-  final User mockUser = User(
-    id: '1',
-    username: 'KrepLord123',
-    email: 'test@example.com',
-    password: 'mock123',
-    utancPuani: 2750,
-    createdAt: DateTime.now().subtract(const Duration(days: 30)),
-    rozetler: ['İlk Krep', 'Aşk Acısı Uzmanı'],
-    isPremium: false, // Twitter'da herkes eşit
-  );
+  // Firebase'den gelecek gerçek kullanıcı verisi
 
   // Twitter tarzı mock cringe posts (herkes eşit)
   final List<CringeEntry> mockCringes = [
@@ -31,7 +20,8 @@ class _HomeScreenState extends State<HomeScreen> {
       authorName: 'Mehmet K.',
       authorHandle: '@mehmetk',
       baslik: 'Hocaya "Anne" Dedim',
-      aciklama: 'Matematik dersinde hocaya yanlışlıkla "anne" dedim. Tüm sınıf güldü ve 5 dakika sürdü gülüşmeler 😬',
+      aciklama:
+          'Matematik dersinde hocaya yanlışlıkla "anne" dedim. Tüm sınıf güldü ve 5 dakika sürdü gülüşmeler 😬',
       kategori: CringeCategory.fizikselRezillik,
       krepSeviyesi: 7.5,
       createdAt: DateTime.now().subtract(const Duration(hours: 2)),
@@ -47,7 +37,8 @@ class _HomeScreenState extends State<HomeScreen> {
       authorName: 'Ayşe Y.',
       authorHandle: '@ayseyilmaz',
       baslik: 'Crushımın Sevgilisine Kardeşim Dedim',
-      aciklama: 'Kafede oturuyorduk, o geldi yanımıza. Tanıştırırken "bu da kardeşim" dedi... Hala utanıyorum bu olaya 💔',
+      aciklama:
+          'Kafede oturuyorduk, o geldi yanımıza. Tanıştırırken "bu da kardeşim" dedi... Hala utanıyorum bu olaya 💔',
       kategori: CringeCategory.askAcisiKrepligi,
       krepSeviyesi: 9.2,
       createdAt: DateTime.now().subtract(const Duration(hours: 5)),
@@ -63,7 +54,8 @@ class _HomeScreenState extends State<HomeScreen> {
       authorName: 'Can D.',
       authorHandle: '@candemir',
       baslik: 'Zoom\'da Mikrofon Açık Kaldı',
-      aciklama: 'Online derste mikrofon açık kaldı, annemle kavga ettim herkes duydu. Hoca bile güldü sonra... 🤦‍♂️',
+      aciklama:
+          'Online derste mikrofon açık kaldı, annemle kavga ettim herkes duydu. Hoca bile güldü sonra... 🤦‍♂️',
       kategori: CringeCategory.sosyalMedyaIntihari,
       krepSeviyesi: 6.8,
       createdAt: DateTime.now().subtract(const Duration(days: 1)),
@@ -71,7 +63,10 @@ class _HomeScreenState extends State<HomeScreen> {
       yorumSayisi: 15,
       retweetSayisi: 7,
       isAnonim: false,
-      imageUrls: ['https://picsum.photos/400/250?random=2', 'https://picsum.photos/400/250?random=3'],
+      imageUrls: [
+        'https://picsum.photos/400/250?random=2',
+        'https://picsum.photos/400/250?random=3',
+      ],
     ),
     CringeEntry(
       id: '4',
@@ -79,7 +74,8 @@ class _HomeScreenState extends State<HomeScreen> {
       authorName: 'Elif S.',
       authorHandle: '@elifsahin',
       baslik: 'Yanlış Kişiye Aşk İtirafı',
-      aciklama: 'WhatsApp\'ta yanlış kişiye "seni seviyorum" yazdım. O da grup arkadaşımızmış... Grup patlak verdi 😭',
+      aciklama:
+          'WhatsApp\'ta yanlış kişiye "seni seviyorum" yazdım. O da grup arkadaşımızmış... Grup patlak verdi 😭',
       kategori: CringeCategory.askAcisiKrepligi,
       krepSeviyesi: 8.9,
       createdAt: DateTime.now().subtract(const Duration(hours: 8)),
@@ -109,7 +105,11 @@ class _HomeScreenState extends State<HomeScreen> {
               elevation: 0,
               title: Row(
                 children: [
-                  CringeBankLogo(type: LogoType.modern, size: 28, animate: false),
+                  CringeBankLogo(
+                    type: LogoType.modern,
+                    size: 28,
+                    animate: false,
+                  ),
                   const SizedBox(width: 8),
                   const Text(
                     'Ana Akış',
@@ -131,21 +131,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-            
+
             // Tweet composer (üstte)
-            SliverToBoxAdapter(
-              child: _buildTweetComposer(),
-            ),
-            
+            SliverToBoxAdapter(child: _buildTweetComposer()),
+
             // Tweets feed
             SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  if (index >= mockCringes.length) return null;
-                  return _buildTwitterStyleTweet(mockCringes[index]);
-                },
-                childCount: mockCringes.length,
-              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                if (index >= mockCringes.length) return null;
+                return _buildTwitterStyleTweet(mockCringes[index]);
+              }, childCount: mockCringes.length),
             ),
           ],
         ),
@@ -168,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
             radius: 20,
             backgroundColor: const Color(0xFFE1E8ED),
             child: Text(
-              mockUser.username[0].toUpperCase(),
+              'U',
               style: const TextStyle(
                 color: Colors.black,
                 fontWeight: FontWeight.w600,
@@ -183,10 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 const Text(
                   'Neler oluyor?',
-                  style: TextStyle(
-                    fontSize: 20,
-                    color: Color(0xFF536471),
-                  ),
+                  style: TextStyle(fontSize: 20, color: Color(0xFF536471)),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -202,7 +194,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Spacer(),
                     // Tweet butonu
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black,
                         borderRadius: BorderRadius.circular(20),
@@ -243,18 +238,18 @@ class _HomeScreenState extends State<HomeScreen> {
               CircleAvatar(
                 radius: 20,
                 backgroundColor: const Color(0xFFE1E8ED),
-                backgroundImage: tweet.authorAvatarUrl != null 
-                  ? NetworkImage(tweet.authorAvatarUrl!) 
-                  : null,
+                backgroundImage: tweet.authorAvatarUrl != null
+                    ? NetworkImage(tweet.authorAvatarUrl!)
+                    : null,
                 child: tweet.authorAvatarUrl == null
-                  ? Text(
-                      tweet.authorName[0].toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    )
-                  : null,
+                    ? Text(
+                        tweet.authorName[0].toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      )
+                    : null,
               ),
               const SizedBox(width: 12),
               // Kullanıcı bilgisi
@@ -299,16 +294,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               // Üç nokta menü
-              Icon(
-                Icons.more_horiz,
-                color: Color(0xFF536471),
-                size: 20,
-              ),
+              Icon(Icons.more_horiz, color: Color(0xFF536471), size: 20),
             ],
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           // Tweet content
           Text(
             '${tweet.baslik}\n\n${tweet.aciklama}',
@@ -318,15 +309,15 @@ class _HomeScreenState extends State<HomeScreen> {
               height: 1.3,
             ),
           ),
-          
+
           // Resimler (varsa)
           if (tweet.imageUrls.isNotEmpty) ...[
             const SizedBox(height: 12),
             _buildImageGrid(tweet.imageUrls),
           ],
-          
+
           const SizedBox(height: 12),
-          
+
           // Tweet actions (Twitter tarzı)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -349,15 +340,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              
+
               // Retweet
               Row(
                 children: [
-                  Icon(
-                    Icons.repeat,
-                    size: 18,
-                    color: Color(0xFF536471),
-                  ),
+                  Icon(Icons.repeat, size: 18, color: Color(0xFF536471)),
                   const SizedBox(width: 4),
                   Text(
                     tweet.retweetSayisi.toString(),
@@ -368,7 +355,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              
+
               // Beğeni
               Row(
                 children: [
@@ -387,14 +374,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              
+
               // Paylaş
-              Icon(
-                Icons.share_outlined,
-                size: 18,
-                color: Color(0xFF536471),
-              ),
-              
+              Icon(Icons.share_outlined, size: 18, color: Color(0xFF536471)),
+
               // Krep seviyesi badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -421,7 +404,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Resim grid'i (Twitter tarzı)
   Widget _buildImageGrid(List<String> imageUrls) {
     if (imageUrls.isEmpty) return const SizedBox.shrink();
-    
+
     if (imageUrls.length == 1) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -435,14 +418,17 @@ class _HomeScreenState extends State<HomeScreen> {
               height: 200,
               color: const Color(0xFFE1E8ED),
               child: const Center(
-                child: Icon(Icons.image_not_supported, color: Color(0xFF536471)),
+                child: Icon(
+                  Icons.image_not_supported,
+                  color: Color(0xFF536471),
+                ),
               ),
             );
           },
         ),
       );
     }
-    
+
     if (imageUrls.length == 2) {
       return Row(
         children: [
@@ -490,9 +476,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       );
     }
-    
+
     // 3+ resim için grid layout
-    return Container(
+    return SizedBox(
       height: 200,
       child: Row(
         children: [
@@ -532,7 +518,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
                           color: const Color(0xFFE1E8ED),
-                          child: const Center(child: Icon(Icons.image_not_supported)),
+                          child: const Center(
+                            child: Icon(Icons.image_not_supported),
+                          ),
                         );
                       },
                     ),
@@ -553,7 +541,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           errorBuilder: (context, error, stackTrace) {
                             return Container(
                               color: const Color(0xFFE1E8ED),
-                              child: const Center(child: Icon(Icons.image_not_supported)),
+                              child: const Center(
+                                child: Icon(Icons.image_not_supported),
+                              ),
                             );
                           },
                         ),
@@ -562,7 +552,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Positioned.fill(
                           child: Container(
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.6),
+                              color: Colors.black.withValues(alpha: 0.6),
                               borderRadius: const BorderRadius.only(
                                 bottomRight: Radius.circular(12),
                               ),
@@ -593,7 +583,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _formatTwitterTime(DateTime time) {
     final now = DateTime.now();
     final difference = now.difference(time);
-    
+
     if (difference.inMinutes < 1) {
       return 'şimdi';
     } else if (difference.inHours < 1) {
@@ -625,18 +615,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('İptal', style: TextStyle(color: Colors.black)),
+                    child: const Text(
+                      'İptal',
+                      style: TextStyle(color: Colors.black),
+                    ),
                   ),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Text(
                       'Krep At',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -649,8 +648,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     radius: 20,
                     backgroundColor: const Color(0xFFE1E8ED),
                     child: Text(
-                      mockUser.username[0].toUpperCase(),
-                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
+                      'U',
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -660,7 +662,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       decoration: InputDecoration(
                         hintText: 'Bugün hangi krep yaşadın?',
                         border: InputBorder.none,
-                        hintStyle: TextStyle(fontSize: 20, color: Color(0xFF536471)),
+                        hintStyle: TextStyle(
+                          fontSize: 20,
+                          color: Color(0xFF536471),
+                        ),
                       ),
                       style: TextStyle(fontSize: 20),
                     ),

@@ -1,22 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'firebase_options.dart';
 import 'services/advanced_ai_service.dart';
 import 'services/cringe_notification_service.dart';
 import 'services/competition_service.dart';
 import 'services/cringe_search_service.dart';
-import 'services/user_service.dart';
-import 'screens/login_screen.dart';
+
+import 'screens/modern_login_screen.dart';
 import 'screens/main_navigation.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   // Flutter binding'i initialize et
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  // Firebase'i initialize et
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   // Servisleri initialize et
   AdvancedAIService.initialize();
-  await CringeNotificationService.initialize();
-  await CompetitionService.initialize();
-  await CringeSearchService.initialize();
-  
+  CringeNotificationService.initialize();
+  CompetitionService.initialize();
+  CringeSearchService.initialize();
+
   runApp(const CringeBankasiApp());
 }
 
@@ -26,52 +35,145 @@ class CringeBankasiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '😬 CRINGE BANKASI',
-      theme: ThemeData(
-        // Instagram tarzı sadece 2 renk: Beyaz zemin + Siyah metin
-        colorScheme: const ColorScheme.light(
-          primary: Color(0xFF000000), // Siyah - Ana renk
-          secondary: Color(0xFF262626), // Koyu gri - İkincil
-          surface: Color(0xFFFFFFFF), // Beyaz - Zemin
-          onPrimary: Color(0xFFFFFFFF), // Beyaz yazı siyah üzerinde
-          onSecondary: Color(0xFFFFFFFF), // Beyaz yazı gri üzerinde
-          onSurface: Color(0xFF000000), // Siyah yazı beyaz üzerinde
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        // AppBar teması
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFFFFFFFF),
-          foregroundColor: Color(0xFF000000),
-          elevation: 0,
-          scrolledUnderElevation: 1,
-        ),
-        // Card teması
-        cardTheme: CardThemeData(
-          color: const Color(0xFFFFFFFF),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: Color(0xFFE0E0E0), width: 1),
+      title: 'Cringe Bankası',
+      theme: AppTheme.lightTheme,
+      debugShowCheckedModeBanner: false,
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const SplashScreen();
+          }
+          
+          if (snapshot.hasData) {
+            return const MainNavigation();
+          } else {
+            return const ModernLoginScreen();
+          }
+        },
+      ),
+      routes: {
+        '/main': (context) => const MainNavigation(),
+        '/login': (context) => const ModernLoginScreen(),
+      },
+    );
+  }
+}
+
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen>
+    with TickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+
+    _scaleAnimation = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.elasticOut,
+    ));
+
+    _opacityAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    ));
+
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppTheme.primaryColor,
+              AppTheme.accentColor,
+            ],
           ),
         ),
-        // Scaffold teması
-        scaffoldBackgroundColor: const Color(0xFFFFFFFF),
-        // BottomNavigationBar teması
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: Color(0xFFFFFFFF),
-          selectedItemColor: Color(0xFF000000),
-          unselectedItemColor: Color(0xFF8E8E8E),
-          elevation: 1,
-          type: BottomNavigationBarType.fixed,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _scaleAnimation.value,
+                    child: FadeTransition(
+                      opacity: _opacityAnimation,
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.emoji_emotions,
+                          size: 80,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 32),
+              FadeTransition(
+                opacity: _opacityAnimation,
+                child: const Text(
+                  'Cringe Bankası',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              FadeTransition(
+                opacity: _opacityAnimation,
+                child: const Text(
+                  'En utanç verici anlarınızın değeri burada',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white70,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      home: UserService.instance.isLoggedIn ? MainNavigation() : LoginScreen(),
-      routes: {
-        '/login': (context) => LoginScreen(),
-        '/main': (context) => MainNavigation(),
-      },
-      debugShowCheckedModeBanner: false,
     );
   }
 }

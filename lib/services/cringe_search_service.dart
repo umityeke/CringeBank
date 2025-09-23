@@ -62,7 +62,7 @@ class SearchFilter {
     );
   }
 
-  bool get isEmpty => 
+  bool get isEmpty =>
       categories.isEmpty &&
       minKrepLevel == null &&
       maxKrepLevel == null &&
@@ -115,10 +115,10 @@ class CringeSearchService {
   // Initialize search service
   static Future<void> initialize() async {
     if (_isInitialized) return;
-    
+
     await _generateMockEntries();
     _generateTrendingTags();
-    
+
     _isInitialized = true;
   }
 
@@ -173,10 +173,34 @@ class CringeSearchService {
 
     final categories = CringeCategory.values;
     final tags = [
-      'okul', 'iş', 'aşk', 'aile', 'sosyal_medya', 'utanç', 'komik', 'epic_fail',
-      'zoom', 'toplantı', 'hata', 'yanlışlık', 'karışıklık', 'eziklik',
-      'arkadaş', 'crush', 'öğretmen', 'patron', 'anne', 'baba', 'restaurant',
-      'telefon', 'mesaj', 'instagram', 'story', 'post', 'like', 'share',
+      'okul',
+      'iş',
+      'aşk',
+      'aile',
+      'sosyal_medya',
+      'utanç',
+      'komik',
+      'epic_fail',
+      'zoom',
+      'toplantı',
+      'hata',
+      'yanlışlık',
+      'karışıklık',
+      'eziklik',
+      'arkadaş',
+      'crush',
+      'öğretmen',
+      'patron',
+      'anne',
+      'baba',
+      'restaurant',
+      'telefon',
+      'mesaj',
+      'instagram',
+      'story',
+      'post',
+      'like',
+      'share',
     ];
 
     for (int i = 0; i < 50; i++) {
@@ -189,10 +213,9 @@ class CringeSearchService {
         aciklama: descriptions[i % descriptions.length],
         kategori: categories[random.nextInt(categories.length)],
         krepSeviyesi: 1.0 + (random.nextDouble() * 9.0), // 1.0-10.0
-        createdAt: DateTime.now().subtract(Duration(
-          days: random.nextInt(365),
-          hours: random.nextInt(24),
-        )),
+        createdAt: DateTime.now().subtract(
+          Duration(days: random.nextInt(365), hours: random.nextInt(24)),
+        ),
         etiketler: List.generate(
           random.nextInt(4) + 1,
           (index) => tags[random.nextInt(tags.length)],
@@ -203,7 +226,7 @@ class CringeSearchService {
 
         borsaDegeri: random.nextBool() ? random.nextDouble() * 1000 : null,
       );
-      
+
       _allEntries.add(entry);
     }
   }
@@ -211,9 +234,19 @@ class CringeSearchService {
   // Generate trending tags
   static void _generateTrendingTags() {
     _trendingTags.addAll([
-      'zoom_fail', 'aşk_acısı', 'okul_rezilligi', 'iş_kazası', 'anne_baba',
-      'sosyal_medya', 'yanlış_mesaj', 'elevator_krizi', 'restaurant_faciası',
-      'crush_drama', 'öğretmen_karışıklığı', 'spor_salonu', 'alışveriş_merkezi',
+      'zoom_fail',
+      'aşk_acısı',
+      'okul_rezilligi',
+      'iş_kazası',
+      'anne_baba',
+      'sosyal_medya',
+      'yanlış_mesaj',
+      'elevator_krizi',
+      'restaurant_faciası',
+      'crush_drama',
+      'öğretmen_karışıklığı',
+      'spor_salonu',
+      'alışveriş_merkezi',
     ]);
   }
 
@@ -226,7 +259,7 @@ class CringeSearchService {
     int limit = 20,
   }) async {
     final startTime = DateTime.now();
-    
+
     // Add to recent searches
     if (query.isNotEmpty && !_recentSearches.contains(query)) {
       _recentSearches.insert(0, query);
@@ -237,11 +270,13 @@ class CringeSearchService {
 
     // Filter entries
     List<CringeEntry> filteredEntries = _allEntries;
-    
+
     // Text search
     if (query.isNotEmpty) {
       filteredEntries = filteredEntries.where((entry) {
-        final searchText = '${entry.baslik} ${entry.aciklama} ${entry.etiketler.join(' ')}'.toLowerCase();
+        final searchText =
+            '${entry.baslik} ${entry.aciklama} ${entry.etiketler.join(' ')}'
+                .toLowerCase();
         return searchText.contains(query.toLowerCase());
       }).toList();
     }
@@ -266,7 +301,7 @@ class CringeSearchService {
     // Generate category distribution
     final categoryDistribution = <CringeCategory, int>{};
     for (final entry in filteredEntries) {
-      categoryDistribution[entry.kategori] = 
+      categoryDistribution[entry.kategori] =
           (categoryDistribution[entry.kategori] ?? 0) + 1;
     }
 
@@ -292,57 +327,60 @@ class CringeSearchService {
   }
 
   // Apply filters to entries
-  static List<CringeEntry> _applyFilters(List<CringeEntry> entries, SearchFilter filter) {
+  static List<CringeEntry> _applyFilters(
+    List<CringeEntry> entries,
+    SearchFilter filter,
+  ) {
     return entries.where((entry) {
       // Category filter
-      if (filter.categories.isNotEmpty && 
+      if (filter.categories.isNotEmpty &&
           !filter.categories.contains(entry.kategori)) {
         return false;
       }
 
       // Krep level filter
-      if (filter.minKrepLevel != null && 
+      if (filter.minKrepLevel != null &&
           entry.krepSeviyesi < filter.minKrepLevel!) {
         return false;
       }
-      if (filter.maxKrepLevel != null && 
+      if (filter.maxKrepLevel != null &&
           entry.krepSeviyesi > filter.maxKrepLevel!) {
         return false;
       }
 
       // Date filter
-      if (filter.startDate != null && 
+      if (filter.startDate != null &&
           entry.createdAt.isBefore(filter.startDate!)) {
         return false;
       }
-      if (filter.endDate != null && 
-          entry.createdAt.isAfter(filter.endDate!)) {
+      if (filter.endDate != null && entry.createdAt.isAfter(filter.endDate!)) {
         return false;
       }
 
       // Anonymous filter
-      if (filter.onlyAnonymous != null && 
+      if (filter.onlyAnonymous != null &&
           entry.isAnonim != filter.onlyAnonymous!) {
         return false;
       }
 
       // Premium filter
-      if (filter.onlyPremium != null && 
+      if (filter.onlyPremium != null &&
           entry.isPremiumCringe != filter.onlyPremium!) {
         return false;
       }
 
       // Likes filter
-      if (filter.minLikes != null && 
-          entry.begeniSayisi < filter.minLikes!) {
+      if (filter.minLikes != null && entry.begeniSayisi < filter.minLikes!) {
         return false;
       }
 
       // Tags filter
       if (filter.tags.isNotEmpty) {
-        final hasMatchingTag = filter.tags.any((tag) => 
-            entry.etiketler.any((entryTag) => 
-                entryTag.toLowerCase().contains(tag.toLowerCase())));
+        final hasMatchingTag = filter.tags.any(
+          (tag) => entry.etiketler.any(
+            (entryTag) => entryTag.toLowerCase().contains(tag.toLowerCase()),
+          ),
+        );
         if (!hasMatchingTag) {
           return false;
         }
@@ -391,7 +429,7 @@ class CringeSearchService {
         'Krep seviyesi filtresi kullan',
         'Son 30 gündeki paylaşımları filtrele',
       ];
-      
+
       final random = Random();
       return mockSuggestions[random.nextInt(mockSuggestions.length)];
     } catch (e) {
@@ -411,13 +449,13 @@ class CringeSearchService {
       'anne': 'aile',
       'baba': 'aile',
     };
-    
+
     for (final entry in generalTerms.entries) {
       if (query.toLowerCase().contains(entry.key)) {
         return entry.value;
       }
     }
-    
+
     return 'utanç';
   }
 
@@ -431,37 +469,37 @@ class CringeSearchService {
       'fail': 'başarısızlık',
       'epic': 'büyük',
     };
-    
+
     for (final entry in synonyms.entries) {
       if (query.toLowerCase().contains(entry.key)) {
         return query.toLowerCase().replaceAll(entry.key, entry.value);
       }
     }
-    
+
     return query;
   }
 
   // Generate related searches
   static List<String> _generateRelatedSearches(String query) {
     if (query.isEmpty) return [];
-    
+
     final related = <String>[];
-    
+
     // Add trending tags that relate to query
     for (final tag in _trendingTags) {
-      if (tag.contains(query.toLowerCase()) || 
+      if (tag.contains(query.toLowerCase()) ||
           query.toLowerCase().contains(tag)) {
         related.add(tag.replaceAll('_', ' '));
       }
     }
-    
+
     // Add category-based suggestions
     for (final category in CringeCategory.values) {
       if (category.displayName.toLowerCase().contains(query.toLowerCase())) {
         related.add(category.displayName);
       }
     }
-    
+
     // Limit to 5 suggestions
     return related.take(5).toList();
   }
@@ -486,36 +524,36 @@ class CringeSearchService {
     if (partialQuery.isEmpty) {
       return getTrendingTags().take(8).toList();
     }
-    
+
     final suggestions = <String>{};
-    
+
     // Add from recent searches
     for (final search in _recentSearches) {
       if (search.toLowerCase().contains(partialQuery.toLowerCase())) {
         suggestions.add(search);
       }
     }
-    
+
     // Add from trending tags
     for (final tag in _trendingTags) {
       if (tag.toLowerCase().contains(partialQuery.toLowerCase())) {
         suggestions.add(tag.replaceAll('_', ' '));
       }
     }
-    
+
     // Add from entry titles and tags
     for (final entry in _allEntries.take(20)) {
       if (entry.baslik.toLowerCase().contains(partialQuery.toLowerCase())) {
         suggestions.add(entry.baslik);
       }
-      
+
       for (final tag in entry.etiketler) {
         if (tag.toLowerCase().contains(partialQuery.toLowerCase())) {
           suggestions.add(tag);
         }
       }
     }
-    
+
     return suggestions.take(8).toList();
   }
 

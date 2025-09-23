@@ -15,7 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
 
   Future<void> _handleAuth() async {
-    if (_usernameController.text.trim().isEmpty || 
+    if (_usernameController.text.trim().isEmpty ||
         _passwordController.text.trim().isEmpty) {
       _showError('Lütfen tüm alanları doldurun');
       return;
@@ -57,19 +57,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.black,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.black),
     );
   }
 
   void _showSuccess(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.green),
     );
   }
 
@@ -117,52 +111,58 @@ class _LoginScreenState extends State<LoginScreen> {
               child: const Text('İptal'),
             ),
             ElevatedButton(
-              onPressed: isLoading ? null : () async {
-                if (usernameController.text.trim().isEmpty || 
-                    newPasswordController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Lütfen tüm alanları doldurun!'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      if (usernameController.text.trim().isEmpty ||
+                          newPasswordController.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Lütfen tüm alanları doldurun!'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
 
-                setState(() => isLoading = true);
+                      setState(() => isLoading = true);
 
-                // Kullanıcı var mı kontrol et
-                if (!UserService.instance.userExists(usernameController.text.trim())) {
-                  setState(() => isLoading = false);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Bu kullanıcı adı bulunamadı!'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
+                      // Kullanıcı var mı kontrol et
+                      if (!UserService.instance.userExists(
+                        usernameController.text.trim(),
+                      )) {
+                        setState(() => isLoading = false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Bu kullanıcı adı bulunamadı!'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
 
-                // Şifre sıfırlama işlemi
-                final success = await UserService.instance.resetPassword(
-                  usernameController.text.trim(),
-                  newPasswordController.text.trim(),
-                );
+                      // Şifre sıfırlama işlemi
+                      final success = await UserService.instance.resetPassword(
+                        usernameController.text.trim(),
+                        newPasswordController.text.trim(),
+                      );
 
-                setState(() => isLoading = false);
+                      setState(() => isLoading = false);
 
-                if (success) {
-                  Navigator.pop(context);
-                  _showSuccess('Şifren başarıyla değiştirildi! Yeni şifrenle giriş yapabilirsin.');
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Şifre sıfırlama işlemi başarısız!'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              },
+                      if (success && mounted) {
+                        Navigator.pop(context);
+                        _showSuccess(
+                          'Şifren başarıyla değiştirildi! Yeni şifrenle giriş yapabilirsin.',
+                        );
+                      } else if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Şifre sıfırlama işlemi başarısız!'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.black,
                 foregroundColor: Colors.white,
@@ -191,164 +191,166 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Logo ve başlık
-              Column(
-                children: [
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: const Icon(
-                      Icons.emoji_emotions_outlined,
-                      size: 60,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'CRINGE BANKASI',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _isLogin ? 'Utanç dolu anlarına hoş geldin' : 'Utanç topluluğuna katıl',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Color(0xFF8E8E8E),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 48),
-              
-              // Form alanları
-              TextField(
-                controller: _usernameController,
-                decoration: InputDecoration(
-                  hintText: 'Kullanıcı adı',
-                  filled: true,
-                  fillColor: const Color(0xFFF5F5F5),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.all(16),
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: InputDecoration(
-                  hintText: 'Şifre',
-                  filled: true,
-                  fillColor: const Color(0xFFF5F5F5),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.all(16),
-                ),
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Giriş/Kayıt butonu
-              ElevatedButton(
-                onPressed: _isLoading ? null : _handleAuth,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.all(16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                child: _isLoading
-                    ? const CircularProgressIndicator(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Logo ve başlık
+                Column(
+                  children: [
+                    Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: const Icon(
+                        Icons.emoji_emotions_outlined,
+                        size: 60,
                         color: Colors.white,
-                        strokeWidth: 2,
-                      )
-                    : Text(
-                        _isLogin ? 'Giriş Yap' : 'Kayıt Ol',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
                       ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Şifremi Unuttum butonu (sadece giriş modunda)
-              if (_isLogin)
-                TextButton(
-                  onPressed: _showForgotPasswordDialog,
-                  child: const Text(
-                    'Şifremi Unuttum?',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF8E8E8E),
-                      decoration: TextDecoration.underline,
                     ),
-                  ),
-                ),
-              
-              const SizedBox(height: 8),
-              
-              // Geçiş butonu
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    _isLogin = !_isLogin;
-                    _usernameController.clear();
-                    _passwordController.clear();
-                  });
-                },
-                child: RichText(
-                  textAlign: TextAlign.center,
-                  text: TextSpan(
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF8E8E8E),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'CRINGE BANKASI',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                        letterSpacing: 1.2,
+                      ),
                     ),
-                    children: [
-                      TextSpan(
-                        text: _isLogin 
-                            ? 'Hesabın yok mu? ' 
-                            : 'Zaten hesabın var mı? ',
+                    const SizedBox(height: 8),
+                    Text(
+                      _isLogin
+                          ? 'Utanç dolu anlarına hoş geldin'
+                          : 'Utanç topluluğuna katıl',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFF8E8E8E),
                       ),
-                      TextSpan(
-                        text: _isLogin ? 'Kayıt Ol' : 'Giriş Yap',
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
-              ),
-              
 
-            ],
+                const SizedBox(height: 48),
+
+                // Form alanları
+                TextField(
+                  controller: _usernameController,
+                  decoration: InputDecoration(
+                    hintText: 'Kullanıcı adı',
+                    filled: true,
+                    fillColor: const Color(0xFFF5F5F5),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.all(16),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                TextField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    hintText: 'Şifre',
+                    filled: true,
+                    fillColor: const Color(0xFFF5F5F5),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.all(16),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Giriş/Kayıt butonu
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _handleAuth,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.all(16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        )
+                      : Text(
+                          _isLogin ? 'Giriş Yap' : 'Kayıt Ol',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Şifremi Unuttum butonu (sadece giriş modunda)
+                if (_isLogin)
+                  TextButton(
+                    onPressed: _showForgotPasswordDialog,
+                    child: const Text(
+                      'Şifremi Unuttum?',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF8E8E8E),
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+
+                const SizedBox(height: 8),
+
+                // Geçiş butonu
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _isLogin = !_isLogin;
+                      _usernameController.clear();
+                      _passwordController.clear();
+                    });
+                  },
+                  child: RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF8E8E8E),
+                      ),
+                      children: [
+                        TextSpan(
+                          text: _isLogin
+                              ? 'Hesabın yok mu? '
+                              : 'Zaten hesabın var mı? ',
+                        ),
+                        TextSpan(
+                          text: _isLogin ? 'Kayıt Ol' : 'Giriş Yap',
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

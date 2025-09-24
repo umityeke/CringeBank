@@ -100,7 +100,7 @@ class BubblePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     for (var bubble in bubbles) {
       final paint = Paint()
-        ..color = bubbleColor.withOpacity(bubble.opacity)
+        ..color = bubbleColor.withValues(alpha: bubble.opacity)
         ..style = PaintingStyle.fill;
 
       // Y pozisyonunu animasyon ile güncelle (yukarı doğru hareket)
@@ -114,7 +114,7 @@ class BubblePainter extends CustomPainter {
 
       // Glow efekti
       final glowPaint = Paint()
-        ..color = bubbleColor.withOpacity(bubble.opacity * 0.1)
+        ..color = bubbleColor.withValues(alpha: bubble.opacity * 0.1)
         ..style = PaintingStyle.fill;
       
       canvas.drawCircle(center, bubble.size * 1.3, glowPaint);

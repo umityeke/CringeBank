@@ -1,1 +1,6 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"cringe-bank","appId":"1:688167942712:android:a6594e59ad424324a5c4cd","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"cringe-bank","configurations":{"android":"1:688167942712:android:a6594e59ad424324a5c4cd","ios":"1:688167942712:ios:59c7041cbfe447a1a5c4cd","macos":"1:688167942712:ios:59c7041cbfe447a1a5c4cd","web":"1:688167942712:web:8947c9f0c89844aea5c4cd","windows":"1:688167942712:web:480a21871f48adbea5c4cd"}}}}}}
+{
+	"firestore": {
+		"rules": "firestore.rules",
+		"indexes": "firestore.indexes.json"
+	}
+}

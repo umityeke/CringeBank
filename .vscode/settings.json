@@ -1,7 +1,25 @@
 {
     "cmake.sourceDirectory": "C:/Users/umit.yeke/CRINGE-BANKASI/CRINGE-BANKASI/linux",
+    "cSpell.language": "en,tr",
     "cSpell.words": [
         "Bankası",
-        "verici"
+        "Cringe",
+        "Krepligi",
+        "Yeke",
+        "Ümit",
+        "begeni",
+        "borsa",
+        "intiharı",
+        "krep",
+        "retweet",
+        "seviyesi",
+        "utanc",
+        "verici",
+        "yorum"
+    ],
+    "cSpell.ignoreWords": [
+        "anonim",
+        "etiketler",
+        "kullanici"
     ]
 }

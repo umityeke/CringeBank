@@ -20,7 +20,7 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
 
   SearchResult? _searchResult;
   SearchFilter _currentFilter = SearchFilter();
-    SearchSortBy _currentSort = SearchSortBy.newest;
+  final SearchSortBy _currentSort = SearchSortBy.newest;
   bool _isLoading = false;
   bool _showFilters = false;
   bool _showSearchSuggestions = false;

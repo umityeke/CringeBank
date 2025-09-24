@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/cringe_entry.dart';
 
 enum SearchSortBy {
@@ -107,9 +108,9 @@ class SearchResult {
 
 class CringeSearchService {
   static bool _isInitialized = false;
+  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Search data
-  static final List<CringeEntry> _allEntries = [];
   static final List<String> _recentSearches = [];
   static final Set<String> _trendingTags = {};
 
@@ -157,8 +158,22 @@ class CringeSearchService {
       }
     }
 
-    // Filter entries - since _allEntries is empty, this will return empty results
-    List<CringeEntry> filteredEntries = _allEntries;
+  final fetchLimit = ((page * limit).clamp(20, 500)).toInt();
+    final fetchedEntries = await _fetchEntriesFromFirestore(limit: fetchLimit);
+
+    if (fetchedEntries.isNotEmpty) {
+      final tags = <String>{};
+      for (final entry in fetchedEntries) {
+        tags.addAll(entry.etiketler.map((tag) => tag.toLowerCase()));
+      }
+      if (tags.isNotEmpty) {
+        _trendingTags
+          ..clear()
+          ..addAll(tags.take(25));
+      }
+    }
+
+    List<CringeEntry> filteredEntries = List.from(fetchedEntries);
 
     // Text search
     if (query.isNotEmpty) {
@@ -298,6 +313,31 @@ class CringeSearchService {
     return []; // Return empty list - no mock suggestions
   }
 
+  static Future<List<CringeEntry>> _fetchEntriesFromFirestore({
+    required int limit,
+  }) async {
+    try {
+    final safeLimit = limit.clamp(1, 500).toInt();
+    final snapshot = await _firestore
+      .collection('cringe_entries')
+      .orderBy('createdAt', descending: true)
+      .limit(safeLimit)
+      .get();
+
+      final entries = snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return CringeEntry.fromFirestore(data);
+      }).toList();
+
+      return entries;
+    } catch (e) {
+      // ignore: avoid_print
+      print('CringeSearchService Firestore fetch error: $e');
+      return [];
+    }
+  }
+
   // Get trending tags
   static List<String> getTrendingTags() {
     return _trendingTags.toList()..shuffle();
@@ -311,24 +351,6 @@ class CringeSearchService {
   // Clear recent searches
   static void clearRecentSearches() {
     _recentSearches.clear();
-  }
-
-  // Add entry to search index (for real data integration)
-  static void addEntry(CringeEntry entry) {
-    _allEntries.add(entry);
-  }
-
-  // Remove entry from search index
-  static void removeEntry(String entryId) {
-    _allEntries.removeWhere((entry) => entry.id == entryId);
-  }
-
-  // Update entry in search index
-  static void updateEntry(CringeEntry entry) {
-    final index = _allEntries.indexWhere((e) => e.id == entry.id);
-    if (index != -1) {
-      _allEntries[index] = entry;
-    }
   }
 
   // Get search suggestions based on input

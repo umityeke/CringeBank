@@ -133,9 +133,10 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
               physics: const ClampingScrollPhysics(),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  minHeight: MediaQuery.of(context).size.height - 
-                           MediaQuery.of(context).padding.top - 
-                           MediaQuery.of(context).padding.bottom,
+                  minHeight:
+                      MediaQuery.of(context).size.height -
+                      MediaQuery.of(context).padding.top -
+                      MediaQuery.of(context).padding.bottom,
                 ),
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(
@@ -146,14 +147,20 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                   ),
                   child: Column(
                     children: [
-                  _buildStaggeredItem(_buildWelcomeText(), 0),
-                  _buildStaggeredItem(_buildLoginForm(), 2),
-                  SizedBox(height: MediaQuery.of(context).size.height * 0.02),
-                  _buildStaggeredItem(_buildLoginButton(), 3),
-                  SizedBox(height: MediaQuery.of(context).size.height * 0.01),
-                  _buildStaggeredItem(_buildSocialLogin(), 4),
-                  SizedBox(height: MediaQuery.of(context).size.height * 0.01),
-                  _buildStaggeredItem(_buildSignUpSection(), 5),
+                      _buildStaggeredItem(_buildWelcomeText(), 0),
+                      _buildStaggeredItem(_buildLoginForm(), 2),
+                      SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.02,
+                      ),
+                      _buildStaggeredItem(_buildLoginButton(), 3),
+                      SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.01,
+                      ),
+                      _buildStaggeredItem(_buildSocialLogin(), 4),
+                      SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.01,
+                      ),
+                      _buildStaggeredItem(_buildSignUpSection(), 5),
                     ],
                   ),
                 ),
@@ -344,7 +351,9 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                             hint: 'Adınız ve soyadınız',
                             icon: Icons.person_outline,
                           ),
-                          SizedBox(height: MediaQuery.of(context).size.height * 0.025),
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.025,
+                          ),
                         ],
                         _buildTextField(
                           controller: _usernameController,
@@ -353,7 +362,9 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                           icon: Icons.person_outline,
                           keyboardType: TextInputType.text,
                         ),
-                        SizedBox(height: MediaQuery.of(context).size.height * 0.025),
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.025,
+                        ),
                         _buildTextField(
                           controller: _passwordController,
                           label: 'Şifre',

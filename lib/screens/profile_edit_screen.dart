@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image/image.dart' as img;
 import '../services/user_service.dart';
@@ -60,7 +60,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
       return Uint8List.fromList(compressedBytes);
     } catch (e) {
-      print('Resim boyutlandırma hatası: $e');
+        debugPrint('Resim boyutlandırma hatası: $e');
       return bytes;
     }
   }
@@ -92,7 +92,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       if (result != null && result.files.single.bytes != null) {
         final originalBytes = result.files.single.bytes!;
         final originalSize = (originalBytes.length / 1024).round();
-        
+
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Resim işleniyor... (Orijinal boyut: ${originalSize}KB)'),
@@ -100,19 +101,23 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             duration: const Duration(seconds: 2),
           ),
         );
-        
+
         // Resmi otomatik olarak boyutlandır ve sıkıştır
         final compressedBytes = await _resizeAndCompressImage(originalBytes);
+
+        if (!mounted) return;
         final compressedSize = (compressedBytes.length / 1024).round();
-        
+
         // Base64 encode et
         final base64String = base64Encode(compressedBytes);
-        
+
+        if (!mounted) return;
         setState(() {
           _selectedAvatarPath = result.files.single.name;
           _selectedAvatarBase64 = 'data:image/jpeg;base64,$base64String';
         });
-        
+
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Avatar hazırlandı! ${originalSize}KB → ${compressedSize}KB'),
@@ -122,7 +127,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         );
       }
     } catch (e) {
-      print('Avatar seçim hatası: $e');
+      debugPrint('Avatar seçim hatası: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Avatar seçilirken hata oluştu'),
@@ -164,6 +170,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       final success = await UserService.instance.updateProfile(updatedUser);
 
       if (success) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Profil başarıyla güncellendi!'),
@@ -175,6 +182,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         throw Exception('Profil güncellenemedi');
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Hata: $e'),
@@ -182,9 +190,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         ),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -239,10 +249,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                       ),
                     ),
                     child: Column(
@@ -255,7 +265,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                             height: 120,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: Colors.orange.withOpacity(0.2),
+                              color: Colors.orange.withValues(alpha: 0.2),
                               border: Border.all(
                                 color: Colors.orange,
                                 width: 3,
@@ -323,7 +333,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                             child: Text(
                               'Seçilen: $_selectedAvatarPath',
                               style: TextStyle(
-                                color: Colors.orange.withOpacity(0.8),
+                                color: Colors.orange.withValues(alpha: 0.8),
                                 fontSize: 12,
                               ),
                             ),
@@ -337,10 +347,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                       ),
                     ),
                     child: Column(
@@ -362,21 +372,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
                             labelText: 'Tam İsim',
-                            labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+                            labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
                             prefixIcon: Icon(
                               Icons.person_outline,
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha: 0.7),
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.white.withOpacity(0.3),
+                                color: Colors.white.withValues(alpha: 0.3),
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.white.withOpacity(0.3),
+                                color: Colors.white.withValues(alpha: 0.3),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
@@ -403,21 +413,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           keyboardType: TextInputType.emailAddress,
                           decoration: InputDecoration(
                             labelText: 'E-posta',
-                            labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+                            labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
                             prefixIcon: Icon(
                               Icons.email_outlined,
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha: 0.7),
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.white.withOpacity(0.3),
+                                color: Colors.white.withValues(alpha: 0.3),
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.white.withOpacity(0.3),
+                                color: Colors.white.withValues(alpha: 0.3),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
@@ -448,28 +458,28 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           maxLength: 150,
                           decoration: InputDecoration(
                             labelText: 'Hakkında',
-                            labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+                            labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
                             prefixIcon: Padding(
                               padding: const EdgeInsets.only(bottom: 60),
                               child: Icon(
                                 Icons.info_outline,
-                                color: Colors.white.withOpacity(0.7),
+                                color: Colors.white.withValues(alpha: 0.7),
                               ),
                             ),
                             hintText: 'Kendiniz hakkında birkaç kelime yazın...',
                             hintStyle: TextStyle(
-                              color: Colors.white.withOpacity(0.5),
+                              color: Colors.white.withValues(alpha: 0.5),
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.white.withOpacity(0.3),
+                                color: Colors.white.withValues(alpha: 0.3),
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.white.withOpacity(0.3),
+                                color: Colors.white.withValues(alpha: 0.3),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
@@ -480,7 +490,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                               ),
                             ),
                             counterStyle: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha: 0.7),
                             ),
                           ),
                         ),

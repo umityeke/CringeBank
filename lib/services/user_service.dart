@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
@@ -16,7 +18,7 @@ class UserService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   User? _currentUser;
-  Map<String, User> _userCache = {}; // Enterprise user cache
+  final Map<String, User> _userCache = {}; // Enterprise user cache
   DateTime? _lastCacheUpdate;
   bool _isInitialized = false;
 
@@ -612,6 +614,42 @@ class UserService {
         await _updateLastActive();
       } else {
         print('User document does not exist for UID: $uid');
+
+        final firebaseUser = _auth.currentUser;
+        if (firebaseUser != null) {
+          final email = firebaseUser.email ?? '';
+          final username = firebaseUser.displayName?.trim().isNotEmpty == true
+              ? firebaseUser.displayName!.trim()
+              : (email.isNotEmpty
+                  ? email.split('@').first
+                  : 'user_${firebaseUser.uid.substring(0, 6)}');
+
+          final fallbackUser = User(
+            id: firebaseUser.uid,
+            username: username,
+            email: email,
+            fullName: firebaseUser.displayName?.trim() ?? username,
+            avatar: firebaseUser.photoURL?.trim().isNotEmpty == true
+                ? firebaseUser.photoURL!
+                : '👤',
+            krepScore: 0,
+            joinDate: DateTime.now(),
+            lastActive: DateTime.now(),
+            rozetler: const ['Yeni Üye'],
+            isPremium: false,
+            isVerified: firebaseUser.emailVerified,
+          );
+
+          try {
+            await _saveUserData(fallbackUser);
+            print('Fallback user document created for UID: $uid');
+          } catch (e) {
+            print('Failed to create fallback user document: $e');
+          }
+
+          _currentUser = fallbackUser;
+          await _updateLastActive();
+        }
       }
     } catch (e) {
       print('Load user data error: $e');

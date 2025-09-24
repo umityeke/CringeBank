@@ -112,7 +112,7 @@ class CringeNotificationService {
   static void _onNotificationTapped(NotificationResponse response) {
     // Debug: 'Notification tapped: \$payload'
 
-    // TODO: Navigator ile ilgili sayfaya yönlendir
+  // Gelecekte kullanıcıyı ilgili ekrana yönlendirmek için navigator entegrasyonu eklenecek
   }
 
   // Cringe Radar sistemi - lokasyon bazlı bildirimler

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:ui';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:image/image.dart' as img;
 import '../theme/app_theme.dart';
@@ -12,10 +12,12 @@ import '../services/user_service.dart';
 
 class ModernCringeDepositScreen extends StatefulWidget {
   final VoidCallback? onCringeSubmitted;
+  final VoidCallback? onCloseRequested;
   
   const ModernCringeDepositScreen({
     super.key,
     this.onCringeSubmitted,
+    this.onCloseRequested,
   });
 
   @override
@@ -86,31 +88,66 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
     super.dispose();
   }
 
+  void _handleBackNavigation() {
+    if (_currentStep > 0) {
+      _goToPreviousStep();
+    } else if (widget.onCloseRequested != null) {
+      widget.onCloseRequested!.call();
+    } else if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  void _goToPreviousStep() {
+    if (_currentStep <= 0) {
+      return;
+    }
+    setState(() => _currentStep--);
+    if (_pageController.hasClients) {
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF000000),
-      body: AnimatedBubbleBackground(
-        bubbleCount: 40,
-        bubbleColor: AppTheme.accentColor.withValues(alpha: 0.3),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              _buildProgressIndicator(),
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    _buildStepOne(),
-                    _buildStepTwo(),
-                    _buildStepThree(),
-                  ],
+    final bool canSystemPop = widget.onCloseRequested == null && _currentStep == 0;
+    return PopScope(
+      canPop: canSystemPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (_currentStep > 0) {
+          _goToPreviousStep();
+        } else if (widget.onCloseRequested != null) {
+          widget.onCloseRequested!.call();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF000000),
+        body: AnimatedBubbleBackground(
+          bubbleCount: 40,
+          bubbleColor: AppTheme.accentColor.withValues(alpha: 0.3),
+          child: SafeArea(
+            child: Column(
+              children: [
+                _buildHeader(),
+                _buildProgressIndicator(),
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: [
+                      _buildStepOne(),
+                      _buildStepTwo(),
+                      _buildStepThree(),
+                    ],
+                  ),
                 ),
-              ),
-              _buildNavigationButtons(),
-            ],
+                _buildNavigationButtons(),
+              ],
+            ),
           ),
         ),
       ),
@@ -149,17 +186,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
               child: Row(
                 children: [
                   GestureDetector(
-                    onTap: () {
-                      if (_currentStep > 0) {
-                        setState(() => _currentStep--);
-                        _pageController.previousPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      } else {
-                        Navigator.pop(context);
-                      }
-                    },
+                    onTap: _handleBackNavigation,
                     child: Container(
                       width: 44,
                       height: 44,
@@ -868,13 +895,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                   if (_currentStep > 0) ...[
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () {
-                          setState(() => _currentStep--);
-                          _pageController.previousPage(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                          );
-                        },
+                        onPressed: _goToPreviousStep,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           backgroundColor: Colors.white.withValues(alpha: 0.1),
@@ -951,7 +972,15 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
     
     try {
       // Kullanıcı bilgilerini al
-      final currentUser = UserService.instance.currentUser;
+      var currentUser = UserService.instance.currentUser;
+      if (currentUser == null) {
+        final firebaseUser = UserService.instance.firebaseUser;
+        if (firebaseUser != null) {
+          await UserService.instance.loadUserData(firebaseUser.uid);
+          currentUser = UserService.instance.currentUser;
+        }
+      }
+
       if (currentUser == null) {
         throw Exception('Kullanıcı oturum açmamış');
       }
@@ -962,13 +991,29 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         String base64Image = base64Encode(_selectedImageBytes!);
         imageUrls.add('data:image/jpeg;base64,$base64Image');
       }
+
+      final displayName = currentUser.displayName.trim().isNotEmpty
+          ? currentUser.displayName.trim()
+          : currentUser.username.trim().isNotEmpty
+              ? currentUser.username.trim()
+              : 'Anonim';
+
+      final usernameHandle = currentUser.username.trim().isNotEmpty
+          ? currentUser.username.trim()
+          : (currentUser.email.contains('@')
+              ? currentUser.email.split('@').first
+              : currentUser.id.substring(0, 6));
+
+      final authorAvatar = _isAnonymous
+          ? null
+          : (currentUser.avatar.trim().isNotEmpty ? currentUser.avatar.trim() : null);
       
       // Krep entry'sini oluştur
       final entry = CringeEntry(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         userId: currentUser.id,
-        authorName: _isAnonymous ? 'Anonim' : currentUser.fullName,
-        authorHandle: _isAnonymous ? '@anonim' : '@${currentUser.username}',
+        authorName: _isAnonymous ? 'Anonim' : displayName,
+        authorHandle: _isAnonymous ? '@anonim' : '@$usernameHandle',
         baslik: _titleController.text.trim(),
         aciklama: _descriptionController.text.trim(),
         kategori: _selectedCategory,
@@ -976,11 +1021,12 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         createdAt: DateTime.now(),
         isAnonim: _isAnonymous,
         imageUrls: imageUrls,
+        authorAvatarUrl: authorAvatar,
       );
       
-      print('Krep entry oluşturuldu: ${entry.baslik}');
+  debugPrint('Krep entry oluşturuldu: ${entry.baslik}');
       if (imageUrls.isNotEmpty) {
-        print('Fotoğraf eklendi: ${imageUrls.length} adet');
+  debugPrint('Fotoğraf eklendi: ${imageUrls.length} adet');
       }
       
       // Firestore'a kaydet
@@ -990,10 +1036,10 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         throw Exception('Krep paylaşılamadı, tekrar deneyin');
       }
       
-      print('Krep başarıyla Firestore\'a kaydedildi!');
+  debugPrint('Krep başarıyla Firestore\'a kaydedildi!');
       
     } catch (e) {
-      print('Krep paylaşma hatası: $e');
+  debugPrint('Krep paylaşma hatası: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1089,7 +1135,9 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
 
         // Fotoğrafı compress et
         Uint8List compressedBytes = await _resizeAndCompressImage(imageBytes);
-        
+
+        if (!mounted) return;
+
         setState(() {
           _selectedImageBytes = compressedBytes;
           _selectedImageName = fileName;
@@ -1104,9 +1152,11 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
           ),
         );
       } else {
+        if (!mounted) return;
         setState(() => _isImageLoading = false);
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isImageLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

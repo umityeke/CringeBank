@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/cringe_entry.dart';
 import '../services/cringe_notification_service.dart';
 
@@ -86,6 +87,98 @@ class Competition {
     );
   }
 
+  factory Competition.fromFirestore(
+    Map<String, dynamic> data, {
+    String? documentId,
+  }) {
+    DateTime parseDate(dynamic value) {
+      if (value is Timestamp) return value.toDate();
+      if (value is String) return DateTime.parse(value);
+      return DateTime.now();
+    }
+
+    CompetitionType parseType(String? value) {
+      if (value == null) return CompetitionType.weeklyBest;
+      return CompetitionType.values.firstWhere(
+        (type) => type.name == value,
+        orElse: () => CompetitionType.weeklyBest,
+      );
+    }
+
+    CompetitionStatus parseStatus(String? value) {
+      if (value == null) return CompetitionStatus.upcoming;
+      return CompetitionStatus.values.firstWhere(
+        (status) => status.name == value,
+        orElse: () => CompetitionStatus.upcoming,
+      );
+    }
+
+    CringeCategory? parseCategory(String? value) {
+      if (value == null) return null;
+      return CringeCategory.values.firstWhere(
+        (category) => category.name == value,
+        orElse: () => CringeCategory.values.first,
+      );
+    }
+
+    final entriesData = (data['entries'] as List<dynamic>?) ?? [];
+    final entries = entriesData
+        .map((item) {
+          if (item is Map<String, dynamic>) {
+            return CringeEntry.fromJson(item);
+          }
+          if (item is Map) {
+            return CringeEntry.fromJson(item.cast<String, dynamic>());
+          }
+          return null;
+        })
+        .whereType<CringeEntry>()
+        .toList();
+
+    final votesData = (data['votes'] as Map<String, dynamic>?) ?? {};
+    final votes = votesData.map(
+      (key, value) => MapEntry(key, (value as num?)?.toInt() ?? 0),
+    );
+
+    return Competition(
+      id: (data['id'] ?? documentId ?? '').toString(),
+      title: data['title'] ?? '',
+      description: data['description'] ?? '',
+      type: parseType(data['type'] as String?),
+      status: parseStatus(data['status'] as String?),
+      startDate: parseDate(data['startDate']),
+      endDate: parseDate(data['endDate']),
+      votingEndDate: parseDate(data['votingEndDate']),
+      entries: entries,
+      votes: votes,
+      maxEntries: (data['maxEntries'] as num?)?.toInt() ?? 100,
+      prizeKrepCoins: (data['prizeKrepCoins'] as num?)?.toDouble() ?? 0,
+      specificCategory: parseCategory(data['specificCategory'] as String?),
+      targetKrepLevel: (data['targetKrepLevel'] as num?)?.toDouble(),
+      sponsor: data['sponsor'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'type': type.name,
+      'status': status.name,
+      'startDate': Timestamp.fromDate(startDate),
+      'endDate': Timestamp.fromDate(endDate),
+      'votingEndDate': Timestamp.fromDate(votingEndDate),
+      'entries': entries.map((entry) => entry.toJson()).toList(),
+      'votes': votes,
+      'maxEntries': maxEntries,
+      'prizeKrepCoins': prizeKrepCoins,
+      'specificCategory': specificCategory?.name,
+      'targetKrepLevel': targetKrepLevel,
+      'sponsor': sponsor,
+    };
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -112,6 +205,9 @@ class CompetitionService {
   static final StreamController<List<Competition>> _competitionsController =
       StreamController<List<Competition>>.broadcast();
   static Timer? _updateTimer;
+  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+      _firestoreSubscription;
   static bool _isInitialized = false;
 
   // Competition stream
@@ -122,7 +218,18 @@ class CompetitionService {
   static Future<void> initialize() async {
     if (_isInitialized) return;
 
-    await _generateInitialCompetitions();
+    final firestoreCompetitions = await _loadCompetitionsFromFirestore();
+    if (firestoreCompetitions.isNotEmpty) {
+      _competitions
+        ..clear()
+        ..addAll(firestoreCompetitions);
+      _competitionsController.add(List.unmodifiable(_competitions));
+    } else {
+      await _generateInitialCompetitions();
+      await _persistCompetitionsToFirestore(_competitions);
+    }
+
+    _listenToFirestoreUpdates();
     _startPeriodicUpdates();
 
     _isInitialized = true;
@@ -204,7 +311,7 @@ class CompetitionService {
     // Mock entries ekle aktif yarışmaya
     await _addMockEntriesToActiveCompetition(activeCompetition.id);
 
-    _competitionsController.add(List.from(_competitions));
+    _competitionsController.add(List.unmodifiable(_competitions));
   }
 
   // Mock entries ekle
@@ -282,13 +389,13 @@ class CompetitionService {
   // Periodic updates
   static void _startPeriodicUpdates() {
     _updateTimer?.cancel();
-    _updateTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
-      _updateCompetitionStatuses();
+    _updateTimer = Timer.periodic(const Duration(minutes: 1), (timer) async {
+      await _updateCompetitionStatuses();
     });
   }
 
   // Update competition statuses
-  static void _updateCompetitionStatuses() {
+  static Future<void> _updateCompetitionStatuses() async {
     final now = DateTime.now();
     bool hasChanges = false;
 
@@ -342,7 +449,8 @@ class CompetitionService {
     }
 
     if (hasChanges) {
-      _competitionsController.add(List.from(_competitions));
+        _competitionsController.add(List.unmodifiable(_competitions));
+      await _persistCompetitionsToFirestore(_competitions);
     }
   }
 
@@ -382,7 +490,7 @@ class CompetitionService {
 
   // Get all competitions
   static List<Competition> getAllCompetitions() {
-    return List.from(_competitions);
+  return List.unmodifiable(_competitions);
   }
 
   // Get active competitions
@@ -420,7 +528,8 @@ class CompetitionService {
       _competitions[competitionIndex] = competition.copyWith(
         votes: updatedVotes,
       );
-      _competitionsController.add(List.from(_competitions));
+      _competitionsController.add(List.unmodifiable(_competitions));
+      await _persistCompetitionsToFirestore(_competitions);
 
       return true;
     } catch (e) {
@@ -459,7 +568,8 @@ class CompetitionService {
       _competitions[competitionIndex] = competition.copyWith(
         entries: updatedEntries,
       );
-      _competitionsController.add(List.from(_competitions));
+      _competitionsController.add(List.unmodifiable(_competitions));
+      await _persistCompetitionsToFirestore(_competitions);
 
       return true;
     } catch (e) {
@@ -492,7 +602,8 @@ class CompetitionService {
   static Future<bool> createCompetition(Competition competition) async {
     try {
       _competitions.add(competition);
-      _competitionsController.add(List.from(_competitions));
+      _competitionsController.add(List.unmodifiable(_competitions));
+      await _persistCompetitionsToFirestore(_competitions);
 
       // Yeni yarışma bildirimini gönder
       _sendCompetitionNotification(
@@ -507,9 +618,78 @@ class CompetitionService {
     }
   }
 
+  static Future<List<Competition>> _loadCompetitionsFromFirestore() async {
+    try {
+      final snapshot = await _firestore
+          .collection('competitions')
+          .orderBy('startDate')
+          .get();
+
+      return snapshot.docs
+          .map((doc) => Competition.fromFirestore(
+                doc.data(),
+                documentId: doc.id,
+              ))
+          .toList();
+    } catch (e) {
+      // ignore: avoid_print
+      print('CompetitionService Firestore load error: $e');
+      return [];
+    }
+  }
+
+  static Future<void> _persistCompetitionsToFirestore(
+    List<Competition> competitions,
+  ) async {
+    try {
+      final collection = _firestore.collection('competitions');
+      final batch = _firestore.batch();
+
+      final existingDocs = await collection.get();
+      for (final doc in existingDocs.docs) {
+        batch.delete(doc.reference);
+      }
+
+      for (final competition in competitions) {
+        final docRef = collection.doc(competition.id);
+        batch.set(docRef, competition.toFirestore());
+      }
+
+      await batch.commit();
+    } catch (e) {
+      // ignore: avoid_print
+      print('CompetitionService Firestore persist error: $e');
+    }
+  }
+
+  static void _listenToFirestoreUpdates() {
+    _firestoreSubscription?.cancel();
+    _firestoreSubscription = _firestore
+        .collection('competitions')
+        .orderBy('startDate')
+        .snapshots()
+        .listen((snapshot) {
+      final competitions = snapshot.docs
+          .map((doc) => Competition.fromFirestore(
+                doc.data(),
+                documentId: doc.id,
+              ))
+          .toList();
+
+      _competitions
+        ..clear()
+        ..addAll(competitions);
+      _competitionsController.add(List.unmodifiable(_competitions));
+    }, onError: (error) {
+      // ignore: avoid_print
+      print('CompetitionService Firestore stream error: $error');
+    });
+  }
+
   // Dispose
   static void dispose() {
     _updateTimer?.cancel();
+    _firestoreSubscription?.cancel();
     _competitionsController.close();
   }
 

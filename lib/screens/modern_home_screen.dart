@@ -1,127 +1,317 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/cringe_entry.dart';
 import '../models/user_model.dart';
 import '../services/cringe_entry_service.dart';
 import '../services/user_service.dart';
+import '../widgets/animated_bubble_background.dart';
 
 class ModernHomeScreen extends StatefulWidget {
-  const ModernHomeScreen({Key? key}) : super(key: key);
+  const ModernHomeScreen({super.key});
 
   @override
   State<ModernHomeScreen> createState() => _ModernHomeScreenState();
 }
 
 class _ModernHomeScreenState extends State<ModernHomeScreen> {
+  User? _currentUser;
+  bool _isUserLoading = true;
+  StreamSubscription<User?>? _userSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeUserStream();
+  }
+
+  @override
+  void dispose() {
+    _userSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initializeUserStream() async {
+    final cachedUser = UserService.instance.currentUser;
+
+    if (mounted) {
+      setState(() {
+        _currentUser = cachedUser;
+        _isUserLoading = cachedUser == null;
+      });
+    }
+
+    if (cachedUser == null) {
+      final firebaseUser = UserService.instance.firebaseUser;
+      if (firebaseUser != null) {
+        await UserService.instance.loadUserData(firebaseUser.uid);
+      }
+
+      if (mounted) {
+        setState(() {
+          _currentUser = UserService.instance.currentUser;
+          _isUserLoading = false;
+        });
+      }
+    } else {
+      if (mounted) {
+        setState(() => _isUserLoading = false);
+      }
+    }
+
+    _userSubscription?.cancel();
+    _userSubscription = UserService.instance.userDataStream.listen(
+      (user) {
+        if (!mounted) return;
+        setState(() {
+          _currentUser = user ?? _currentUser;
+          _isUserLoading = false;
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() => _isUserLoading = false);
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
-      body: CustomScrollView(
-        slivers: [
-          _buildAppBar(),
-          _buildPostsFeed(),
-        ],
+      backgroundColor: Colors.black,
+      body: AnimatedBubbleBackground(
+        bubbleCount: 28,
+        bubbleColor: const Color(0xFF444444),
+        child: CustomScrollView(
+          slivers: [
+            _buildAppBar(),
+            _buildPostsFeed(),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildAppBar() {
     return SliverAppBar(
-      expandedHeight: 100,
-      floating: false,
       pinned: true,
-      backgroundColor: const Color(0xFF2A2A2A),
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFF1A1A1A),
-                Color(0xFF0A0A0A),
+      floating: false,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      toolbarHeight: 110,
+      flexibleSpace: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF1A1A1A),
+              Color(0xFF0A0A0A),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _buildAvatar(_currentUser),
+                const SizedBox(width: 16),
+                Expanded(child: _buildWelcomeSection(_currentUser)),
+                IconButton(
+                  icon: const Icon(
+                    Icons.notifications_outlined,
+                    color: Colors.white70,
+                  ),
+                  onPressed: () {},
+                ),
               ],
             ),
-          ),
-          child: StreamBuilder<User?>(
-            stream: UserService.instance.userDataStream,
-            builder: (context, snapshot) {
-              final user = snapshot.data;
-              return SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundColor: const Color(0xFFFF6B6B),
-                            child: (user?.avatar != null && user!.avatar.startsWith('data:image'))
-                                ? ClipOval(
-                                    child: Image.memory(
-                                      base64Decode(user.avatar.split(',')[1]),
-                                      width: 40,
-                                      height: 40,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  )
-                                : Text(
-                                    (user?.displayName != null && user!.displayName.isNotEmpty)
-                                        ? user.displayName[0].toUpperCase()
-                                        : 'U',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Hoş geldin,',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                Text(
-                                  user?.displayName ?? 'Kullanıcı',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.notifications_outlined,
-                              color: Colors.white70,
-                            ),
-                            onPressed: () {},
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildAvatar(User? user) {
+    final size = 56.0;
+    final borderColor = const Color(0xFFFF6B6B);
+    final avatarData = (user?.avatar ?? '').trim();
+
+    if (_isUserLoading) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0x22FFFFFF),
+          border: Border.all(color: const Color(0x33FFFFFF)),
+        ),
+        alignment: Alignment.center,
+        child: const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70),
+        ),
+      );
+    }
+
+    Widget buildInitialAvatar() {
+      final displayName = _resolveDisplayName(user);
+      final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '👤';
+
+      return Center(
+        child: Text(
+          initial,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
+        ),
+      );
+    }
+
+    Widget buildBase64Avatar(String dataUri) {
+      try {
+        final base64String = dataUri.split(',').last;
+        final bytes = base64Decode(base64String);
+        return ClipOval(
+          child: Image.memory(
+            bytes,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+          ),
+        );
+      } catch (_) {
+        return buildInitialAvatar();
+      }
+    }
+
+    Widget buildNetworkAvatar(String url) {
+      return ClipOval(
+        child: Image.network(
+          url,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => buildInitialAvatar(),
+        ),
+      );
+    }
+
+    Widget avatarChild;
+    if (avatarData.startsWith('data:image')) {
+      avatarChild = buildBase64Avatar(avatarData);
+    } else if (avatarData.startsWith('http')) {
+      avatarChild = buildNetworkAvatar(avatarData);
+    } else if (avatarData.isNotEmpty && avatarData.length <= 3) {
+      avatarChild = Center(
+        child: Text(
+          avatarData,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 26,
+          ),
+        ),
+      );
+    } else {
+      avatarChild = buildInitialAvatar();
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0x33FF6B6B),
+        border: Border.all(color: borderColor, width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x55000000),
+            blurRadius: 8,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: avatarChild,
+    );
+  }
+
+  Widget _buildWelcomeSection(User? user) {
+    if (_isUserLoading) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            height: 14,
+            width: 90,
+            decoration: BoxDecoration(
+              color: const Color(0x22FFFFFF),
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 18,
+            width: 140,
+            decoration: BoxDecoration(
+              color: const Color(0x33FFFFFF),
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final welcomeName = _resolveDisplayName(user, fallback: 'Misafir');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          'Hoşgeldin',
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 14,
+            letterSpacing: 0.2,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          welcomeName,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _resolveDisplayName(User? user, {String fallback = 'Misafir'}) {
+    if (user == null) return fallback;
+
+    final fullName = user.fullName.trim();
+    if (fullName.isNotEmpty) return fullName;
+
+    final username = user.username.trim();
+    if (username.isNotEmpty) return username;
+
+    final email = user.email.trim();
+    if (email.isNotEmpty) {
+      final localPart = email.split('@').first;
+      if (localPart.isNotEmpty) return localPart;
+    }
+
+    return fallback;
   }
 
   Widget _buildPostsFeed() {

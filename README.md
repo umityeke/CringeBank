@@ -1,4 +1,4 @@
-# cringe_bankasi
+# cringe_bank
 
 A new Flutter project.
 

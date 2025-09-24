@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'firebase_options.dart';
 import 'services/advanced_ai_service.dart';
 import 'services/cringe_notification_service.dart';
@@ -27,7 +27,7 @@ void main() async {
   CompetitionService.initialize();
   CringeSearchService.initialize();
   await UserService.instance.initialize();
-
+  
   runApp(const CringeBankApp());
 }
 
@@ -40,14 +40,16 @@ class CringeBankApp extends StatelessWidget {
       title: 'CringeBank',
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
+      home: StreamBuilder<firebase_auth.User?>(
+        stream: firebase_auth.FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const SplashScreen();
           }
           
-          if (snapshot.hasData) {
+          // Firebase Auth user varsa veya UserService'te user varsa giriş yapmış sayılır
+          bool isLoggedIn = snapshot.hasData || UserService.instance.isLoggedIn;
+          if (isLoggedIn) {
             return const MainNavigation();
           } else {
             return const ModernLoginScreen();

@@ -304,4 +304,58 @@ class CringeEntry {
       authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
     );
   }
+
+  // Firestore için factory constructor
+  factory CringeEntry.fromFirestore(Map<String, dynamic> data) {
+    return CringeEntry(
+      id: data['id'] ?? '',
+      userId: data['userId'] ?? '',
+      authorName: data['authorName'] ?? data['username'] ?? 'Anonim',
+      authorHandle: data['authorHandle'] ?? '@${data['username'] ?? 'anonim'}',
+      baslik: data['baslik'] ?? data['title'] ?? '',
+      aciklama: data['aciklama'] ?? data['description'] ?? '',
+      kategori: data['kategori'] != null 
+          ? CringeCategory.values[data['kategori'] % CringeCategory.values.length]
+          : CringeCategory.values.firstWhere(
+              (cat) => cat.name == data['category'],
+              orElse: () => CringeCategory.fizikselRezillik,
+            ),
+      krepSeviyesi: (data['krepSeviyesi'] ?? data['krepValue'] ?? 0).toDouble(),
+      createdAt: data['createdAt'] != null 
+          ? (data['createdAt'] as dynamic).toDate()
+          : DateTime.now(),
+      begeniSayisi: data['begeniSayisi'] ?? data['likes'] ?? 0,
+      yorumSayisi: data['yorumSayisi'] ?? data['comments'] ?? 0,
+      retweetSayisi: data['retweetSayisi'] ?? data['retweets'] ?? 0,
+      imageUrls: List<String>.from(data['imageUrls'] ?? []),
+      authorAvatarUrl: data['authorAvatarUrl'],
+      isAnonim: data['isAnonim'] ?? false,
+    );
+  }
+
+  // Firestore için Map'e çevir
+  Map<String, dynamic> toFirestore() {
+    return {
+      'userId': userId,
+      'username': authorHandle.replaceAll('@', ''),
+      'authorName': authorName,
+      'title': baslik,
+      'description': aciklama,
+      'category': kategori.name,
+      'krepValue': krepSeviyesi,
+      'createdAt': createdAt,
+      'likes': begeniSayisi,
+      'comments': yorumSayisi,
+      'retweets': retweetSayisi,
+      'imageUrls': imageUrls,
+      'authorAvatarUrl': authorAvatarUrl,
+    };
+  }
+
+  // Kolay erişim için getter'lar (CringeEntryService uyumluluğu için)
+  String get username => authorHandle.replaceAll('@', '');
+  String get title => baslik;
+  String get description => aciklama;
+  double get krepValue => krepSeviyesi;
+  CringeCategory get category => kategori;
 }

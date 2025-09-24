@@ -128,7 +128,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
           _buildAnimatedBackground(),
 
           // Content
-          Expanded(
+          Positioned.fill(
             child: SingleChildScrollView(
               physics: const ClampingScrollPhysics(),
               child: ConstrainedBox(
@@ -785,12 +785,14 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
   }
 
   void _handleLogin() async {
+    print('_handleLogin called');
     // Alanların dolu olup olmadığını kontrol et
     if (_usernameController.text.trim().isEmpty ||
         _passwordController.text.trim().isEmpty) {
       _showError('Lütfen tüm alanları doldurun');
       return;
     }
+    print('Fields are not empty');
 
     // Kayıt modunda ek kontroller
     if (!_isLoginMode) {
@@ -810,6 +812,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
       }
     }
 
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
     try {
@@ -817,13 +820,18 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
 
       if (_isLoginMode) {
         // Giriş yap
+        print('Attempting login with: ${_usernameController.text.trim()}');
         success = await UserService.instance.login(
           _usernameController.text.trim(),
           _passwordController.text.trim(),
         );
+        print('Login result: $success');
 
         if (!success) {
           _showError('Kullanıcı adı veya şifre hatalı!');
+        } else {
+          // Başarılı login sonrası ana sayfaya git
+          Navigator.of(context).pushReplacementNamed('/main');
         }
       } else {
         // Kayıt ol
@@ -846,10 +854,13 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
       _showError('Bir hata oluştu: $e');
     }
 
-    setState(() => _isLoading = false);
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
   }
 
   void _showError(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),

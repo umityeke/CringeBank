@@ -44,6 +44,9 @@ class User {
     return 'Cringe Lord';
   }
 
+  // Avatar URL için getter
+  String get avatarUrl => avatar;
+
   // Seviye ilerlemesi
   double get seviyeIlerlemesi {
     final thresholds = [100, 500, 1500, 5000, 10000];

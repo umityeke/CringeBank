@@ -17,10 +17,17 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = [
+  List<Widget> get _screens => [
     const ModernHomeScreen(), // Twitter tarzı ana akış  
     const ModernSearchScreen(), // Arama/Keşfet
-    const ModernCringeDepositScreen(), // Yeni krep ekle
+    ModernCringeDepositScreen(
+      onCringeSubmitted: () {
+        // Krep paylaşıldıktan sonra ana sayfaya geç
+        setState(() {
+          _selectedIndex = 0;
+        });
+      },
+    ), // Yeni krep ekle
     const ModernCompetitionsScreen(), // Yarışmalar (Aktivite)
     const SimpleProfileScreen(), // Profil
   ];

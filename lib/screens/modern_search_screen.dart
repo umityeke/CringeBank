@@ -29,20 +29,8 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
   late AnimationController _backgroundController;
   late AnimationController _searchBarController;
   late AnimationController _filterController;
-  late Animation<double> _backgroundAnimation;
   late Animation<double> _searchBarAnimation;
   late Animation<double> _filterAnimation;
-
-  final List<Color> _gradientColors = [
-    const Color(0xFF667eea),
-    const Color(0xFF764ba2),
-    const Color(0xFFf093fb),
-    const Color(0xFFf5576c),
-    const Color(0xFF4facfe),
-    const Color(0xFF00f2fe),
-  ];
-
-  final List<String> _trendingSearches = [];
 
   @override
   void initState() {
@@ -85,10 +73,6 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
       vsync: this,
     );
 
-    _backgroundAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _backgroundController, curve: Curves.linear),
-    );
-
     _searchBarAnimation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _searchBarController, curve: Curves.elasticOut),
     );
@@ -126,11 +110,10 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
       extendBodyBehindAppBar: true,
       appBar: _buildGlassAppBar(),
       body: AnimatedBubbleBackground(
-        bubbleCount: 20,
-        bubbleColor: const Color(0xFF333333),
+        bubbleCount: 35,
+        bubbleColor: const Color(0xFF888888),
         child: Stack(
           children: [
-            _buildAnimatedBackground(),
             _buildContent(),
             if (_showSearchSuggestions) _buildSearchSuggestions(),
           ],
@@ -160,32 +143,6 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
         ),
       ),
       title: _buildSearchBar(),
-    );
-  }
-
-  Widget _buildAnimatedBackground() {
-    return AnimatedBuilder(
-      animation: _backgroundAnimation,
-      builder: (context, child) {
-        return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                _gradientColors[(_backgroundAnimation.value * 6).floor() % _gradientColors.length],
-                _gradientColors[(_backgroundAnimation.value * 6 + 1).floor() % _gradientColors.length],
-                _gradientColors[(_backgroundAnimation.value * 6 + 2).floor() % _gradientColors.length],
-              ],
-              stops: const [0.0, 0.5, 1.0],
-            ),
-          ),
-          child: CustomPaint(
-            painter: SearchBubblesPainter(_backgroundAnimation.value),
-            size: Size.infinite,
-          ),
-        );
-      },
     );
   }
 
@@ -524,74 +481,7 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                colors: [
-                  Colors.white.withValues(alpha: 0.25),
-                  Colors.white.withValues(alpha: 0.1),
-                ],
-              ),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Column(
-                  children: [
-                    const Icon(
-                      Icons.search_off,
-                      size: 64,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Trend Aramalar',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ...List.generate(_trendingSearches.length, (index) {
-                      return GestureDetector(
-                        onTap: () => _selectSuggestion(_trendingSearches[index]),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          margin: const EdgeInsets.only(bottom: 8),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            color: Colors.white.withValues(alpha: 0.1),
-                          ),
-                          child: Text(
-                            _trendingSearches[index],
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      );
-                    }),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    return const SizedBox.shrink();
   }
 
   Widget _buildSearchResults() {
@@ -656,15 +546,10 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
   }
 
   void _showSuggestions() {
-    // Simulated suggestions
+    // Simulated suggestions - now empty since we removed trending searches
     setState(() {
-      _currentSuggestions = _trendingSearches
-          .where((search) => search
-              .toLowerCase()
-              .contains(_searchController.text.toLowerCase()))
-          .take(5)
-          .toList();
-      _showSearchSuggestions = _currentSuggestions.isNotEmpty;
+      _currentSuggestions = [];
+      _showSearchSuggestions = false;
     });
   }
 

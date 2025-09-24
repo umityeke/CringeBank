@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
-import 'dart:math' as math;
 import '../theme/app_theme.dart';
+import '../widgets/animated_bubble_background.dart';
 
 class ModernCompetitionsScreen extends StatefulWidget {
   const ModernCompetitionsScreen({super.key});
@@ -13,11 +13,9 @@ class ModernCompetitionsScreen extends StatefulWidget {
 class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
     with TickerProviderStateMixin {
   late AnimationController _controller;
-  late AnimationController _floatingController;
   late AnimationController _tabController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
-  late Animation<double> _floatingAnimation;
 
   int _selectedTab = 0;
   final PageController _pageController = PageController();
@@ -27,10 +25,6 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
     super.initState();
     _controller = AnimationController(
       duration: const Duration(milliseconds: 1200),
-      vsync: this,
-    );
-    _floatingController = AnimationController(
-      duration: const Duration(seconds: 4),
       vsync: this,
     );
     _tabController = AnimationController(
@@ -54,22 +48,12 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
       curve: const Interval(0.3, 1.0, curve: Curves.easeInOut),
     ));
 
-    _floatingAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _floatingController,
-      curve: Curves.easeInOut,
-    ));
-
     _controller.forward();
-    _floatingController.repeat(reverse: true);
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _floatingController.dispose();
     _tabController.dispose();
     _pageController.dispose();
     super.dispose();
@@ -78,81 +62,35 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.primaryColor,
-      body: Stack(
-        children: [
-          // Animated Background
-          _buildAnimatedBackground(),
-          
-          // Content
-          SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(),
-                _buildTabBar(),
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    onPageChanged: (index) {
-                      setState(() => _selectedTab = index);
-                    },
-                    children: [
-                      _buildActiveCompetitions(),
-                      _buildLeaderboard(),
-                      _buildMyCompetitions(),
-                    ],
-                  ),
+      backgroundColor: Colors.black,
+      body: AnimatedBubbleBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(),
+              _buildTabBar(),
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    setState(() => _selectedTab = index);
+                  },
+                  children: [
+                    _buildActiveCompetitions(),
+                    _buildLeaderboard(),
+                    _buildMyCompetitions(),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
       floatingActionButton: _buildFloatingActionButton(),
     );
   }
 
-  Widget _buildAnimatedBackground() {
-    return AnimatedBuilder(
-      animation: _floatingAnimation,
-      builder: (context, child) {
-        return Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-              ),
-            ),
-            ...List.generate(6, (index) {
-              final offset = _floatingAnimation.value * 2 * math.pi;
-              final x = (index % 3) * 0.33 + 0.16;
-              final y = (index ~/ 3) * 0.5 + 0.25;
-              return Positioned(
-                left: MediaQuery.of(context).size.width * x + 
-                      25 * math.sin(offset + index * 0.8),
-                top: MediaQuery.of(context).size.height * y + 
-                     15 * math.cos(offset + index * 1.2),
-                child: Container(
-                  width: 60 + (index % 2) * 30,
-                  height: 60 + (index % 2) * 30,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        AppTheme.accentColor.withValues(alpha: 0.15),
-                        AppTheme.accentColor.withValues(alpha: 0.08),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ],
-        );
-      },
-    );
-  }
+
 
   Widget _buildHeader() {
     return AnimatedBuilder(

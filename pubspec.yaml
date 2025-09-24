@@ -58,7 +58,11 @@ dependencies:
   provider: ^6.1.1
   shared_preferences: ^2.2.2
   hive: ^2.2.3
+  
+  # File Operations
+  file_picker: ^6.1.1
   hive_flutter: ^1.1.0
+  image: ^4.0.17
   
   # UI Enhancements
   lottie: ^2.7.0

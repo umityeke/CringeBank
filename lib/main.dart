@@ -1,34 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
-import 'firebase_options.dart';
-import 'services/advanced_ai_service.dart';
-import 'services/cringe_notification_service.dart';
-import 'services/competition_service.dart';
-import 'services/cringe_search_service.dart';
+
+import 'bootstrap.dart';
 import 'services/user_service.dart';
 
 import 'screens/modern_login_screen.dart';
 import 'screens/main_navigation.dart';
 import 'theme/app_theme.dart';
 
-void main() async {
-  // Flutter binding'i initialize et
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Firebase'i initialize et
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  // Servisleri initialize et
-  AdvancedAIService.initialize();
-  CringeNotificationService.initialize();
-  CompetitionService.initialize();
-  CringeSearchService.initialize();
-  await UserService.instance.initialize();
-  
-  runApp(const CringeBankApp());
+Future<void> main() async {
+  await bootstrap(const CringeBankApp());
 }
 
 class CringeBankApp extends StatelessWidget {
@@ -41,12 +22,12 @@ class CringeBankApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
       home: StreamBuilder<firebase_auth.User?>(
-        stream: firebase_auth.FirebaseAuth.instance.authStateChanges(),
+        stream: UserService.instance.authStateChanges,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const SplashScreen();
           }
-          
+
           // Firebase Auth user varsa veya UserService'te user varsa giriş yapmış sayılır
           bool isLoggedIn = snapshot.hasData || UserService.instance.isLoggedIn;
           if (isLoggedIn) {
@@ -88,18 +69,12 @@ class _SplashScreenState extends State<SplashScreen>
     _scaleAnimation = Tween<double>(
       begin: 0.5,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.elasticOut,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
 
     _opacityAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
     _controller.forward();
   }
@@ -118,10 +93,7 @@ class _SplashScreenState extends State<SplashScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              AppTheme.primaryColor,
-              AppTheme.accentColor,
-            ],
+            colors: [AppTheme.primaryColor, AppTheme.accentColor],
           ),
         ),
         child: Center(
@@ -168,10 +140,7 @@ class _SplashScreenState extends State<SplashScreen>
                 opacity: _opacityAnimation,
                 child: const Text(
                   'En utanç verici anlarınızın değeri burada',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white70,
-                  ),
+                  style: TextStyle(fontSize: 16, color: Colors.white70),
                 ),
               ),
             ],

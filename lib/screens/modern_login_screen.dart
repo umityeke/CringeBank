@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'dart:math' as math;
 import '../theme/app_theme.dart';
 import '../services/user_service.dart';
+import 'registration_flow_screen.dart';
 
 class ModernLoginScreen extends StatefulWidget {
   const ModernLoginScreen({super.key});
@@ -28,14 +29,9 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
 
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
-  final TextEditingController _fullNameController = TextEditingController();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
-  bool _isLoginMode = true;
 
   @override
   void initState() {
@@ -113,8 +109,6 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
     _staggerController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
-    _confirmPasswordController.dispose();
-    _fullNameController.dispose();
     super.dispose();
   }
 
@@ -180,6 +174,14 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         _pulseAnimation,
       ]),
       builder: (context, child) {
+        final double glowStrength = (0.2 + (_pulseAnimation.value - 0.8))
+            .clamp(0.18, 0.55)
+            .toDouble();
+        final Alignment glowAlignment = Alignment(
+          math.sin(_floatingAnimation.value * math.pi) * 0.7,
+          math.cos(_floatingAnimation.value * math.pi) * 0.4,
+        );
+
         return Stack(
           children: [
             // Enhanced gradient background
@@ -195,6 +197,47 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                     Color(0xFF000000),
                   ],
                   stops: [0.0, 0.3, 0.7, 1.0],
+                ),
+              ),
+            ),
+
+            // Accent glow that follows the background motion
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: glowStrength,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: glowAlignment,
+                        radius: 1.2,
+                        colors: [
+                          AppTheme.accentColor.withValues(alpha: 0.35),
+                          AppTheme.primaryColor.withValues(alpha: 0.08),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Soft top highlight to add depth
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.08),
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.25),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -310,25 +353,32 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Colors.white.withValues(alpha: 0.25),
-                    Colors.white.withValues(alpha: 0.1),
-                    Colors.white.withValues(alpha: 0.05),
+                    AppTheme.primaryColor.withValues(alpha: 0.45),
+                    Colors.white.withValues(alpha: 0.16),
+                    AppTheme.accentColor.withValues(alpha: 0.25),
                   ],
+                  stops: const [0.0, 0.55, 1.0],
                 ),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  width: 1.5,
+                  color: AppTheme.accentColor.withValues(alpha: 0.55),
+                  width: 1.4,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
+                    color: AppTheme.accentColor.withValues(alpha: 0.35),
+                    blurRadius: 30,
+                    offset: const Offset(0, 14),
+                    spreadRadius: 3,
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.28),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
                   ),
                   BoxShadow(
                     color: Colors.white.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, -4),
+                    blurRadius: 12,
+                    offset: const Offset(0, -6),
                   ),
                 ],
               ),
@@ -343,24 +393,12 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                     ),
                     child: Column(
                       children: [
-                        // Ad Soyad alanı (sadece kayıt modunda)
-                        if (!_isLoginMode) ...[
-                          _buildTextField(
-                            controller: _fullNameController,
-                            label: 'Ad Soyad',
-                            hint: 'Adınız ve soyadınız',
-                            icon: Icons.person_outline,
-                          ),
-                          SizedBox(
-                            height: MediaQuery.of(context).size.height * 0.025,
-                          ),
-                        ],
                         _buildTextField(
                           controller: _usernameController,
-                          label: 'Kullanıcı Adı',
-                          hint: 'Kullanıcı adı',
+                          label: 'E-posta Adresi',
+                          hint: 'ornek@email.com',
                           icon: Icons.person_outline,
-                          keyboardType: TextInputType.text,
+                          keyboardType: TextInputType.emailAddress,
                         ),
                         SizedBox(
                           height: MediaQuery.of(context).size.height * 0.025,
@@ -368,9 +406,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                         _buildTextField(
                           controller: _passwordController,
                           label: 'Şifre',
-                          hint: _isLoginMode
-                              ? 'Şifrenizi girin'
-                              : 'En az 6 karakter',
+                          hint: 'Şifrenizi girin',
                           icon: Icons.lock_outline,
                           obscureText: _obscurePassword,
                           suffixIcon: IconButton(
@@ -387,47 +423,20 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                             },
                           ),
                         ),
-                        // Şifre tekrar alanı (sadece kayıt modunda)
-                        if (!_isLoginMode) ...[
-                          const SizedBox(height: 20),
-                          _buildTextField(
-                            controller: _confirmPasswordController,
-                            label: 'Şifre Tekrar',
-                            hint: 'Şifrenizi tekrar girin',
-                            icon: Icons.lock_outline,
-                            obscureText: _obscureConfirmPassword,
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscureConfirmPassword
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                                color: Colors.white.withValues(alpha: 0.7),
-                              ),
-                              onPressed: () {
-                                setState(
-                                  () => _obscureConfirmPassword =
-                                      !_obscureConfirmPassword,
-                                );
-                              },
-                            ),
-                          ),
-                        ],
                         const SizedBox(height: 16),
-                        // Şifremi Unuttum butonu (sadece giriş modunda)
-                        if (_isLoginMode)
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: () {},
-                              child: Text(
-                                'Şifremi Unuttum',
-                                style: TextStyle(
-                                  color: AppTheme.accentColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () {},
+                            child: Text(
+                              'Şifremi Unuttum',
+                              style: TextStyle(
+                                color: AppTheme.accentColor,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
+                        ),
                       ],
                     ),
                   ),
@@ -581,9 +590,9 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                         children: [
                           const Icon(Icons.login, size: 26),
                           const SizedBox(width: 14),
-                          Text(
-                            _isLoginMode ? 'Giriş Yap' : 'Kayıt Ol',
-                            style: const TextStyle(
+                          const Text(
+                            'Giriş Yap',
+                            style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.5,
@@ -762,7 +771,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  _isLoginMode ? 'Hesabın yok mu? ' : 'Zaten hesabın var mı? ',
+                  'Hesabın yok mu? ',
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.7),
                     fontSize: 16,
@@ -770,17 +779,15 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                 ),
                 TextButton(
                   onPressed: () {
-                    setState(() {
-                      _isLoginMode = !_isLoginMode;
-                      _usernameController.clear();
-                      _passwordController.clear();
-                      _confirmPasswordController.clear();
-                      _fullNameController.clear();
-                    });
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const RegistrationFlowScreen(),
+                      ),
+                    );
                   },
-                  child: Text(
-                    _isLoginMode ? 'Kayıt Ol' : 'Giriş Yap',
-                    style: const TextStyle(
+                  child: const Text(
+                    'Kayıt Ol',
+                    style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -798,69 +805,38 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
   void _handleLogin() async {
     print('_handleLogin called');
     // Alanların dolu olup olmadığını kontrol et
-    if (_usernameController.text.trim().isEmpty ||
-        _passwordController.text.trim().isEmpty) {
+    final emailInput = _usernameController.text.trim();
+    final passwordInput = _passwordController.text.trim();
+
+    if (emailInput.isEmpty || passwordInput.isEmpty) {
       _showError('Lütfen tüm alanları doldurun');
       return;
     }
     print('Fields are not empty');
 
-    // Kayıt modunda ek kontroller
-    if (!_isLoginMode) {
-      if (_fullNameController.text.trim().isEmpty) {
-        _showError('Lütfen ad soyad alanını doldurun');
-        return;
-      }
-
-      if (_passwordController.text.length < 6) {
-        _showError('Şifre en az 6 karakter olmalıdır');
-        return;
-      }
-
-      if (_passwordController.text != _confirmPasswordController.text) {
-        _showError('Şifreler eşleşmiyor');
-        return;
-      }
+    const emailPattern = r'^[^@\s]+@[^@\s]+\.[^@\s]+$';
+    if (!RegExp(emailPattern).hasMatch(emailInput)) {
+      _showError('Lütfen geçerli bir e-posta adresi girin');
+      return;
     }
 
     if (!mounted) return;
     setState(() => _isLoading = true);
 
     try {
-      bool success = false;
+      print('Attempting login with: $emailInput');
+      final success = await UserService.instance.login(
+        emailInput,
+        passwordInput,
+      );
+      print('Login result: $success');
 
-      if (_isLoginMode) {
-        // Giriş yap
-        print('Attempting login with: ${_usernameController.text.trim()}');
-        success = await UserService.instance.login(
-          _usernameController.text.trim(),
-          _passwordController.text.trim(),
-        );
-        print('Login result: $success');
-
-        if (!success) {
-          _showError('Kullanıcı adı veya şifre hatalı!');
-        } else {
-          // Başarılı login sonrası ana sayfaya git
-          Navigator.of(context).pushReplacementNamed('/main');
-        }
+      if (!success) {
+        _showError('Kullanıcı adı veya şifre hatalı!');
       } else {
-        // Kayıt ol
-        success = await UserService.instance.register(
-          _usernameController.text.trim(),
-          _passwordController.text.trim(),
-          fullName: _fullNameController.text.trim(),
-        );
-
-        if (!success) {
-          _showError('Bu kullanıcı adı zaten alınmış!');
-        } else {
-          _showSuccess('Hesabınız başarıyla oluşturuldu!');
-        }
+        if (!mounted) return;
+        Navigator.of(context).pushReplacementNamed('/main');
       }
-
-      // Firebase Auth state changes otomatik olarak kullanıcıyı yönlendirecek
-      // Navigator işlemi main.dart'taki StreamBuilder tarafından halledilecek
     } catch (e) {
       _showError('Bir hata oluştu: $e');
     }
@@ -876,16 +852,6 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
       ),
     );

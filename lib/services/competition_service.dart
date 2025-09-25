@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import '../models/cringe_entry.dart';
 import '../services/cringe_notification_service.dart';
 
@@ -207,7 +208,7 @@ class CompetitionService {
   static Timer? _updateTimer;
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
-      _firestoreSubscription;
+  _firestoreSubscription;
   static bool _isInitialized = false;
 
   // Competition stream
@@ -217,6 +218,15 @@ class CompetitionService {
   // Initialize competition service
   static Future<void> initialize() async {
     if (_isInitialized) return;
+
+    final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      // ignore: avoid_print
+      print(
+        '⚠️ CompetitionService: Initialization skipped, user not signed in',
+      );
+      return;
+    }
 
     final firestoreCompetitions = await _loadCompetitionsFromFirestore();
     if (firestoreCompetitions.isNotEmpty) {
@@ -449,7 +459,7 @@ class CompetitionService {
     }
 
     if (hasChanges) {
-        _competitionsController.add(List.unmodifiable(_competitions));
+      _competitionsController.add(List.unmodifiable(_competitions));
       await _persistCompetitionsToFirestore(_competitions);
     }
   }
@@ -490,7 +500,7 @@ class CompetitionService {
 
   // Get all competitions
   static List<Competition> getAllCompetitions() {
-  return List.unmodifiable(_competitions);
+    return List.unmodifiable(_competitions);
   }
 
   // Get active competitions
@@ -626,10 +636,9 @@ class CompetitionService {
           .get();
 
       return snapshot.docs
-          .map((doc) => Competition.fromFirestore(
-                doc.data(),
-                documentId: doc.id,
-              ))
+          .map(
+            (doc) => Competition.fromFirestore(doc.data(), documentId: doc.id),
+          )
           .toList();
     } catch (e) {
       // ignore: avoid_print
@@ -668,29 +677,34 @@ class CompetitionService {
         .collection('competitions')
         .orderBy('startDate')
         .snapshots()
-        .listen((snapshot) {
-      final competitions = snapshot.docs
-          .map((doc) => Competition.fromFirestore(
-                doc.data(),
-                documentId: doc.id,
-              ))
-          .toList();
+        .listen(
+          (snapshot) {
+            final competitions = snapshot.docs
+                .map(
+                  (doc) =>
+                      Competition.fromFirestore(doc.data(), documentId: doc.id),
+                )
+                .toList();
 
-      _competitions
-        ..clear()
-        ..addAll(competitions);
-      _competitionsController.add(List.unmodifiable(_competitions));
-    }, onError: (error) {
-      // ignore: avoid_print
-      print('CompetitionService Firestore stream error: $error');
-    });
+            _competitions
+              ..clear()
+              ..addAll(competitions);
+            _competitionsController.add(List.unmodifiable(_competitions));
+          },
+          onError: (error) {
+            // ignore: avoid_print
+            print('CompetitionService Firestore stream error: $error');
+          },
+        );
   }
 
   // Dispose
   static void dispose() {
     _updateTimer?.cancel();
     _firestoreSubscription?.cancel();
-    _competitionsController.close();
+    _competitions.clear();
+    _competitionsController.add(const []);
+    _isInitialized = false;
   }
 
   // Generate sample competition for testing

@@ -27,7 +27,9 @@ class UserService {
     if (!_isInitialized) {
       print('⚠️ WARNING: Service not fully initialized yet');
     }
-    print('🔍 ENTERPRISE ACCESS: Current user requested - ${_currentUser?.displayName ?? 'null'}');
+    print(
+      '🔍 ENTERPRISE ACCESS: Current user requested - ${_currentUser?.displayName ?? 'null'}',
+    );
     return _currentUser;
   }
 
@@ -35,42 +37,52 @@ class UserService {
   Stream<firebase_auth.User?> get authStateChanges {
     print('🔄 ENTERPRISE STREAM: Auth state changes stream requested');
     return _auth.authStateChanges().map((user) {
-      print('🔐 AUTH STATE CHANGE: ${user?.uid ?? 'null'} (${user?.email ?? 'no email'})');
+      print(
+        '🔐 AUTH STATE CHANGE: ${user?.uid ?? 'null'} (${user?.email ?? 'no email'})',
+      );
       _logAuthStateChange(user);
       return user;
     });
   }
-  
+
   // Enterprise Firebase user with validation
   firebase_auth.User? get firebaseUser {
     final user = _auth.currentUser;
-    print('👤 FIREBASE USER ACCESS: ${user?.uid ?? 'null'} - Verified: ${user?.emailVerified ?? false}');
+    print(
+      '👤 FIREBASE USER ACCESS: ${user?.uid ?? 'null'} - Verified: ${user?.emailVerified ?? false}',
+    );
     return user;
   }
 
   // Initialize enterprise service with monitoring
   void _initializeEnterpriseService() {
-    print('🚀 ENTERPRISE INIT: Initializing advanced user service with monitoring');
-    
+    print(
+      '🚀 ENTERPRISE INIT: Initializing advanced user service with monitoring',
+    );
+
     // Setup auth state listener with enterprise features
     _auth.authStateChanges().listen((user) {
       _handleEnterpriseAuthStateChange(user);
     });
-    
+
     // Setup periodic cache cleanup
     Timer.periodic(const Duration(minutes: 15), (_) {
       _performEnterpriseCacheCleanup();
     });
-    
+
     _isInitialized = true;
-    print('✅ ENTERPRISE READY: User service initialized with enterprise features');
+    print(
+      '✅ ENTERPRISE READY: User service initialized with enterprise features',
+    );
   }
 
   // Handle enterprise auth state changes
   void _handleEnterpriseAuthStateChange(firebase_auth.User? user) async {
     final timestamp = DateTime.now();
-    print('🔄 ENTERPRISE AUTH CHANGE: Processing at ${timestamp.toIso8601String()}');
-    
+    print(
+      '🔄 ENTERPRISE AUTH CHANGE: Processing at ${timestamp.toIso8601String()}',
+    );
+
     if (user != null) {
       print('✅ USER SIGNED IN: ${user.uid} - ${user.email}');
       await _loadEnterpriseUserData(user.uid);
@@ -80,14 +92,14 @@ class UserService {
       _currentUser = null;
       _clearEnterpriseCache();
     }
-    
+
     await _logAuthActivity(user, 'AUTH_STATE_CHANGE');
   }
 
   // Load enterprise user data with caching
   Future<void> _loadEnterpriseUserData(String userId) async {
     print('📊 LOADING: Enterprise user data for $userId');
-    
+
     try {
       // Check cache first
       if (_userCache.containsKey(userId) && _isCacheValid()) {
@@ -108,7 +120,7 @@ class UserService {
         _currentUser = user;
         _userCache[userId] = user;
         _lastCacheUpdate = DateTime.now();
-        
+
         print('✅ FIRESTORE SUCCESS: User data loaded and cached');
       } else {
         print('⚠️ NO USER DATA: Document does not exist for $userId');
@@ -140,7 +152,7 @@ class UserService {
         'platform': 'web',
         'sessionStart': DateTime.now().toIso8601String(),
       }, SetOptions(merge: true));
-      
+
       print('📱 ACTIVITY: Updated user activity for $userId');
     } catch (e) {
       print('⚠️ ACTIVITY ERROR: Failed to update activity: $e');
@@ -158,7 +170,7 @@ class UserService {
         'platform': 'web',
         'verified': user?.emailVerified ?? false,
       });
-      
+
       print('📋 AUTH LOG: Logged $action for ${user?.uid ?? 'anonymous'}');
     } catch (e) {
       print('⚠️ LOG ERROR: Failed to log auth activity: $e');
@@ -178,7 +190,7 @@ class UserService {
   // Perform enterprise cache cleanup
   void _performEnterpriseCacheCleanup() {
     print('🧹 CACHE CLEANUP: Starting enterprise cache maintenance');
-    
+
     // Remove old cache entries
     final cutoff = DateTime.now().subtract(const Duration(hours: 2));
     if (_lastCacheUpdate != null && _lastCacheUpdate!.isBefore(cutoff)) {
@@ -186,7 +198,7 @@ class UserService {
       _lastCacheUpdate = null;
       print('🗑️ CACHE CLEARED: Old cache data removed');
     }
-    
+
     print('✅ CLEANUP COMPLETE: Enterprise cache maintenance finished');
   }
 
@@ -200,15 +212,19 @@ class UserService {
   // 🏢 ENTERPRISE REAL-TIME USER DATA STREAM WITH ADVANCED MONITORING
   Stream<User?> get userDataStream {
     print('🔄 ENTERPRISE STREAM: Initializing advanced user data stream');
-    
+
     // Check if service is properly initialized
     if (!_isInitialized) {
-      print('⚠️ STREAM WARNING: Service not fully initialized, using basic stream');
+      print(
+        '⚠️ STREAM WARNING: Service not fully initialized, using basic stream',
+      );
       return Stream.value(_currentUser);
     }
 
     // Enterprise multi-source stream with fallback strategies
-    return Stream.fromFuture(_initializeEnterpriseUserStream()).asyncExpand((initialUser) {
+    return Stream.fromFuture(_initializeEnterpriseUserStream()).asyncExpand((
+      initialUser,
+    ) {
       return _createEnterpriseUserStream(initialUser);
     });
   }
@@ -217,19 +233,13 @@ class UserService {
   Future<User?> _initializeEnterpriseUserStream() async {
     print('⚡ STREAM INIT: Starting enterprise user stream initialization');
     final stopwatch = Stopwatch()..start();
-    
+
     try {
       // Check current Firebase auth state
       final firebaseUser = _auth.currentUser;
       if (firebaseUser == null) {
         print('👤 NO AUTH: No authenticated user found');
         return null;
-      }
-
-      // Skip enterprise stream for test users
-      if (_currentUser?.id == 'test_user_umityeke') {
-        print('🧪 TEST USER: Using cached test user data');
-        return _currentUser;
       }
 
       // Check enterprise cache first
@@ -240,12 +250,11 @@ class UserService {
 
       // Load fresh data from Firestore
       final userData = await _loadFreshUserData(firebaseUser.uid);
-      
+
       final elapsedTime = stopwatch.elapsedMilliseconds;
       print('✅ STREAM INIT SUCCESS: Completed in ${elapsedTime}ms');
-      
+
       return userData;
-      
     } catch (e) {
       print('❌ STREAM INIT ERROR: $e');
       return _currentUser; // Fallback to cached data
@@ -268,13 +277,15 @@ class UserService {
 
       void startFirestoreStream() {
         final firebaseUser = _auth.currentUser;
-        if (firebaseUser == null || _currentUser?.id == 'test_user_umityeke') {
-          print('🔄 STREAM: No Firebase user or test user, using static stream');
+        if (firebaseUser == null) {
+          print('🔄 STREAM: No Firebase user, using static stream');
           return;
         }
 
-        print('🔗 CONNECTING: Enterprise Firestore stream for ${firebaseUser.uid}');
-        
+        print(
+          '🔗 CONNECTING: Enterprise Firestore stream for ${firebaseUser.uid}',
+        );
+
         firestoreSubscription = _firestore
             .collection('users')
             .doc(firebaseUser.uid)
@@ -282,14 +293,25 @@ class UserService {
             .timeout(const Duration(seconds: 15)) // Enterprise timeout
             .listen(
               (doc) => _handleEnterpriseUserSnapshot(doc, controller),
-              onError: (error) => _handleEnterpriseStreamError(error, controller, () {
-                if (reconnectAttempts < maxReconnectAttempts) {
-                  reconnectAttempts++;
-                  print('🔄 RECONNECT: Attempt $reconnectAttempts/$maxReconnectAttempts');
-                  Future.delayed(Duration(seconds: reconnectAttempts * 2), startFirestoreStream);
-                }
-              }),
-              onDone: () => print('✅ STREAM COMPLETE: Firestore stream completed normally'),
+              onError: (error) => _handleEnterpriseStreamError(
+                error,
+                controller,
+                () {
+                  if (reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++;
+                    print(
+                      '🔄 RECONNECT: Attempt $reconnectAttempts/$maxReconnectAttempts',
+                    );
+                    Future.delayed(
+                      Duration(seconds: reconnectAttempts * 2),
+                      startFirestoreStream,
+                    );
+                  }
+                },
+              ),
+              onDone: () => print(
+                '✅ STREAM COMPLETE: Firestore stream completed normally',
+              ),
             );
       }
 
@@ -298,7 +320,9 @@ class UserService {
 
       // Enterprise health monitoring
       healthCheckTimer = Timer.periodic(const Duration(minutes: 3), (_) {
-        print('🏥 HEALTH CHECK: User stream operational - User: ${_currentUser?.displayName ?? 'null'}');
+        print(
+          '🏥 HEALTH CHECK: User stream operational - User: ${_currentUser?.displayName ?? 'null'}',
+        );
         _performStreamHealthCheck(controller);
       });
 
@@ -315,7 +339,7 @@ class UserService {
   Future<User?> _loadFreshUserData(String userId) async {
     try {
       print('📥 LOADING: Fresh user data for $userId');
-      
+
       final doc = await _firestore
           .collection('users')
           .doc(userId)
@@ -327,7 +351,7 @@ class UserService {
         _currentUser = user;
         _userCache[userId] = user;
         _lastCacheUpdate = DateTime.now();
-        
+
         print('✅ FRESH DATA: User data loaded and cached');
         return user;
       } else {
@@ -341,30 +365,32 @@ class UserService {
   }
 
   // Handle enterprise user snapshot
-  void _handleEnterpriseUserSnapshot(DocumentSnapshot doc, MultiStreamController<User?> controller) {
+  void _handleEnterpriseUserSnapshot(
+    DocumentSnapshot doc,
+    MultiStreamController<User?> controller,
+  ) {
     final stopwatch = Stopwatch()..start();
-    
+
     try {
       print('📥 SNAPSHOT: Processing enterprise user data update');
-      
+
       if (doc.exists && doc.data() != null) {
         final data = doc.data() as Map<String, dynamic>;
         final user = User.fromMap(data);
-        
+
         // Update cache and current user
         _currentUser = user;
         _userCache[doc.id] = user;
         _lastCacheUpdate = DateTime.now();
-        
+
         // Emit updated user data
         controller.add(user);
-        
+
         final processingTime = stopwatch.elapsedMilliseconds;
         print('✅ SNAPSHOT SUCCESS: User data processed in ${processingTime}ms');
-        
+
         // Log user activity update
         _logUserDataUpdate(doc.id, user);
-        
       } else {
         print('⚠️ EMPTY SNAPSHOT: Document exists but has no data');
         controller.add(_currentUser);
@@ -378,15 +404,19 @@ class UserService {
   }
 
   // Handle enterprise stream errors
-  void _handleEnterpriseStreamError(dynamic error, MultiStreamController<User?> controller, VoidCallback reconnect) {
+  void _handleEnterpriseStreamError(
+    dynamic error,
+    MultiStreamController<User?> controller,
+    VoidCallback reconnect,
+  ) {
     print('🚨 STREAM ERROR: Enterprise user stream error: $error');
-    
+
     // Log the error
     _logStreamError(error);
-    
+
     // Emit cached data as fallback
     controller.add(_currentUser);
-    
+
     // Attempt reconnection
     print('🔄 RECOVERY: Attempting stream recovery');
     reconnect();
@@ -404,14 +434,13 @@ class UserService {
           }
         });
       }
-      
+
       // Check authentication state
       if (_auth.currentUser == null && _currentUser != null) {
         print('🚪 HEALTH: User signed out, clearing data');
         _currentUser = null;
         controller.add(null);
       }
-      
     } catch (e) {
       print('❌ HEALTH CHECK ERROR: $e');
     }
@@ -450,48 +479,41 @@ class UserService {
 
   Future<bool> login(String username, String password) async {
     try {
-      print('Starting login process for: $username');
-      
-      // Test kullanıcısı kontrolü önce yap (Firebase sorunlarından kaçınmak için)
-      if (username == 'umityeke' && password == '123456') {
-        _currentUser = User(
-          id: 'test_user_umityeke',
-          username: 'umityeke',
-          email: 'umityeke@cringebank.com',
-          fullName: 'Ümit Yeke',
-          krepScore: 1000,
-          joinDate: DateTime.now().subtract(const Duration(days: 30)),
-          lastActive: DateTime.now(),
-          rozetler: ['Yeni Üye', 'Kurucu', 'Test Kullanıcısı'],
-          isPremium: true,
-          avatar: '👤',
-        );
-        print('Test user login successful');
-        return true;
+      final identifier = username.trim();
+      final normalizedIdentifier = identifier.toLowerCase();
+      print('Starting login process for: $normalizedIdentifier');
+
+      const emailPattern = r'^[^@\s]+@[^@\s]+\.[^@\s]+$';
+      if (!RegExp(emailPattern).hasMatch(identifier)) {
+        print('Login failed: invalid email format -> $identifier');
+        return false;
       }
-      
+
       // Firebase Authentication ile giriş
-      String email = username.contains('@') ? username : '$username@cringebank.com';
+      final String email = normalizedIdentifier;
       print('Attempting Firebase login with: $email');
-      
+
       try {
-        final credential = await _auth.signInWithEmailAndPassword(
-          email: email,
-          password: password,
-        ).timeout(const Duration(seconds: 10));
+        final credential = await _auth
+            .signInWithEmailAndPassword(email: email, password: password)
+            .timeout(const Duration(seconds: 10));
 
         if (credential.user != null) {
           print('Firebase login successful: ${credential.user!.uid}');
           await loadUserData(credential.user!.uid);
-          
+
           // Eğer Firestore'dan yüklenemezse fallback user oluştur
           if (_currentUser == null) {
             print('Creating fallback user for: ${credential.user!.uid}');
             _currentUser = User(
               id: credential.user!.uid,
-              username: username,
+              username: identifier.contains('@')
+                  ? normalizedIdentifier.split('@').first
+                  : identifier,
               email: email,
-              fullName: username,
+              fullName: identifier.contains('@')
+                  ? identifier
+                  : normalizedIdentifier,
               krepScore: 0,
               joinDate: DateTime.now(),
               lastActive: DateTime.now(),
@@ -506,7 +528,7 @@ class UserService {
               print('Failed to save user data to Firestore: $e');
             }
           }
-          
+
           print('Login completed, current user: ${_currentUser?.username}');
           return true;
         }
@@ -515,7 +537,7 @@ class UserService {
         // Firebase hatası durumunda false döndür
         return false;
       }
-      
+
       return false;
     } catch (e) {
       print('Login error: $e');
@@ -523,13 +545,46 @@ class UserService {
     }
   }
 
-  Future<bool> register(String username, String password, {String fullName = ''}) async {
+  Future<bool> isEmailAvailable(String email) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    return !(await _isEmailRegistered(normalizedEmail));
+  }
+
+  Future<bool> isUsernameAvailable(String username) async {
+    return !(await _isUsernameExists(username.toLowerCase()));
+  }
+
+  Future<bool> register({
+    required String email,
+    required String username,
+    required String password,
+    String fullName = '',
+  }) async {
     try {
-      print('Starting registration for: $username');
-      
+      final rawEmail = email.trim();
+      final normalizedEmail = rawEmail.toLowerCase();
+      final normalizedUsername = username.trim();
+      final usernameLower = normalizedUsername.toLowerCase();
+
+      print(
+        'Starting registration for: $normalizedEmail with username $normalizedUsername',
+      );
+
+      const emailPattern = r'^[^@\s]+@[^@\s]+\.[^@\s]+$';
+      if (!RegExp(emailPattern).hasMatch(rawEmail)) {
+        print('Registration failed: invalid email format -> $rawEmail');
+        return false;
+      }
+
+      // E-posta benzersizliği kontrolü
+      if (await _isEmailRegistered(normalizedEmail)) {
+        print('Email already registered: $normalizedEmail');
+        return false;
+      }
+
       // Kullanıcı adı kontrolü (Firebase'e bağlanmazsa skip et)
       try {
-        if (await _isUsernameExists(username)) {
+        if (await _isUsernameExists(usernameLower)) {
           print('Username already exists');
           return false;
         }
@@ -538,34 +593,37 @@ class UserService {
       }
 
       // Firebase Authentication ile kayıt
-      String email = username.contains('@') ? username : '$username@cringebank.com';
-      
       try {
-        final credential = await _auth.createUserWithEmailAndPassword(
-          email: email,
-          password: password,
-        ).timeout(const Duration(seconds: 10));
+        final credential = await _auth
+            .createUserWithEmailAndPassword(
+              email: normalizedEmail,
+              password: password,
+            )
+            .timeout(const Duration(seconds: 10));
 
         if (credential.user != null) {
           // Kullanıcı profilini güncelle
           try {
-            await credential.user!.updateDisplayName(fullName.isEmpty ? username : fullName);
+            await credential.user!.updateDisplayName(
+              fullName.isEmpty ? normalizedUsername : fullName,
+            );
           } catch (e) {
             print('Failed to update display name: $e');
           }
-          
+
           // Firestore'a kullanıcı verilerini kaydet
           final newUser = User(
             id: credential.user!.uid,
-            username: username,
-            email: email,
-            fullName: fullName.isEmpty ? username : fullName,
+            username: normalizedUsername,
+            email: normalizedEmail,
+            fullName: fullName.isEmpty ? normalizedUsername : fullName,
             krepScore: 0,
             joinDate: DateTime.now(),
             lastActive: DateTime.now(),
             rozetler: ['Yeni Üye'],
             isPremium: false,
             avatar: '👤',
+            isVerified: true,
           );
 
           try {
@@ -573,8 +631,9 @@ class UserService {
           } catch (e) {
             print('Failed to save user data: $e');
           }
-          
+
           _currentUser = newUser;
+          await _logAuthActivity(credential.user, 'REGISTER');
           print('Registration successful');
           return true;
         }
@@ -582,7 +641,7 @@ class UserService {
         print('Firebase registration failed: $firebaseError');
         return false;
       }
-      
+
       return false;
     } catch (e) {
       print('Register error: $e');
@@ -598,8 +657,6 @@ class UserService {
       print('Logout error: $e');
     }
   }
-
-
 
   // Firestore'dan kullanıcı verilerini yükle
   Future<void> loadUserData(String uid) async {
@@ -621,8 +678,8 @@ class UserService {
           final username = firebaseUser.displayName?.trim().isNotEmpty == true
               ? firebaseUser.displayName!.trim()
               : (email.isNotEmpty
-                  ? email.split('@').first
-                  : 'user_${firebaseUser.uid.substring(0, 6)}');
+                    ? email.split('@').first
+                    : 'user_${firebaseUser.uid.substring(0, 6)}');
 
           final fallbackUser = User(
             id: firebaseUser.uid,
@@ -659,7 +716,24 @@ class UserService {
   // Firestore'a kullanıcı verilerini kaydet
   Future<void> _saveUserData(User user) async {
     try {
-      await _firestore.collection('users').doc(user.id).set(user.toMap());
+      final data = user.toMap();
+      data['usernameLower'] = user.username.toLowerCase();
+      data['emailLower'] = user.email.toLowerCase();
+
+      final existing = await _firestore
+          .collection('users')
+          .where('emailLower', isEqualTo: data['emailLower'])
+          .limit(1)
+          .get();
+
+      if (existing.docs.isNotEmpty && existing.docs.first.id != user.id) {
+        throw StateError('Email already associated with another account');
+      }
+
+      await _firestore
+          .collection('users')
+          .doc(user.id)
+          .set(data, SetOptions(merge: true));
     } catch (e) {
       print('Save user data error: $e');
     }
@@ -670,12 +744,27 @@ class UserService {
     try {
       final query = await _firestore
           .collection('users')
-          .where('username', isEqualTo: username.toLowerCase())
+          .where('usernameLower', isEqualTo: username.toLowerCase())
           .get();
       return query.docs.isNotEmpty;
     } catch (e) {
       print('Check username error: $e');
       return false;
+    }
+  }
+
+  Future<bool> _isEmailRegistered(String emailLower) async {
+    final normalized = emailLower.trim().toLowerCase();
+    try {
+      final query = await _firestore
+          .collection('users')
+          .where('emailLower', isEqualTo: normalized)
+          .limit(1)
+          .get();
+      return query.docs.isNotEmpty;
+    } catch (e) {
+      print('Check email error: $e');
+      return true; // Fail-safe: treat as registered when query fails
     }
   }
 
@@ -732,13 +821,13 @@ class UserService {
   Future<bool> updateProfile(User updatedUser) async {
     try {
       print('Updating user profile for: ${updatedUser.username}');
-      
+
       // Firestore'a güncellenen verileri kaydet
       await _saveUserData(updatedUser);
-      
+
       // Mevcut kullanıcıyı güncelle
       _currentUser = updatedUser;
-      
+
       print('Profile updated successfully');
       return true;
     } catch (e) {
@@ -755,7 +844,7 @@ class UserService {
   }) async {
     // Mock update delay
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     if (_currentUser != null) {
       _currentUser = _currentUser!.copyWith(
         fullName: fullName ?? _currentUser!.fullName,
@@ -850,53 +939,6 @@ class UserService {
       }
     });
 
-    // İlk kullanıcıyı oluştur
-    await _createInitialUser();
-  }
-
-  // İlk kullanıcıyı oluştur
-  Future<void> _createInitialUser() async {
-    try {
-      // Kullanıcı zaten var mı kontrol et
-      final existingUser = await _isUsernameExists('umityeke');
-      if (existingUser) {
-        print('User umityeke already exists');
-        return;
-      }
-
-      // Firebase Authentication ile hesap oluştur
-      final credential = await _auth.createUserWithEmailAndPassword(
-        email: 'umityeke@cringebank.com',
-        password: '123456',
-      );
-
-      if (credential.user != null) {
-        // Display name güncelle
-        await credential.user!.updateDisplayName('Umit Yeke');
-        
-        // Firestore'a kullanıcı verilerini kaydet
-        final newUser = User(
-          id: credential.user!.uid,
-          username: 'umityeke',
-          email: 'umityeke@cringebank.com',
-          fullName: 'Umit Yeke',
-          krepScore: 1000,
-          joinDate: DateTime.now(),
-          lastActive: DateTime.now(),
-          rozetler: ['Kurucu', 'Yeni Üye', 'Cringe Master'],
-          isPremium: true,
-          isVerified: true,
-        );
-
-        await _saveUserData(newUser);
-        print('Initial user created successfully: umityeke');
-      }
-    } catch (e) {
-      if (e.toString().contains('email-already-in-use')) {
-        print('User umityeke already exists in Firebase Auth');
-      } else {
-        print('Error creating initial user: $e');
-      }
-    }
+    // Otomatik başlangıç kullanıcısı oluşturmayı kaldırdık; gerekliysa manuel tetikleyin.
   }
 }

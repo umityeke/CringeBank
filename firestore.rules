@@ -7,7 +7,7 @@ service cloud.firestore {
 
     // Kullanıcı profilleri
     match /users/{userId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow update, delete: if isSignedIn() && request.auth.uid == userId;
     }
@@ -23,6 +23,38 @@ service cloud.firestore {
     match /competitions/{document=**} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
+    }
+
+    match /email_otps/{emailId} {
+      function otpDataIsValid(data) {
+        return data.keys().hasOnly([
+              'email',
+              'hash',
+              'expiresAt',
+              'createdAt',
+              'lastAttemptAt',
+              'attempts'
+            ]) &&
+          data.email is string &&
+          data.email.lower() == data.email &&
+          data.email == emailId &&
+          data.hash is string &&
+          data.expiresAt is timestamp &&
+          (!data.keys().hasAny(['attempts']) || (data.attempts is int && data.attempts >= 0)) &&
+          (!data.keys().hasAny(['lastAttemptAt']) ||
+            data.lastAttemptAt == null || data.lastAttemptAt is timestamp) &&
+          (!data.keys().hasAny(['createdAt']) ||
+            data.createdAt == null || data.createdAt is timestamp);
+      }
+
+      allow create: if otpDataIsValid(request.resource.data);
+
+      allow read: if resource.data.expiresAt is timestamp &&
+        request.time <= resource.data.expiresAt + duration.value(1, 'hours');
+
+      allow update: if otpDataIsValid(request.resource.data);
+
+      allow delete: if true;
     }
 
     match /leaderboard/{document=**} {
@@ -42,7 +74,7 @@ service cloud.firestore {
     }
 
     match /auth_logs/{document=**} {
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() || request.resource.data.userId == null;
       allow read, update, delete: if false;
     }
 

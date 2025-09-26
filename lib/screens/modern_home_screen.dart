@@ -15,9 +15,13 @@ class ModernHomeScreen extends StatefulWidget {
 }
 
 class _ModernHomeScreenState extends State<ModernHomeScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   User? _currentUser;
   bool _isUserLoading = true;
   StreamSubscription<User?>? _userSubscription;
+  bool _pushNotificationsEnabled = true;
+  bool _emailSummaryEnabled = false;
+  bool _darkModeEnabled = true;
 
   @override
   void initState() {
@@ -78,16 +82,13 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: Colors.black,
+      endDrawer: _buildSettingsDrawer(),
       body: AnimatedBubbleBackground(
         bubbleCount: 28,
         bubbleColor: const Color(0xFF444444),
-        child: CustomScrollView(
-          slivers: [
-            _buildAppBar(),
-            _buildPostsFeed(),
-          ],
-        ),
+        child: CustomScrollView(slivers: [_buildAppBar(), _buildPostsFeed()]),
       ),
     );
   }
@@ -105,10 +106,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF1A1A1A),
-              Color(0xFF0A0A0A),
-            ],
+            colors: [Color(0xFF1A1A1A), Color(0xFF0A0A0A)],
           ),
         ),
         child: SafeArea(
@@ -121,13 +119,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                 _buildAvatar(_currentUser),
                 const SizedBox(width: 16),
                 Expanded(child: _buildWelcomeSection(_currentUser)),
-                IconButton(
-                  icon: const Icon(
-                    Icons.notifications_outlined,
-                    color: Colors.white70,
-                  ),
-                  onPressed: () {},
-                ),
               ],
             ),
           ),
@@ -154,14 +145,19 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
         child: const SizedBox(
           width: 20,
           height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70),
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Colors.white70,
+          ),
         ),
       );
     }
 
     Widget buildInitialAvatar() {
       final displayName = _resolveDisplayName(user);
-      final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '👤';
+      final initial = displayName.isNotEmpty
+          ? displayName[0].toUpperCase()
+          : '👤';
 
       return Center(
         child: Text(
@@ -213,10 +209,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
       avatarChild = Center(
         child: Text(
           avatarData,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 26,
-          ),
+          style: const TextStyle(color: Colors.white, fontSize: 26),
         ),
       );
     } else {
@@ -314,12 +307,421 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
     return fallback;
   }
 
+  void _showComingSoonSnack(String feature) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF1A1A1A),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          content: Text(
+            '$feature çok yakında!'
+            ' 🎉',
+            style: const TextStyle(color: Colors.white),
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+  }
+
+  Widget _buildSettingsDrawer() {
+    return Drawer(
+      backgroundColor: const Color(0xFF0E0E0E),
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 8, 12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0x33FF6B6B),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.tune_rounded, color: Colors.white),
+                  ),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Ayarlar',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Profilini ve uygulama deneyimini kişiselleştir',
+                          style: TextStyle(color: Colors.white54, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white54,
+                    ),
+                    onPressed: () => Navigator.of(context).maybePop(),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(color: Color(0x22FFFFFF), height: 1),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle('Profil & Hesap'),
+                    _buildSettingsTile(
+                      icon: Icons.person_outline,
+                      title: 'Profilini düzenle',
+                      subtitle:
+                          'Avatarını, kullanıcı adını ve bio\'nu güncelle',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _showComingSoonSnack('Profilini düzenle');
+                      },
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.photo_library_outlined,
+                      title: 'Anı koleksiyonu',
+                      subtitle: 'Kaydettiğin cringe anılarını yönet',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _showComingSoonSnack('Anı koleksiyonu');
+                      },
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.workspace_premium_outlined,
+                      title: 'Cringe+ Premium',
+                      subtitle: 'Özel rozetler ve sınırsız erişim',
+                      trailing: _buildComingSoonTag(),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _showComingSoonSnack('Cringe+ Premium');
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    _buildSectionTitle('Güvenlik & Gizlilik'),
+                    _buildSettingsTile(
+                      icon: Icons.shield_outlined,
+                      title: 'Hesap güvenliği',
+                      subtitle: 'Giriş bilgilerini ve iki adımı yönet',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _showComingSoonSnack('Hesap güvenliği');
+                      },
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.lock_outline,
+                      title: 'Gizlilik tercihleri',
+                      subtitle: 'Kimlerin cringe\'lerini görebileceğini seç',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _showComingSoonSnack('Gizlilik tercihleri');
+                      },
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.download_outlined,
+                      title: 'Veri arşivini indir',
+                      subtitle: 'Tüm cringe geçmişini dışa aktar',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _showComingSoonSnack('Veri arşivini indir');
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    _buildSectionTitle('Bildirimler'),
+                    _buildToggleTile(
+                      icon: Icons.notifications_active_outlined,
+                      title: 'Push bildirimleri',
+                      subtitle: 'Yeni cringe girişlerinde anında haber al',
+                      value: _pushNotificationsEnabled,
+                      onChanged: (value) =>
+                          setState(() => _pushNotificationsEnabled = value),
+                    ),
+                    _buildToggleTile(
+                      icon: Icons.email_outlined,
+                      title: 'Haftalık özet e-postası',
+                      subtitle:
+                          'En popüler cringe anıları her pazartesi gelsin',
+                      value: _emailSummaryEnabled,
+                      onChanged: (value) =>
+                          setState(() => _emailSummaryEnabled = value),
+                    ),
+                    const SizedBox(height: 24),
+                    _buildSectionTitle('Deneyim'),
+                    _buildToggleTile(
+                      icon: Icons.dark_mode_outlined,
+                      title: 'Koyu tema',
+                      subtitle: 'Gece kullanımında göz konforu',
+                      value: _darkModeEnabled,
+                      onChanged: (value) =>
+                          setState(() => _darkModeEnabled = value),
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.translate_outlined,
+                      title: 'Dil ve bölge',
+                      subtitle: 'Uygulamayı farklı bir dilde kullan',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _showComingSoonSnack('Dil ve bölge');
+                      },
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.palette_outlined,
+                      title: 'Tema mağazası',
+                      subtitle: 'Profiline özel şablonlar seç',
+                      trailing: _buildComingSoonTag('Yeni'),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _showComingSoonSnack('Tema mağazası');
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    _buildSectionTitle('Destek'),
+                    _buildSettingsTile(
+                      icon: Icons.help_outline,
+                      title: 'Yardım merkezi',
+                      subtitle: 'Sık sorulan sorulara göz at',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _showComingSoonSnack('Yardım merkezi');
+                      },
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.feedback_outlined,
+                      title: 'Geri bildirim gönder',
+                      subtitle: 'Geliştirme önerini ekibe ulaştır',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _showComingSoonSnack('Geri bildirim gönder');
+                      },
+                    ),
+                    _buildSettingsTile(
+                      icon: Icons.book_outlined,
+                      title: 'Topluluk kuralları',
+                      subtitle: 'Cringe Bankası etik kurallarını oku',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _showComingSoonSnack('Topluluk kuralları');
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Divider(color: Color(0x22FFFFFF), height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Yakında',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    'Parti modu, canlı cringe izlemeleri ve daha fazlası hazırlanıyor! 🎬',
+                    style: TextStyle(
+                      color: Colors.white38,
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.white70,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsTile({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    VoidCallback? onTap,
+    Widget? trailing,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161616),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0x11FFFFFF)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x11000000),
+            blurRadius: 8,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ListTile(
+        onTap: onTap,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 12,
+        ),
+        leading: Container(
+          height: 44,
+          width: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0x22FFFFFF),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, color: Colors.white70, size: 22),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: subtitle != null
+            ? Text(
+                subtitle,
+                style: const TextStyle(
+                  color: Colors.white38,
+                  fontSize: 12,
+                  height: 1.3,
+                ),
+              )
+            : null,
+        trailing:
+            trailing ??
+            const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+      ),
+    );
+  }
+
+  Widget _buildToggleTile({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161616),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0x11FFFFFF)),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 12,
+        ),
+        leading: Container(
+          height: 44,
+          width: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0x22FFFFFF),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, color: Colors.white70, size: 22),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: subtitle != null
+            ? Text(
+                subtitle,
+                style: const TextStyle(
+                  color: Colors.white38,
+                  fontSize: 12,
+                  height: 1.3,
+                ),
+              )
+            : null,
+        trailing: Switch.adaptive(
+          value: value,
+          onChanged: onChanged,
+          activeTrackColor: const Color(0xFFFF6B6B),
+          thumbColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? Colors.white24
+                : Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildComingSoonTag([String label = 'Yakında']) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0x33FF6B6B),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xFFFF6B6B),
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
   Widget _buildPostsFeed() {
     return StreamBuilder<List<CringeEntry>>(
       stream: CringeEntryService.instance.entriesStream,
       builder: (context, snapshot) {
-        
-        if (snapshot.connectionState == ConnectionState.waiting && 
+        if (snapshot.connectionState == ConnectionState.waiting &&
             (!snapshot.hasData || snapshot.data!.isEmpty)) {
           return SliverToBoxAdapter(
             child: Center(
@@ -337,8 +739,10 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                       strokeWidth: 3,
                     ),
                     SizedBox(height: 16),
-                    Text('Cringe anılar yükleniyor...', 
-                         style: TextStyle(color: Colors.white, fontSize: 16)),
+                    Text(
+                      'Cringe anılar yükleniyor...',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
                   ],
                 ),
               ),
@@ -360,8 +764,10 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                   children: [
                     const Icon(Icons.error, color: Colors.red, size: 48),
                     const SizedBox(height: 16),
-                    const Text('Hata oluştu!', 
-                               style: TextStyle(color: Colors.white, fontSize: 18)),
+                    const Text(
+                      'Hata oluştu!',
+                      style: TextStyle(color: Colors.white, fontSize: 18),
+                    ),
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () => setState(() {}),
@@ -406,10 +812,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                     SizedBox(height: 8),
                     Text(
                       'İlk utanç verici anını paylaş!',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white70,
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.white70),
                     ),
                   ],
                 ),
@@ -420,13 +823,10 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
 
         final entries = snapshot.data!;
         return SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              if (index >= entries.length) return null;
-              return _buildPostCard(entries[index]);
-            },
-            childCount: entries.length,
-          ),
+          delegate: SliverChildBuilderDelegate((context, index) {
+            if (index >= entries.length) return null;
+            return _buildPostCard(entries[index]);
+          }, childCount: entries.length),
         );
       },
     );
@@ -450,7 +850,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                 radius: 16,
                 backgroundColor: const Color(0xFFFF6B6B),
                 child: Text(
-                  entry.authorName.isNotEmpty 
+                  entry.authorName.isNotEmpty
                       ? entry.authorName[0].toUpperCase()
                       : 'U',
                   style: const TextStyle(
@@ -500,9 +900,9 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
               ),
             ],
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           Text(
             entry.baslik,
             style: const TextStyle(
@@ -511,9 +911,9 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           Text(
             entry.aciklama,
             style: const TextStyle(
@@ -522,9 +922,9 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
               height: 1.4,
             ),
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           Row(
             children: [
               Icon(Icons.thumb_up_outlined, color: Colors.green, size: 18),

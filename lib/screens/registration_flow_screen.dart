@@ -458,9 +458,14 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final success = await EmailOtpService.verifyOtp(_pendingEmail!, code);
-      if (!success) {
-        _showMessage('Kod doğrulanamadı. Lütfen tekrar deneyin.');
+      final result = await EmailOtpService.verifyOtp(_pendingEmail!, code);
+      if (!result.success) {
+        final message = _mapOtpFailureToMessage(result);
+        if (result.isExpired || result.isNotFound || result.isTooManyAttempts) {
+          _otpController.clear();
+        }
+
+        _showMessage(message);
         return;
       }
 
@@ -542,5 +547,29 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
+  }
+
+  String _mapOtpFailureToMessage(EmailOtpVerificationResult result) {
+    if (result.isExpired) {
+      return 'Kodun süresi dolmuş. Lütfen yeni bir kod iste.';
+    }
+
+    if (result.isTooManyAttempts) {
+      return 'Çok fazla hatalı deneme yapıldı. Güvenlik için yeni kod istemen gerekiyor.';
+    }
+
+    if (result.isNotFound) {
+      return 'Kod bulunamadı. Lütfen yeni bir kod gönder.';
+    }
+
+    if (result.isInvalidCode) {
+      final remaining = result.remainingAttempts ?? 0;
+      if (remaining > 0) {
+        return 'Kod hatalı. $remaining deneme hakkın kaldı.';
+      }
+      return 'Kod hatalı. Lütfen yeni bir kod iste.';
+    }
+
+    return 'Kod doğrulanamadı. Lütfen tekrar dene.';
   }
 }

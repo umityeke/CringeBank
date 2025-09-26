@@ -6,6 +6,7 @@ const crypto = require('crypto');
 admin.initializeApp();
 
 const OTP_EXPIRY_MINUTES = 10;
+const MAX_ATTEMPTS = 5;
 
 const normalizeEmail = (email) => email.trim().toLowerCase();
 
@@ -18,6 +19,19 @@ const hashCode = (email, code) => {
 };
 
 const shouldExposeDebugOtp = () => functions.config().environment?.expose_debug_otp === 'true';
+
+const validateOtpCode = (code) => {
+  const normalized = (code ?? '').toString().trim();
+
+  if (!/^[0-9]{6}$/.test(normalized)) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Geçerli bir doğrulama kodu (6 haneli) gerekli.'
+    );
+  }
+
+  return normalized;
+};
 
 const getSmtpConfig = () => {
   const config = functions.config();
@@ -121,6 +135,61 @@ const sendOtpCore = async (rawEmail) => {
   }
 
   return { code };
+};
+
+const verifyOtpCore = async (rawEmail, rawCode) => {
+  const trimmedEmail = (rawEmail ?? '').toString().trim();
+
+  if (!trimmedEmail) {
+    throw new functions.https.HttpsError('invalid-argument', 'E-posta adresi gerekli.');
+  }
+
+  const normalizedEmail = normalizeEmail(trimmedEmail);
+  const normalizedCode = validateOtpCode(rawCode);
+
+  const docRef = admin.firestore().collection('email_otps').doc(normalizedEmail);
+  const snapshot = await docRef.get();
+
+  if (!snapshot.exists) {
+    return { success: false, reason: 'not-found' };
+  }
+
+  const data = snapshot.data() || {};
+  const attempts = Number.isFinite(data.attempts) ? data.attempts : 0;
+
+  if (attempts >= MAX_ATTEMPTS) {
+    await docRef.delete();
+    return { success: false, reason: 'too-many-attempts' };
+  }
+
+  const expiresAt = data.expiresAt;
+  const expiresDate = expiresAt?.toDate ? expiresAt.toDate() : null;
+  if (!expiresDate || expiresDate.getTime() <= Date.now()) {
+    await docRef.delete();
+    return { success: false, reason: 'expired' };
+  }
+
+  const storedHash = data.hash;
+  const expectedHash = hashCode(normalizedEmail, normalizedCode);
+
+  if (storedHash && storedHash === expectedHash) {
+    await docRef.delete();
+    return { success: true };
+  }
+
+  await docRef.update({
+    attempts: admin.firestore.FieldValue.increment(1),
+    lastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  const nextAttempts = attempts + 1;
+
+  return {
+    success: false,
+    reason: 'invalid-code',
+    remainingAttempts: Math.max(0, MAX_ATTEMPTS - nextAttempts),
+    attempts: nextAttempts,
+  };
 };
 
 exports.sendEmailOtp = functions.region('europe-west1').https.onCall(async (data, context) => {
@@ -240,6 +309,129 @@ exports.sendEmailOtpHttp = functions.region('europe-west1').https.onRequest(asyn
     res.status(500).json({
       error: 'internal',
       message: 'Doğrulama e-postası gönderilemedi.',
+    });
+  }
+});
+
+exports.verifyEmailOtp = functions.region('europe-west1').https.onCall(async (data, context) => {
+  try {
+    const rawEmail = data?.email ?? '';
+    const rawCode = data?.code ?? '';
+    return await verifyOtpCore(rawEmail, rawCode);
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    functions.logger.error('verifyEmailOtp failed', { error: error?.message ?? error });
+    throw new functions.https.HttpsError(
+      'internal',
+      'Doğrulama işlemi tamamlanamadı.',
+      error?.message ?? error
+    );
+  }
+});
+
+const extractCodeFromBody = (body) => {
+  if (!body || typeof body !== 'object') {
+    return '';
+  }
+
+  if (typeof body.code === 'string') {
+    return body.code;
+  }
+
+  if (body.data && typeof body.data.code === 'string') {
+    return body.data.code;
+  }
+
+  return '';
+};
+
+exports.verifyEmailOtpHttp = functions.region('europe-west1').https.onRequest(async (req, res) => {
+  const origin = req.headers.origin ?? '*';
+  res.set('Access-Control-Allow-Origin', origin);
+  res.set('Vary', 'Origin');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-Firebase-AppCheck, X-Firebase-Client, X-Firebase-Functions-Client, X-Firebase-GMPID, X-Firebase-Installations-Auth'
+  );
+  res.set('Access-Control-Allow-Credentials', 'true');
+  res.set('Access-Control-Max-Age', '3600');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    res.status(405).json({
+      error: 'method-not-allowed',
+      message: 'Bu uç noktaya yalnızca POST isteği yapılabilir.',
+    });
+    return;
+  }
+
+  let rawEmail = '';
+  let rawCode = '';
+
+  try {
+    if (typeof req.body === 'string' && req.body) {
+      const parsed = JSON.parse(req.body);
+      rawEmail = extractEmailFromBody(parsed);
+      rawCode = extractCodeFromBody(parsed);
+    } else {
+      rawEmail = extractEmailFromBody(req.body);
+      rawCode = extractCodeFromBody(req.body);
+    }
+  } catch (parseError) {
+    functions.logger.error('Doğrulama isteği gövdesi çözümlenemedi', {
+      error: parseError,
+    });
+    res.status(400).json({
+      error: 'invalid-json',
+      message: 'Geçersiz JSON gövdesi.',
+    });
+    return;
+  }
+
+  if (!rawEmail) {
+    res.status(400).json({
+      error: 'invalid-argument',
+      message: 'E-posta adresi gerekli.',
+    });
+    return;
+  }
+
+  if (!rawCode) {
+    res.status(400).json({
+      error: 'invalid-argument',
+      message: 'Doğrulama kodu gerekli.',
+    });
+    return;
+  }
+
+  try {
+    const result = await verifyOtpCore(rawEmail, rawCode);
+    res.status(200).json(result);
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      res.status(mapHttpsErrorToStatus(error.code)).json({
+        error: error.code,
+        message: error.message,
+        details: error.details ?? null,
+      });
+      return;
+    }
+
+    functions.logger.error('HTTP OTP doğrulama isteği başarısız oldu', {
+      error: error?.message ?? error,
+    });
+
+    res.status(500).json({
+      error: 'internal',
+      message: 'Doğrulama işlemi tamamlanamadı.',
     });
   }
 });

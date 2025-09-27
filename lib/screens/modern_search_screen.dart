@@ -134,8 +134,8 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.white.withValues(alpha: 0.25),
-                  Colors.white.withValues(alpha: 0.1),
+                  Colors.white.withOpacity(0.25),
+                  Colors.white.withOpacity(0.1),
                 ],
               ),
             ),
@@ -158,14 +158,14 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
               borderRadius: BorderRadius.circular(25),
               gradient: LinearGradient(
                 colors: [
-                  Colors.white.withValues(alpha: 0.3),
-                  Colors.white.withValues(alpha: 0.1),
+                  Colors.white.withOpacity(0.3),
+                  Colors.white.withOpacity(0.1),
                 ],
               ),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+              border: Border.all(color: Colors.white.withOpacity(0.3)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: Colors.black.withOpacity(0.1),
                   blurRadius: 10,
                   spreadRadius: 0,
                   offset: const Offset(0, 4),
@@ -187,7 +187,7 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
                   decoration: InputDecoration(
                     hintText: 'Krep ara...',
                     hintStyle: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
+                      color: Colors.white.withOpacity(0.7),
                       fontSize: 16,
                     ),
                     prefixIcon: const Icon(
@@ -261,11 +261,11 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
                 borderRadius: BorderRadius.circular(20),
                 gradient: LinearGradient(
                   colors: [
-                    Colors.white.withValues(alpha: 0.25),
-                    Colors.white.withValues(alpha: 0.1),
+                    Colors.white.withOpacity(0.25),
+                    Colors.white.withOpacity(0.1),
                   ],
                 ),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                border: Border.all(color: Colors.white.withOpacity(0.2)),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
@@ -306,7 +306,7 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Colors.white.withValues(alpha: 0.9),
+            color: Colors.white.withOpacity(0.9),
           ),
         ),
         const SizedBox(height: 8),
@@ -324,15 +324,15 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
                   gradient: isSelected
                       ? LinearGradient(
                           colors: [
-                            Colors.white.withValues(alpha: 0.4),
-                            Colors.white.withValues(alpha: 0.2),
+                            Colors.white.withOpacity(0.4),
+                            Colors.white.withOpacity(0.2),
                           ],
                         )
                       : null,
                   border: Border.all(
                     color: isSelected
-                        ? Colors.white.withValues(alpha: 0.6)
-                        : Colors.white.withValues(alpha: 0.3),
+                        ? Colors.white.withOpacity(0.6)
+                        : Colors.white.withOpacity(0.3),
                   ),
                 ),
                 child: Text(
@@ -340,9 +340,9 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: isSelected
-                        ? Colors.white
-                        : Colors.white.withValues(alpha: 0.8),
+          color: isSelected
+            ? Colors.white
+            : Colors.white.withOpacity(0.8),
                   ),
                 ),
               ),
@@ -362,16 +362,16 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Colors.white.withValues(alpha: 0.9),
+            color: Colors.white.withOpacity(0.9),
           ),
         ),
         const SizedBox(height: 8),
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
             activeTrackColor: Colors.white,
-            inactiveTrackColor: Colors.white.withValues(alpha: 0.3),
-            thumbColor: Colors.white,
-            overlayColor: Colors.white.withValues(alpha: 0.2),
+              inactiveTrackColor: Colors.white.withOpacity(0.3),
+              thumbColor: Colors.white,
+              overlayColor: Colors.white.withOpacity(0.2),
           ),
           child: RangeSlider(
             values: RangeValues(
@@ -410,14 +410,14 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
           borderRadius: BorderRadius.circular(20),
           gradient: LinearGradient(
             colors: [
-              Colors.white.withValues(alpha: 0.3),
-              Colors.white.withValues(alpha: 0.1),
+              Colors.white.withOpacity(0.3),
+              Colors.white.withOpacity(0.1),
             ],
           ),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+          border: Border.all(color: Colors.white.withOpacity(0.2)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
+              color: Colors.black.withOpacity(0.2),
               blurRadius: 20,
               spreadRadius: 0,
               offset: const Offset(0, 8),
@@ -440,7 +440,7 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
                     margin: const EdgeInsets.only(bottom: 8),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
-                      color: Colors.white.withValues(alpha: 0.1),
+                      color: Colors.white.withOpacity(0.1),
                     ),
                     child: Row(
                       children: [
@@ -599,7 +599,7 @@ class SearchBubblesPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.08)
+      ..color = Colors.white.withOpacity(0.08)
       ..style = PaintingStyle.fill;
 
     // Animated search icons

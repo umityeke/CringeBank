@@ -38,7 +38,7 @@ class ModernAvatar extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: size / 2,
-              backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+              backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
               backgroundImage: imageUrl != null
                   ? NetworkImage(imageUrl!)
                   : null,
@@ -365,7 +365,7 @@ class ModernBadge extends StatelessWidget {
         vertical: isSmall ? AppTheme.spacingXS : AppTheme.spacingXS,
       ),
       decoration: BoxDecoration(
-        color: backgroundColor ?? AppTheme.primaryColor.withValues(alpha: 0.1),
+  color: backgroundColor ?? AppTheme.primaryColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(isSmall ? 8 : 12),
       ),
       child: Text(

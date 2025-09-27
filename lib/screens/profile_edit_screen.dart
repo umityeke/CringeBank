@@ -249,10 +249,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
+                      color: Colors.white.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.2),
+                        color: Colors.white.withOpacity(0.2),
                       ),
                     ),
                     child: Column(
@@ -265,7 +265,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                             height: 120,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: Colors.orange.withValues(alpha: 0.2),
+                              color: Colors.orange.withOpacity(0.2),
                               border: Border.all(
                                 color: Colors.orange,
                                 width: 3,
@@ -333,7 +333,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                             child: Text(
                               'Seçilen: $_selectedAvatarPath',
                               style: TextStyle(
-                                color: Colors.orange.withValues(alpha: 0.8),
+                                color: Colors.orange.withOpacity(0.8),
                                 fontSize: 12,
                               ),
                             ),
@@ -347,10 +347,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
+                      color: Colors.white.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.2),
+                        color: Colors.white.withOpacity(0.2),
                       ),
                     ),
                     child: Column(
@@ -372,21 +372,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
                             labelText: 'Tam İsim',
-                            labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                            labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
                             prefixIcon: Icon(
                               Icons.person_outline,
-                              color: Colors.white.withValues(alpha: 0.7),
+                              color: Colors.white.withOpacity(0.7),
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.3),
+                                color: Colors.white.withOpacity(0.3),
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.3),
+                                color: Colors.white.withOpacity(0.3),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
@@ -413,21 +413,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           keyboardType: TextInputType.emailAddress,
                           decoration: InputDecoration(
                             labelText: 'E-posta',
-                            labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                            labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
                             prefixIcon: Icon(
                               Icons.email_outlined,
-                              color: Colors.white.withValues(alpha: 0.7),
+                              color: Colors.white.withOpacity(0.7),
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.3),
+                                color: Colors.white.withOpacity(0.3),
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.3),
+                                color: Colors.white.withOpacity(0.3),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
@@ -458,28 +458,28 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           maxLength: 150,
                           decoration: InputDecoration(
                             labelText: 'Hakkında',
-                            labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                            labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
                             prefixIcon: Padding(
                               padding: const EdgeInsets.only(bottom: 60),
                               child: Icon(
                                 Icons.info_outline,
-                                color: Colors.white.withValues(alpha: 0.7),
+                                color: Colors.white.withOpacity(0.7),
                               ),
                             ),
                             hintText: 'Kendiniz hakkında birkaç kelime yazın...',
                             hintStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.5),
+                              color: Colors.white.withOpacity(0.5),
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.3),
+                                color: Colors.white.withOpacity(0.3),
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.3),
+                                color: Colors.white.withOpacity(0.3),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
@@ -490,7 +490,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                               ),
                             ),
                             counterStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.7),
+                              color: Colors.white.withOpacity(0.7),
                             ),
                           ),
                         ),

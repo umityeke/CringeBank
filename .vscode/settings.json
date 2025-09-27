@@ -1,5 +1,5 @@
 {
-    "cmake.sourceDirectory": "C:/Users/umit.yeke/CRINGE-BANKASI/CRINGE-BANKASI/linux",
+    "cmake.sourceDirectory": "C:/Users/Ümit YEKE/CRINGE-BANKASI-2/linux",
     "cSpell.language": "en,tr",
     "cSpell.words": [
         "Bankası",
@@ -21,5 +21,6 @@
         "anonim",
         "etiketler",
         "kullanici"
-    ]
+    ],
+    "java.configuration.updateBuildConfiguration": "interactive"
 }

@@ -112,7 +112,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                       gradient: AppTheme.primaryGradient,
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.accentColor.withValues(alpha: 0.3),
+                          color: AppTheme.accentColor.withOpacity(0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 5),
                         ),
@@ -141,7 +141,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                           'En krep anları yarışıyor!',
                           style: TextStyle(
                             fontSize: 14,
-                            color: Colors.white.withValues(alpha: 0.7),
+                            color: Colors.white.withOpacity(0.7),
                           ),
                         ),
                       ],
@@ -154,9 +154,9 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                     ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(20),
-                      color: Colors.white.withValues(alpha: 0.1),
+                      color: Colors.white.withOpacity(0.1),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.2),
+                        color: Colors.white.withOpacity(0.2),
                         width: 1,
                       ),
                     ),
@@ -191,9 +191,9 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                color: Colors.white.withValues(alpha: 0.1),
+                color: Colors.white.withOpacity(0.1),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: Colors.white.withOpacity(0.2),
                   width: 1,
                 ),
               ),
@@ -233,10 +233,10 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            color: isSelected 
-                ? AppTheme.accentColor.withValues(alpha: 0.8)
-                : Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+      color: isSelected 
+        ? AppTheme.accentColor.withOpacity(0.8)
+        : Colors.transparent,
           ),
           child: Text(
             title,
@@ -308,9 +308,9 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        color: Colors.white.withValues(alpha: 0.1),
+        color: Colors.white.withOpacity(0.1),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.2),
+          color: Colors.white.withOpacity(0.2),
           width: 1,
         ),
       ),
@@ -330,7 +330,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                       height: 50,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: (competition['color'] as Color).withValues(alpha: 0.2),
+                        color: (competition['color'] as Color).withOpacity(0.2),
                       ),
                       child: Icon(
                         competition['icon'] as IconData,
@@ -355,7 +355,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                             competition['description'] as String,
                             style: TextStyle(
                               fontSize: 14,
-                              color: Colors.white.withValues(alpha: 0.7),
+                              color: Colors.white.withOpacity(0.7),
                             ),
                           ),
                         ],
@@ -368,7 +368,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    color: Colors.white.withValues(alpha: 0.05),
+                    color: Colors.white.withOpacity(0.05),
                   ),
                   child: Row(
                     children: [
@@ -380,7 +380,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                               'Ödül',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.white.withValues(alpha: 0.7),
+                                color: Colors.white.withOpacity(0.7),
                               ),
                             ),
                             Text(
@@ -402,7 +402,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                               'Katılımcı',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.white.withValues(alpha: 0.7),
+                                color: Colors.white.withOpacity(0.7),
                               ),
                             ),
                             Text(
@@ -424,7 +424,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                               'Kalan Süre',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.white.withValues(alpha: 0.7),
+                                color: Colors.white.withOpacity(0.7),
                               ),
                             ),
                             Text(
@@ -504,9 +504,9 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        color: Colors.white.withValues(alpha: 0.08),
+        color: Colors.white.withOpacity(0.08),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
+          color: Colors.white.withOpacity(0.1),
           width: 1,
         ),
       ),
@@ -525,7 +525,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                   radius: 24,
                   backgroundColor: index < 3 
                       ? [Colors.amber, Colors.grey, Colors.brown][index]
-                      : AppTheme.accentColor.withValues(alpha: 0.3),
+                      : AppTheme.accentColor.withOpacity(0.3),
                   child: Text(
                     '${index + 1}',
                     style: const TextStyle(
@@ -566,7 +566,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
             subtitle: Text(
               '${scores[index]} puan',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: Colors.white.withOpacity(0.7),
                 fontSize: 14,
               ),
             ),
@@ -579,7 +579,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       color: [Colors.amber, Colors.grey, Colors.brown][index]
-                          .withValues(alpha: 0.2),
+                          .withOpacity(0.2),
                     ),
                     child: Text(
                       ['👑', '🥈', '🥉'][index],
@@ -608,9 +608,9 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                   height: 100,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: Colors.white.withOpacity(0.1),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.2),
+                      color: Colors.white.withOpacity(0.2),
                       width: 2,
                     ),
                   ),
@@ -634,7 +634,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                   'İlk yarışmanıza katılın ve ödül kazanın!',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white.withValues(alpha: 0.7),
+                    color: Colors.white.withOpacity(0.7),
                   ),
                 ),
                 const SizedBox(height: 30),

@@ -49,17 +49,24 @@ class User {
 
   // Seviye ilerlemesi
   double get seviyeIlerlemesi {
-    final thresholds = [100, 500, 1500, 5000, 10000];
-    final currentThreshold = thresholds.firstWhere(
-      (threshold) => krepScore < threshold,
-      orElse: () => thresholds.last,
-    );
-    final previousThreshold = thresholds[thresholds.indexOf(currentThreshold) - 1];
-    
-    if (krepScore >= thresholds.last) return 1.0;
-    
-    return (krepScore - (previousThreshold == currentThreshold ? 0 : previousThreshold)) /
-           (currentThreshold - (previousThreshold == currentThreshold ? 0 : previousThreshold));
+    const thresholds = [0, 100, 500, 1500, 5000, 10000];
+
+    if (krepScore >= thresholds.last) {
+      return 1.0;
+    }
+
+    for (var i = 1; i < thresholds.length; i++) {
+      final current = thresholds[i];
+      final previous = thresholds[i - 1];
+
+      if (krepScore < current) {
+        final span = (current - previous).toDouble();
+        final progress = (krepScore - previous) / span;
+        return progress.clamp(0.0, 1.0);
+      }
+    }
+
+    return 1.0;
   }
 
   // JSON Serialization
@@ -90,8 +97,15 @@ class User {
 
   // Firebase Firestore serialization
   factory User.fromMap(Map<String, dynamic> map) {
+    final rawId = map['id'] ?? map['uid'] ?? map['userId'];
+  final normalizedId = rawId is String
+    ? rawId.trim()
+        : rawId != null
+      ? rawId.toString().trim()
+            : '';
+
     return User(
-      id: map['id'] ?? '',
+      id: normalizedId,
       username: map['username'] ?? '',
       email: map['email'] ?? '',
       fullName: map['fullName'] ?? '',

@@ -2,21 +2,73 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/cringe_entry.dart';
+import '../models/user_model.dart';
+
+enum CringeStreamStatus { initializing, connecting, healthy, degraded, error }
 
 class CringeEntryService {
   static CringeEntryService? _instance;
   static CringeEntryService get instance =>
-      _instance ??= CringeEntryService._();
-  CringeEntryService._();
+    _instance ??= CringeEntryService._();
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final FirebaseFirestore _firestore;
+  final firebase_auth.FirebaseAuth _auth;
+  final FirebaseStorage _storage;
+  final FirebaseAnalytics _analytics;
+  CringeEntryService._({
+    FirebaseFirestore? firestore,
+    firebase_auth.FirebaseAuth? auth,
+    FirebaseStorage? storage,
+    FirebaseAnalytics? analytics,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? firebase_auth.FirebaseAuth.instance,
+        _storage = storage ?? FirebaseStorage.instance,
+        _analytics = analytics ?? FirebaseAnalytics.instance;
+
+  @visibleForTesting
+  static void configureForTesting({
+    FirebaseFirestore? firestore,
+    firebase_auth.FirebaseAuth? auth,
+    FirebaseStorage? storage,
+    FirebaseAnalytics? analytics,
+  }) {
+    _instance?.dispose();
+    _instance = CringeEntryService._(
+      firestore: firestore,
+      auth: auth,
+      storage: storage,
+      analytics: analytics,
+    );
+  }
+
+  @visibleForTesting
+  static void resetForTesting() {
+    _instance?.dispose();
+    _instance = null;
+  }
+
+  void dispose() {
+    streamStatusNotifier.dispose();
+    timeoutExceptionCountNotifier.dispose();
+    streamHintNotifier.dispose();
+  }
+  final ValueNotifier<CringeStreamStatus> streamStatusNotifier =
+    ValueNotifier<CringeStreamStatus>(CringeStreamStatus.initializing);
+  final ValueNotifier<int> timeoutExceptionCountNotifier =
+    ValueNotifier<int>(0);
+  final ValueNotifier<String?> streamHintNotifier =
+    ValueNotifier<String?>(null);
+  static const String _cacheKey = 'enterprise_cringe_entries_cache_v1';
+  static const String _cacheTimestampKey =
+      'enterprise_cringe_entries_cache_timestamp_v1';
+  static const Duration _cacheTTL = Duration(minutes: 5);
   Future<void>? _ongoingWarmUp;
 
   Future<void> warmUp() async {
@@ -55,11 +107,31 @@ class CringeEntryService {
       '🏢 ENTERPRISE CringeEntryService: Initializing high-performance stream with enterprise features',
     );
 
+    streamStatusNotifier.value = CringeStreamStatus.connecting;
+    streamHintNotifier.value = null;
+    timeoutExceptionCountNotifier.value = 0;
+
     return Stream.fromFuture(_initializeEnterpriseStream()).asyncExpand((
       initialData,
     ) {
       return _createEnterpriseStreamWithAdvancedFeatures(initialData);
     });
+  }
+
+  ValueListenable<CringeStreamStatus> get streamStatus =>
+    streamStatusNotifier;
+  ValueListenable<int> get timeoutExceptionCount =>
+    timeoutExceptionCountNotifier;
+  ValueListenable<String?> get streamHint => streamHintNotifier;
+
+  @visibleForTesting
+  Future<List<CringeEntry>> getCachedEntriesForTesting() async {
+    return _getCachedEntriesWithTTL();
+  }
+
+  @visibleForTesting
+  Future<void> primeCacheForTesting(List<CringeEntry> entries) {
+    return _updateEnterpriseCache(entries);
   }
 
   // Initialize enterprise stream with performance monitoring
@@ -79,7 +151,7 @@ class CringeEntryService {
       final entries = await _fetchEntriesWithRetryLogic();
 
       // Update cache asynchronously
-      _updateEnterpriseCache(entries);
+  unawaited(_updateEnterpriseCache(entries));
 
       print(
         '🎯 SUCCESS: Enterprise stream initialized in ${stopwatch.elapsedMilliseconds}ms',
@@ -99,9 +171,13 @@ class CringeEntryService {
     List<CringeEntry> initialData,
   ) {
     return Stream.multi((controller) {
+      streamStatusNotifier.value = CringeStreamStatus.connecting;
+
       // Emit initial data immediately
       controller.add(initialData);
       print('📊 ANALYTICS: Initial data emitted to ${controller.hashCode}');
+      streamStatusNotifier.value = CringeStreamStatus.healthy;
+      streamHintNotifier.value = null;
 
       StreamSubscription? subscription;
       Timer? healthCheckTimer;
@@ -113,7 +189,7 @@ class CringeEntryService {
             .orderBy('createdAt', descending: true)
             .limit(100) // Enterprise limit
             .snapshots()
-            .timeout(const Duration(seconds: 15)) // Enterprise timeout
+            .timeout(const Duration(seconds: 30)) // Enterprise timeout
             .listen(
               (snapshot) => _handleEnterpriseSnapshot(snapshot, controller),
               onError: (error) => _handleEnterpriseError(error, controller),
@@ -135,6 +211,8 @@ class CringeEntryService {
         print('🧹 CLEANUP: Enterprise stream resources being released');
         subscription?.cancel();
         healthCheckTimer?.cancel();
+        streamStatusNotifier.value = CringeStreamStatus.initializing;
+        streamHintNotifier.value = null;
       };
     });
   }
@@ -177,9 +255,11 @@ class CringeEntryService {
 
       // Emit processed data
       controller.add(entries);
+  streamStatusNotifier.value = CringeStreamStatus.healthy;
+  streamHintNotifier.value = null;
 
       // Update enterprise cache asynchronously
-      _updateEnterpriseCache(entries);
+  unawaited(_updateEnterpriseCache(entries));
     } catch (e) {
       print('💥 PROCESSING ERROR: Enterprise snapshot handling failed: $e');
       controller.addError(e);
@@ -197,23 +277,109 @@ class CringeEntryService {
       '🚨 ENTERPRISE ERROR HANDLER: Implementing recovery strategy for: $error',
     );
 
+  final errorDescription = error.toString();
+  final isTimeout = error is TimeoutException ||
+    (error is FirebaseException &&
+      (error.code == 'deadline-exceeded' ||
+        (error.message?.contains('DEADLINE') ?? false))) ||
+    (error is Exception && errorDescription.contains('TimeoutException'));
+
+    if (isTimeout) {
+      timeoutExceptionCountNotifier.value =
+          timeoutExceptionCountNotifier.value + 1;
+      streamStatusNotifier.value = CringeStreamStatus.degraded;
+      streamHintNotifier.value =
+          'Bağlantı beklenenden yavaş. Önbelleğe alınan veriler gösteriliyor.';
+      unawaited(
+        _analytics.logEvent(
+          name: 'cringe_entries_stream_timeout',
+          parameters: {
+            'timeout_count': timeoutExceptionCountNotifier.value,
+            'timestamp': DateTime.now().toIso8601String(),
+          },
+        ),
+      );
+    } else {
+      streamStatusNotifier.value = CringeStreamStatus.error;
+      streamHintNotifier.value =
+          'Akışta beklenmeyen bir hata oluştu. Yeniden bağlanılıyor…';
+      unawaited(
+        _analytics.logEvent(
+          name: 'cringe_entries_stream_error',
+          parameters: {
+            'error_type': error.runtimeType.toString(),
+            'details': errorDescription.substring(
+              0,
+              errorDescription.length > 500 ? 500 : errorDescription.length,
+            ),
+            'timestamp': DateTime.now().toIso8601String(),
+          },
+        ),
+      );
+    }
+
     // Try emergency recovery
     _getCachedEntriesWithTTL().then((cachedData) {
       if (cachedData.isNotEmpty) {
         print('💊 RECOVERY: Using cached data during error state');
         controller.add(cachedData);
+        if (isTimeout) {
+          streamStatusNotifier.value = CringeStreamStatus.degraded;
+        }
       } else {
         print('❌ RECOVERY FAILED: No cached data available');
         controller.add(<CringeEntry>[]);
+        if (!isTimeout) {
+          streamStatusNotifier.value = CringeStreamStatus.error;
+        }
       }
     });
   }
 
   // Enterprise caching with TTL
   Future<List<CringeEntry>> _getCachedEntriesWithTTL() async {
-    // Gelecek geliştirme: Redis/SharedPreferences tabanlı TTL cache eklenecek
     print('💾 CACHE: Checking enterprise cache with TTL validation');
-    return <CringeEntry>[];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedJson = prefs.getString(_cacheKey);
+      final cachedTimestamp = prefs.getInt(_cacheTimestampKey);
+
+      if (cachedJson == null || cachedTimestamp == null) {
+        print('📦 CACHE MISS: No cached entries found');
+        return <CringeEntry>[];
+      }
+
+      final cachedAt =
+          DateTime.fromMillisecondsSinceEpoch(cachedTimestamp, isUtc: true)
+              .toLocal();
+      final isExpired = DateTime.now().difference(cachedAt) > _cacheTTL;
+
+      if (isExpired) {
+        print(
+          '⌛ CACHE EXPIRED: Cached data older than ${_cacheTTL.inMinutes} minutes',
+        );
+        await prefs.remove(_cacheKey);
+        await prefs.remove(_cacheTimestampKey);
+        return <CringeEntry>[];
+      }
+
+      final decoded = jsonDecode(cachedJson) as List<dynamic>;
+      final entries = decoded
+          .map(
+            (item) => CringeEntry.fromJson(
+              Map<String, dynamic>.from(item as Map<String, dynamic>),
+            ),
+          )
+          .toList();
+
+      print(
+        '✅ CACHE HIT: Returning ${entries.length} cached entries (cached at $cachedAt)',
+      );
+      return entries;
+    } catch (e) {
+      print('⚠️ CACHE ERROR: Failed to load cached entries: $e');
+      return <CringeEntry>[];
+    }
   }
 
   // Fetch with enterprise retry logic
@@ -256,11 +422,29 @@ class CringeEntryService {
   }
 
   // Update enterprise cache system
-  void _updateEnterpriseCache(List<CringeEntry> entries) {
-    // Gelecek geliştirme: Enterprise cache katmanı Redis/SharedPreferences ile tutulacak
-    print(
-      '💾 CACHE UPDATE: Storing ${entries.length} entries in enterprise cache',
-    );
+  Future<void> _updateEnterpriseCache(List<CringeEntry> entries) async {
+    if (entries.isEmpty) {
+      print('📦 CACHE UPDATE SKIPPED: No entries to cache');
+      return;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final serializedEntries =
+          jsonEncode(entries.map((entry) => entry.toJson()).toList());
+
+      await prefs.setString(_cacheKey, serializedEntries);
+      await prefs.setInt(
+        _cacheTimestampKey,
+        DateTime.now().toUtc().millisecondsSinceEpoch,
+      );
+
+      print(
+        '💾 CACHE UPDATE: Stored ${entries.length} entries at ${DateTime.now()}',
+      );
+    } catch (e) {
+      print('⚠️ CACHE UPDATE ERROR: Failed to persist cache: $e');
+    }
   }
 
   // Emergency fallback data
@@ -325,19 +509,176 @@ class CringeEntryService {
   }
 
   // Kullanıcının entries'leri
-  Stream<List<CringeEntry>> getUserEntriesStream(String userId) {
-    return _firestore
+  Stream<List<CringeEntry>> getUserEntriesStream(User user) {
+    final queries = <Query<Map<String, dynamic>>>[];
+    final normalizedUserId = user.id.trim();
+
+    if (normalizedUserId.isNotEmpty) {
+      queries.add(
+        _firestore
+            .collection('cringe_entries')
+            .where('userId', isEqualTo: normalizedUserId),
+      );
+    }
+
+    final identifierCandidates = <String>{};
+    final normalizedUsername = user.username.trim();
+    if (normalizedUsername.isNotEmpty) {
+      final handle = normalizedUsername.startsWith('@')
+          ? normalizedUsername
+          : '@$normalizedUsername';
+      identifierCandidates.add(handle);
+    }
+
+    final emailLocalPart = user.email.split('@').first.trim();
+    if (emailLocalPart.isNotEmpty) {
+      identifierCandidates.add('@$emailLocalPart');
+    }
+
+    final fullName = user.fullName.trim();
+    if (fullName.isNotEmpty) {
+      identifierCandidates.add(fullName);
+    }
+
+    for (final candidate in identifierCandidates) {
+      final field = candidate.startsWith('@') ? 'authorHandle' : 'authorName';
+  queries.add(
+    _firestore
+    .collection('cringe_entries')
+    .where(field, isEqualTo: candidate),
+  );
+    }
+
+    if (queries.isEmpty) {
+      return Stream<List<CringeEntry>>.value(const []);
+    }
+
+    return _combineEntryStreams(queries);
+  }
+
+  Stream<List<CringeEntry>> _combineEntryStreams(
+    List<Query<Map<String, dynamic>>> queries,
+  ) {
+    final entryMap = <String, CringeEntry>{};
+    final sourceMap = <String, Set<int>>{};
+    final subscriptions = <StreamSubscription>[];
+
+    late StreamController<List<CringeEntry>> controller;
+    controller = StreamController<List<CringeEntry>>.broadcast(
+      onListen: () {
+        for (var index = 0; index < queries.length; index++) {
+          final query = queries[index];
+          final subscription = query.snapshots().listen((snapshot) {
+            final currentDocIds = <String>{};
+
+            for (final doc in snapshot.docs) {
+              final data = doc.data();
+              data['id'] = doc.id;
+              final entry = CringeEntry.fromFirestore(data);
+              entryMap[doc.id] = entry;
+              sourceMap.putIfAbsent(doc.id, () => <int>{}).add(index);
+              currentDocIds.add(doc.id);
+            }
+
+            final pendingRemoval = <String>[];
+            sourceMap.forEach((docId, sources) {
+              if (!sources.contains(index)) return;
+              if (!currentDocIds.contains(docId)) {
+                sources.remove(index);
+                if (sources.isEmpty) {
+                  pendingRemoval.add(docId);
+                }
+              }
+            });
+
+            for (final docId in pendingRemoval) {
+              sourceMap.remove(docId);
+              entryMap.remove(docId);
+            }
+
+            final sortedEntries = entryMap.values.toList()
+              ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            controller.add(sortedEntries);
+          }, onError: controller.addError);
+
+          subscriptions.add(subscription);
+        }
+      },
+      onCancel: () async {
+        for (final subscription in subscriptions) {
+          await subscription.cancel();
+        }
+      },
+    );
+
+    return controller.stream;
+  }
+
+  Future<void> repairMissingUserIdsForUser(User user) async {
+    final candidateUserId = user.id.trim();
+    if (candidateUserId.isEmpty) return;
+
+    final candidates = <String>{};
+    final username = user.username.trim();
+    if (username.isNotEmpty) {
+      candidates.add('@$username');
+    }
+
+    final emailLocalPart = user.email.split('@').first.trim();
+    if (emailLocalPart.isNotEmpty) {
+      candidates.add('@$emailLocalPart');
+    }
+
+    if (user.fullName.trim().isNotEmpty) {
+      candidates.add(user.fullName.trim());
+    }
+
+    for (final candidate in candidates) {
+      await _repairEntriesMatchingCandidate(
+        candidateUserId,
+        field: candidate.startsWith('@') ? 'authorHandle' : 'authorName',
+        value: candidate,
+      );
+    }
+  }
+
+  Future<void> _repairEntriesMatchingCandidate(
+    String userId, {
+    required String field,
+    required String value,
+  }) async {
+    await _repairEntriesWhere(userId, field: field, value: value, isNull: true);
+    await _repairEntriesWhere(userId, field: field, value: value, emptyString: true);
+  }
+
+  Future<void> _repairEntriesWhere(
+    String userId, {
+    required String field,
+    required String value,
+    bool isNull = false,
+    bool emptyString = false,
+  }) async {
+    Query<Map<String, dynamic>> query = _firestore
         .collection('cringe_entries')
-        .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs.map((doc) {
-            final data = doc.data();
-            data['id'] = doc.id;
-            return CringeEntry.fromFirestore(data);
-          }).toList();
-        });
+        .where(field, isEqualTo: value)
+        .limit(200);
+
+    if (isNull) {
+      query = query.where('userId', isNull: true);
+    } else if (emptyString) {
+      query = query.where('userId', isEqualTo: '');
+    } else {
+      return;
+    }
+
+    final snapshot = await query.get();
+    if (snapshot.docs.isEmpty) return;
+
+    final batch = _firestore.batch();
+    for (final doc in snapshot.docs) {
+      batch.update(doc.reference, {'userId': userId});
+    }
+    await batch.commit();
   }
 
   // Yeni entry ekle
@@ -726,6 +1067,105 @@ class CringeEntryService {
     }
   }
 
+  Future<Map<String, dynamic>> _prepareEnterpriseUpdateData(
+    CringeEntry entry,
+    String transactionId,
+  ) async {
+    print(
+      '🛠️ UPDATE: Preparing enterprise update payload (Entry: ${entry.id}, Transaction: $transactionId)',
+    );
+
+    final processedImages = await _processEnterpriseImages(entry, transactionId);
+
+    final payload = <String, dynamic>{
+      'authorName': entry.authorName.trim(),
+      'authorHandle': entry.authorHandle.trim(),
+      'baslik': entry.baslik.trim(),
+      'aciklama': entry.aciklama.trim(),
+      'kategori': entry.kategori.index,
+      'krepSeviyesi': entry.krepSeviyesi,
+      'isAnonim': entry.isAnonim,
+      'etiketler': entry.etiketler,
+      'audioUrl': entry.audioUrl,
+      'videoUrl': entry.videoUrl,
+      'borsaDegeri': entry.borsaDegeri,
+      'authorAvatarUrl': entry.authorAvatarUrl,
+      'imageUrls': processedImages,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'transactionId': transactionId,
+      'qualityScore': _calculateQualityScore(entry, processedImages),
+      'imageCount': processedImages.length,
+    };
+
+    payload.removeWhere((key, value) => value == null);
+
+    return payload;
+  }
+
+  Future<void> _logAuditTrailUpdate(
+    String entryId,
+    String userId,
+    Map<String, dynamic> updateData,
+    String transactionId,
+  ) async {
+    try {
+      await _firestore.collection('audit_logs').add({
+        'action': 'UPDATE_ENTRY',
+        'entryId': entryId,
+        'userId': userId,
+        'transactionId': transactionId,
+        'timestamp': FieldValue.serverTimestamp(),
+        'metadata': {
+          'updatedFields': updateData.keys.toList(),
+          'imageCount': updateData['imageCount'] ?? 0,
+          'qualityScore': updateData['qualityScore'],
+        },
+      });
+
+      print('📋 AUDIT: Logged update of entry $entryId');
+    } catch (e) {
+      print('⚠️ AUDIT ERROR: Failed to log update for $entryId: $e');
+    }
+  }
+
+  Future<void> _logAuditTrailDelete(
+    String entryId,
+    String userId,
+    String transactionId,
+  ) async {
+    try {
+      await _firestore.collection('audit_logs').add({
+        'action': 'DELETE_ENTRY',
+        'entryId': entryId,
+        'userId': userId,
+        'transactionId': transactionId,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      print('📋 AUDIT: Logged deletion of entry $entryId');
+    } catch (e) {
+      print('⚠️ AUDIT ERROR: Failed to log delete audit for $entryId: $e');
+    }
+  }
+
+  Future<void> _decrementUserStats(
+    String userId,
+    String transactionId,
+  ) async {
+    try {
+      await _firestore.collection('user_stats').doc(userId).set({
+        'totalPosts': FieldValue.increment(-1),
+        'lifetimeCringeScore': FieldValue.increment(-1),
+        'lastTransactionId': transactionId,
+        'lastPostAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      print('📉 USER STATS: Decremented statistics for user $userId');
+    } catch (e) {
+      print('⚠️ USER STATS ERROR: Failed to decrement stats for $userId: $e');
+    }
+  }
+
   // Enterprise error handling
   Future<void> _handleEnterpriseAddError(
     dynamic error,
@@ -786,5 +1226,62 @@ class CringeEntryService {
       print('Like entry error: $e');
       return false;
     }
+  }
+
+  Future<bool> updateEntry(CringeEntry entry) async {
+    final currentUserId = _auth.currentUser?.uid;
+    if (currentUserId == null) {
+      throw StateError('NOT_AUTHENTICATED: Kullanıcı oturumu bulunamadı');
+    }
+
+    final docRef = _firestore.collection('cringe_entries').doc(entry.id);
+    final snapshot = await docRef.get();
+    if (!snapshot.exists) {
+      return false;
+    }
+
+    final ownerId = snapshot.data()?['userId'] as String? ?? '';
+    if (ownerId != currentUserId) {
+      throw StateError('NOT_AUTHORIZED: Bu krepi düzenleme yetkin yok');
+    }
+
+    final transactionId =
+        'upd_${DateTime.now().millisecondsSinceEpoch.toString()}';
+    final updateData = await _prepareEnterpriseUpdateData(
+      entry.copyWith(userId: currentUserId),
+      transactionId,
+    );
+
+    await docRef.update(updateData);
+    await _logAuditTrailUpdate(entry.id, currentUserId, updateData, transactionId);
+
+    return true;
+  }
+
+  Future<bool> deleteEntry(String entryId) async {
+    final currentUserId = _auth.currentUser?.uid;
+    if (currentUserId == null) {
+      throw StateError('NOT_AUTHENTICATED: Kullanıcı oturumu bulunamadı');
+    }
+
+    final docRef = _firestore.collection('cringe_entries').doc(entryId);
+    final snapshot = await docRef.get();
+    if (!snapshot.exists) {
+      return false;
+    }
+
+    final ownerId = snapshot.data()?['userId'] as String? ?? '';
+    if (ownerId != currentUserId) {
+      throw StateError('NOT_AUTHORIZED: Bu krepi silme yetkin yok');
+    }
+
+    final transactionId =
+        'del_${DateTime.now().millisecondsSinceEpoch.toString()}';
+
+    await docRef.delete();
+    await _decrementUserStats(currentUserId, transactionId);
+    await _logAuditTrailDelete(entryId, currentUserId, transactionId);
+
+    return true;
   }
 }

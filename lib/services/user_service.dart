@@ -116,7 +116,11 @@ class UserService {
           .timeout(const Duration(seconds: 10));
 
       if (doc.exists && doc.data() != null) {
-        final user = User.fromMap(doc.data()!);
+        final data = doc.data()!;
+        final user = User.fromMap({
+          ...data,
+          'id': doc.id,
+        });
         _currentUser = user;
         _userCache[userId] = user;
         _lastCacheUpdate = DateTime.now();
@@ -347,7 +351,11 @@ class UserService {
           .timeout(const Duration(seconds: 10));
 
       if (doc.exists && doc.data() != null) {
-        final user = User.fromMap(doc.data()!);
+        final data = doc.data()!;
+        final user = User.fromMap({
+          ...data,
+          'id': doc.id,
+        });
         _currentUser = user;
         _userCache[userId] = user;
         _lastCacheUpdate = DateTime.now();
@@ -376,7 +384,10 @@ class UserService {
 
       if (doc.exists && doc.data() != null) {
         final data = doc.data() as Map<String, dynamic>;
-        final user = User.fromMap(data);
+        final user = User.fromMap({
+          ...data,
+          'id': doc.id,
+        });
 
         // Update cache and current user
         _currentUser = user;
@@ -665,7 +676,11 @@ class UserService {
       final doc = await _firestore.collection('users').doc(uid).get();
       if (doc.exists) {
         print('User document exists, loading data...');
-        _currentUser = User.fromMap(doc.data()!);
+        final data = doc.data()!;
+        _currentUser = User.fromMap({
+          ...data,
+          'id': doc.id,
+        });
         print('User loaded: ${_currentUser?.username}');
         // Son aktif zamanını güncelle
         await _updateLastActive();
@@ -889,7 +904,13 @@ class UserService {
           .collection('users')
           .orderBy('krepScore', descending: true)
           .get();
-      return query.docs.map((doc) => User.fromMap(doc.data())).toList();
+      return query.docs.map((doc) {
+        final data = doc.data();
+        return User.fromMap({
+          ...data,
+          'id': doc.id,
+        });
+      }).toList();
     } catch (e) {
       print('Get all users error: $e');
       return [];

@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -14,7 +17,8 @@ class RegistrationFlowScreen extends StatefulWidget {
   State<RegistrationFlowScreen> createState() => _RegistrationFlowScreenState();
 }
 
-class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
+class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
+  with SingleTickerProviderStateMixin {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
@@ -25,9 +29,71 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
 
   RegistrationStep _step = RegistrationStep.email;
   bool _isLoading = false;
+  late final AnimationController _bubbleController;
+  late final List<_BubbleConfig> _bubbles;
 
   String? _pendingEmail;
   String? _pendingPassword;
+
+  @override
+  void initState() {
+    super.initState();
+    _bubbleController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 18),
+    )..repeat();
+
+    _bubbles = [
+      _BubbleConfig(
+        origin: const Offset(0.2, 0.25),
+        radius: 110,
+        horizontalShift: 0.06,
+        verticalShift: 0.08,
+        speed: 1.0,
+        phase: 0.0,
+        colors: [
+          const Color(0xFF3C8CE7).withOpacity(0.55),
+          const Color(0xFF00EAFF).withOpacity(0.25),
+        ],
+      ),
+      _BubbleConfig(
+        origin: const Offset(0.75, 0.2),
+        radius: 140,
+        horizontalShift: 0.08,
+        verticalShift: 0.06,
+        speed: 0.75,
+        phase: 0.35,
+        colors: [
+          const Color(0xFF6A11CB).withOpacity(0.45),
+          const Color(0xFF2575FC).withOpacity(0.22),
+        ],
+      ),
+      _BubbleConfig(
+        origin: const Offset(0.3, 0.75),
+        radius: 90,
+        horizontalShift: 0.05,
+        verticalShift: 0.07,
+        speed: 1.25,
+        phase: 0.6,
+        colors: [
+          const Color(0xFF00B4DB).withOpacity(0.5),
+          const Color(0xFF0083B0).withOpacity(0.2),
+        ],
+      ),
+      _BubbleConfig(
+        origin: const Offset(0.8, 0.72),
+        radius: 120,
+        horizontalShift: 0.07,
+        verticalShift: 0.09,
+        speed: 0.9,
+        phase: 0.9,
+        colors: [
+          const Color(0xFFE96443).withOpacity(0.42),
+          const Color(0xFF904E95).withOpacity(0.18),
+        ],
+      ),
+    ];
+  }
 
   @override
   void dispose() {
@@ -37,31 +103,159 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
     _otpController.dispose();
     _usernameController.dispose();
     _fullNameController.dispose();
+    _bubbleController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final horizontalPadding = mediaQuery.size.width * 0.07;
+    final availableWidth = mediaQuery.size.width - (horizontalPadding * 2);
+    final double cardWidth = availableWidth > 0
+        ? math.min(480, availableWidth)
+        : 480;
+    final canPop = Navigator.canPop(context);
+
     return Scaffold(
-      appBar: AppBar(title: Text(_buildTitle()), backgroundColor: Colors.black),
-      backgroundColor: const Color(0xFF101010),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              _buildStepIndicator(),
-              const SizedBox(height: 24),
-              Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: _buildCurrentStep(),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF0F172A),
+                    Color(0xFF111827),
+                    Color(0xFF0B1120),
+                  ],
                 ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _bubbleController,
+              builder: (context, _) => CustomPaint(
+                painter: _BubblesPainter(
+                  bubbles: _bubbles,
+                  progress: _bubbleController.value,
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.black.withOpacity(0.25),
+                    Colors.transparent,
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+          ),
+          Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.only(
+                left: horizontalPadding,
+                right: horizontalPadding,
+                top: mediaQuery.padding.top + 40,
+                bottom: 40,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildRegistrationCard(context, cardWidth),
+                ],
+              ),
+            ),
+          ),
+          if (canPop)
+            Positioned(
+              top: mediaQuery.padding.top + 16,
+              left: horizontalPadding,
+              child: SafeArea(
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                  color: Colors.white.withOpacity(0.9),
+                  splashRadius: 24,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRegistrationCard(BuildContext context, double cardWidth) {
+  final cardColor = Colors.white.withOpacity(0.04);
+  final borderColor = Colors.white.withOpacity(0.08);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          width: cardWidth,
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: borderColor, width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.45),
+                blurRadius: 30,
+                offset: const Offset(0, 22),
+                spreadRadius: -18,
               ),
             ],
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+          child: _buildCardContent(context),
         ),
       ),
+    );
+  }
+
+  Widget _buildCardContent(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          _buildTitle(),
+          style: const TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'CRINGE Bankası\'na katılmak için birkaç adım kaldı.',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.white.withOpacity(0.65),
+          ),
+        ),
+        const SizedBox(height: 28),
+        _buildStepIndicator(),
+        const SizedBox(height: 28),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          transitionBuilder: (child, animation) =>
+              FadeTransition(opacity: animation, child: child),
+          child: _buildCurrentStep(),
+        ),
+      ],
     );
   }
 
@@ -93,7 +287,7 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
                       shape: BoxShape.circle,
                       color: isActive
                           ? AppTheme.accentColor
-                          : Colors.white.withValues(alpha: 0.2),
+                          : Colors.white.withOpacity(0.2),
                     ),
                     child: Text(
                       '$index',
@@ -110,13 +304,11 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
                             colors: isActive
                                 ? [
                                     AppTheme.accentColor,
-                                    AppTheme.primaryColor.withValues(
-                                      alpha: 0.7,
-                                    ),
+                                    AppTheme.primaryColor.withOpacity(0.7),
                                   ]
                                 : [
-                                    Colors.white.withValues(alpha: 0.1),
-                                    Colors.white.withValues(alpha: 0.1),
+                                    Colors.white.withOpacity(0.1),
+                                    Colors.white.withOpacity(0.1),
                                   ],
                           ),
                         ),
@@ -130,7 +322,7 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
                 style: TextStyle(
                   color: isActive
                       ? Colors.white
-                      : Colors.white.withValues(alpha: 0.5),
+                      : Colors.white.withOpacity(0.5),
                   fontSize: 12,
                 ),
               ),
@@ -164,7 +356,9 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
   }
 
   Widget _buildEmailStep() {
-    return _buildCard(
+    return Column(
+      key: const ValueKey('emailStep'),
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildTextField(
           controller: _emailController,
@@ -180,6 +374,7 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
           hint: 'En az 6 karakter',
           obscureText: true,
           icon: Icons.lock_outline,
+          textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 18),
         _buildTextField(
@@ -188,10 +383,12 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
           hint: 'Şifrenizi doğrulayın',
           obscureText: true,
           icon: Icons.lock_reset,
+          textInputAction: TextInputAction.done,
         ),
-        const Spacer(),
-        _buildPrimaryButton(
+        const SizedBox(height: 26),
+        _GradientButton(
           label: 'Devam Et',
+          isLoading: _isLoading,
           onPressed: _isLoading ? null : _submitEmailStep,
         ),
       ],
@@ -199,7 +396,9 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
   }
 
   Widget _buildOtpStep() {
-    return _buildCard(
+    return Column(
+      key: const ValueKey('otpStep'),
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'E-postana 6 haneli bir doğrulama kodu gönderdik. Lütfen gelen kutunu ve spam klasörünü kontrol et.',
@@ -213,18 +412,29 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
           keyboardType: TextInputType.number,
           maxLength: 6,
           icon: Icons.verified_user_outlined,
+          textInputAction: TextInputAction.done,
         ),
-        const Spacer(),
+        const SizedBox(height: 26),
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             TextButton(
               onPressed: _isLoading ? null : _resendOtp,
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF2D79F3),
+                textStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               child: const Text('Kodu Tekrar Gönder'),
             ),
-            _buildPrimaryButton(
-              label: 'Doğrula',
-              onPressed: _isLoading ? null : _verifyOtpStep,
+            const SizedBox(width: 16),
+            Expanded(
+              child: _GradientButton(
+                label: 'Doğrula',
+                isLoading: _isLoading,
+                onPressed: _isLoading ? null : _verifyOtpStep,
+              ),
             ),
           ],
         ),
@@ -233,7 +443,9 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
   }
 
   Widget _buildProfileStep() {
-    return _buildCard(
+    return Column(
+      key: const ValueKey('profileStep'),
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildTextField(
           controller: _usernameController,
@@ -247,43 +459,15 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
           label: 'Ad Soyad (Opsiyonel)',
           hint: 'İsteğe bağlı',
           icon: Icons.person_outline,
+          textInputAction: TextInputAction.done,
         ),
-        const Spacer(),
-        _buildPrimaryButton(
+        const SizedBox(height: 26),
+        _GradientButton(
           label: 'Hesabı Oluştur',
+          isLoading: _isLoading,
           onPressed: _isLoading ? null : _finalizeRegistration,
         ),
       ],
-    );
-  }
-
-  Widget _buildCard({required List<Widget> children}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          colors: [
-            Colors.white.withValues(alpha: 0.08),
-            Colors.white.withValues(alpha: 0.02),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
-      ),
     );
   }
 
@@ -295,7 +479,11 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
     bool obscureText = false,
     TextInputType keyboardType = TextInputType.text,
     int? maxLength,
+    TextInputAction textInputAction = TextInputAction.next,
   }) {
+  final borderColor = Colors.white.withOpacity(0.12);
+    const focusedBorderColor = Color(0xFF2D79F3);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -307,69 +495,46 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
             fontSize: 14,
           ),
         ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          obscureText: obscureText,
-          keyboardType: keyboardType,
-          maxLength: maxLength,
-          style: const TextStyle(color: Colors.white, fontSize: 16),
-          decoration: InputDecoration(
-            counterText: '',
-            prefixIcon: Icon(icon, color: Colors.white.withValues(alpha: 0.7)),
-            hintText: hint,
-            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-            filled: true,
-            fillColor: Colors.black.withValues(alpha: 0.35),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: Colors.white.withValues(alpha: 0.1),
+        const SizedBox(height: 10),
+        Container(
+          height: 56,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor, width: 1.4),
+            color: Colors.white.withOpacity(0.06),
+          ),
+          child: Row(
+            children: [
+              const SizedBox(width: 16),
+              Icon(icon, size: 20, color: Colors.white.withOpacity(0.7)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  obscureText: obscureText,
+                  keyboardType: keyboardType,
+                  textInputAction: textInputAction,
+                  maxLength: maxLength,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                  cursorColor: focusedBorderColor,
+                  decoration: InputDecoration(
+                    counterText: '',
+                    hintText: hint,
+                    border: InputBorder.none,
+                    hintStyle: TextStyle(
+                      color: Colors.white.withOpacity(0.5),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
               ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: Colors.white.withValues(alpha: 0.1),
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppTheme.accentColor, width: 2),
-            ),
+            ],
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildPrimaryButton({
-    required String label,
-    required VoidCallback? onPressed,
-  }) {
-    return SizedBox(
-      height: 56,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.accentColor,
-          foregroundColor: Colors.white,
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: _isLoading
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 3,
-                ),
-              )
-            : Text(label),
-      ),
     );
   }
 
@@ -571,5 +736,163 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen> {
     }
 
     return 'Kod doğrulanamadı. Lütfen tekrar dene.';
+  }
+}
+
+class _GradientButton extends StatefulWidget {
+  const _GradientButton({
+    required this.label,
+    required this.onPressed,
+    required this.isLoading,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final bool isLoading;
+
+  @override
+  State<_GradientButton> createState() => _GradientButtonState();
+}
+
+class _GradientButtonState extends State<_GradientButton> {
+  bool _isHovered = false;
+
+  void _setHovered(bool value) {
+    if (_isHovered == value) return;
+    setState(() => _isHovered = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isDisabled = widget.onPressed == null;
+    final List<Color> colors = isDisabled
+        ? const [
+            Color(0xFF1F2937),
+            Color(0xFF1F2937),
+            Color(0xFF1F2937),
+          ]
+        : _isHovered
+            ? const [
+                Color(0xFF1A1A1A),
+                Color(0xFF374151),
+                Color(0xFF3B82F6),
+              ]
+            : const [
+                Color(0xFF000000),
+                Color(0xFF1F2937),
+                Color(0xFF2D79F3),
+              ];
+
+    return SizedBox(
+      height: 56,
+      width: double.infinity,
+      child: MouseRegion(
+        cursor: isDisabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+        onEnter: (_) => _setHovered(true),
+        onExit: (_) => _setHovered(false),
+        child: GestureDetector(
+          onTap: isDisabled || widget.isLoading ? null : widget.onPressed,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: colors,
+                stops: const [0.0, 0.4, 1.0],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: !isDisabled && _isHovered
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFF2D79F3).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Center(
+              child: widget.isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Text(
+                      widget.label,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BubbleConfig {
+  const _BubbleConfig({
+    required this.origin,
+    required this.radius,
+    required this.horizontalShift,
+    required this.verticalShift,
+    required this.speed,
+    required this.phase,
+    required this.colors,
+  });
+
+  final Offset origin;
+  final double radius;
+  final double horizontalShift;
+  final double verticalShift;
+  final double speed;
+  final double phase;
+  final List<Color> colors;
+}
+
+class _BubblesPainter extends CustomPainter {
+  const _BubblesPainter({required this.bubbles, required this.progress});
+
+  final List<_BubbleConfig> bubbles;
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final bubble in bubbles) {
+      final animationPhase =
+          (progress * bubble.speed + bubble.phase) * 2 * math.pi;
+      final dx =
+          (bubble.origin.dx +
+                  math.cos(animationPhase) * bubble.horizontalShift) *
+              size.width;
+      final dy =
+          (bubble.origin.dy + math.sin(animationPhase) * bubble.verticalShift) *
+              size.height;
+
+      final center = Offset(dx, dy);
+      final paint = ui.Paint()
+        ..shader = RadialGradient(
+          colors: bubble.colors,
+          stops: const [0.0, 1.0],
+        ).createShader(
+          ui.Rect.fromCircle(center: center, radius: bubble.radius),
+        );
+
+      canvas.drawCircle(center, bubble.radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BubblesPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.bubbles != bubbles;
   }
 }

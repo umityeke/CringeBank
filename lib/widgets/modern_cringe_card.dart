@@ -23,29 +23,8 @@ class ModernCringeCard extends StatefulWidget {
   State<ModernCringeCard> createState() => _ModernCringeCardState();
 }
 
-class _ModernCringeCardState extends State<ModernCringeCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _likeController;
-  late Animation<double> _likeAnimation;
+class _ModernCringeCardState extends State<ModernCringeCard> {
   bool _isLiked = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _likeController = AnimationController(
-      duration: AppAnimations.normal,
-      vsync: this,
-    );
-    _likeAnimation = Tween<double>(begin: 1.0, end: 1.3).animate(
-      CurvedAnimation(parent: _likeController, curve: Curves.elasticOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _likeController.dispose();
-    super.dispose();
-  }
 
   Color _getCringeColor(double level) {
     if (level < 3) return AppTheme.secondaryColor;
@@ -56,89 +35,91 @@ class _ModernCringeCardState extends State<ModernCringeCard>
 
   @override
   Widget build(BuildContext context) {
-    return ModernCard(
+    return InkWell(
       onTap: widget.onTap,
-      margin: const EdgeInsets.symmetric(
-        horizontal: AppTheme.spacingM,
-        vertical: AppTheme.spacingS,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header: User info and cringe level
-          _buildHeader(),
-
-          const SizedBox(height: AppTheme.spacingM),
-
-          // Content
-          _buildContent(),
-
-          const SizedBox(height: AppTheme.spacingM),
-
-          // Actions
-          _buildActions(),
-        ],
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: AppTheme.spacingS),
+        padding: const EdgeInsets.all(AppTheme.spacingM),
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.6),
+            width: 0.5,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            const SizedBox(height: AppTheme.spacingM),
+            _buildContent(),
+            const SizedBox(height: AppTheme.spacingM),
+            _buildActions(),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildHeader() {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ModernAvatar(
-          initials: widget.entry.authorName.substring(0, 2).toUpperCase(),
-          size: 44,
-          isOnline: true,
+          imageUrl: widget.entry.authorAvatarUrl,
+          initials: _buildInitials(),
+          size: 40,
+          isOnline: false,
         ),
-
-        const SizedBox(width: AppTheme.spacingM),
-
+        const SizedBox(width: AppTheme.spacingS),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Text(
-                    widget.entry.isAnonim ? 'Anonim' : widget.entry.authorName,
-                    style: AppTextStyles.username,
-                  ),
-                  if (!widget.entry.isAnonim) ...[
-                    const SizedBox(width: AppTheme.spacingXS),
-                    const Icon(
-                      Icons.verified,
-                      size: 16,
-                      color: AppTheme.primaryColor,
+              Text(
+                widget.entry.isAnonim ? 'Anonim' : widget.entry.authorName,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
                     ),
-                  ],
-                ],
               ),
-
+              const SizedBox(height: AppTheme.spacingXS),
               Row(
                 children: [
-                  if (!widget.entry.isAnonim)
-                    Text(
-                      widget.entry.authorHandle,
-                      style: AppTextStyles.handle,
+                  if (!widget.entry.isAnonim) ...[
+                    Flexible(
+                      child: Text(
+                        widget.entry.authorHandle,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: AppTheme.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  const SizedBox(width: AppTheme.spacingXS),
+                    const SizedBox(width: AppTheme.spacingXS),
+                  ],
                   Text(
                     _formatTimestamp(widget.entry.createdAt),
-                    style: AppTextStyles.timestamp,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: AppTheme.textMuted),
                   ),
                 ],
               ),
             ],
           ),
         ),
-
-        // Cringe Level Badge
-        _buildCringeLevel(),
+        const SizedBox(width: AppTheme.spacingS),
+        _buildCringeBadge(),
       ],
     );
   }
 
-  Widget _buildCringeLevel() {
+  Widget _buildCringeBadge() {
     final level = widget.entry.krepSeviyesi;
     final color = _getCringeColor(level);
 
@@ -148,11 +129,9 @@ class _ModernCringeCardState extends State<ModernCringeCard>
         vertical: AppTheme.spacingXS,
       ),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color.withValues(alpha: 0.2), color.withValues(alpha: 0.1)],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color, width: 1),
+  color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(12),
+  border: Border.all(color: color.withOpacity(0.4)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -160,10 +139,10 @@ class _ModernCringeCardState extends State<ModernCringeCard>
           Icon(Icons.local_fire_department, size: 16, color: color),
           const SizedBox(width: 4),
           Text(
-            level.toStringAsFixed(1),
+            '${level.toStringAsFixed(1)}/10',
             style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
               color: color,
             ),
           ),
@@ -173,36 +152,40 @@ class _ModernCringeCardState extends State<ModernCringeCard>
   }
 
   Widget _buildContent() {
+    final category = widget.entry.kategori;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Title
         Text(
           widget.entry.baslik,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-            height: 1.3,
-          ),
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textPrimary,
+              ),
         ),
-
         const SizedBox(height: AppTheme.spacingS),
-
-        // Description
         Text(
           widget.entry.aciklama,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.6),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppTheme.textSecondary,
+                height: 1.5,
+              ),
           maxLines: 4,
           overflow: TextOverflow.ellipsis,
         ),
-
         const SizedBox(height: AppTheme.spacingM),
-
-        // Category
-        ModernBadge(
-          text: _getCategoryName(widget.entry.kategori),
-          backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-          textColor: AppTheme.primaryColor,
-          isSmall: true,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(category.icon, size: 16, color: category.color),
+            const SizedBox(width: AppTheme.spacingXS),
+            Text(
+              category.displayName,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondary,
+                  ),
+            ),
+          ],
         ),
       ],
     );
@@ -211,75 +194,88 @@ class _ModernCringeCardState extends State<ModernCringeCard>
   Widget _buildActions() {
     return Row(
       children: [
-        _buildActionButton(
+        _buildMetricAction(
           icon: _isLiked ? Icons.favorite : Icons.favorite_border,
-          count: widget.entry.begeniSayisi,
+          label: _formatCount(widget.entry.begeniSayisi),
           color: _isLiked ? AppTheme.cringeRed : AppTheme.textSecondary,
           onTap: _handleLike,
         ),
-
         const SizedBox(width: AppTheme.spacingL),
-
-        _buildActionButton(
+        _buildMetricAction(
           icon: Icons.chat_bubble_outline,
-          count: widget.entry.yorumSayisi,
-          color: AppTheme.textSecondary,
+          label: _formatCount(widget.entry.yorumSayisi),
           onTap: widget.onComment,
         ),
-
         const Spacer(),
-
-        _buildActionButton(
+        _buildSecondaryAction(
           icon: Icons.share_outlined,
-          color: AppTheme.textSecondary,
+          label: 'Paylaş',
           onTap: widget.onShare,
-        ),
-
-        const SizedBox(width: AppTheme.spacingS),
-
-        _buildActionButton(
-          icon: Icons.bookmark_border,
-          color: AppTheme.textSecondary,
-          onTap: () {},
         ),
       ],
     );
   }
 
-  Widget _buildActionButton({
+  Widget _buildMetricAction({
     required IconData icon,
-    int? count,
-    required Color color,
+    required String label,
+    VoidCallback? onTap,
+    Color? color,
+  }) {
+    final effectiveColor = color ?? AppTheme.textSecondary;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTheme.spacingS,
+          vertical: AppTheme.spacingXS,
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: effectiveColor),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: effectiveColor,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecondaryAction({
+    required IconData icon,
+    required String label,
     VoidCallback? onTap,
   }) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
-      child: AnimatedBuilder(
-        animation: _likeAnimation,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: icon == Icons.favorite && _isLiked
-                ? _likeAnimation.value
-                : 1.0,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 22, color: color),
-                if (count != null) ...[
-                  const SizedBox(width: 4),
-                  Text(
-                    _formatCount(count),
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: color,
-                    ),
-                  ),
-                ],
-              ],
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTheme.spacingS,
+          vertical: AppTheme.spacingXS,
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: AppTheme.textSecondary),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppTheme.textSecondary,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+              ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
@@ -289,13 +285,34 @@ class _ModernCringeCardState extends State<ModernCringeCard>
       _isLiked = !_isLiked;
     });
 
-    if (_isLiked) {
-      _likeController.forward().then((_) {
-        _likeController.reverse();
-      });
+    widget.onLike?.call();
+  }
+
+  String _buildInitials() {
+    final name = widget.entry.authorName.trim();
+    if (name.isNotEmpty) {
+      final parts = name.split(RegExp(r'\s+'));
+      final buffer = StringBuffer();
+      for (final part in parts) {
+        if (part.isEmpty) continue;
+        buffer.write(part[0]);
+        if (buffer.length == 2) break;
+      }
+      if (buffer.isNotEmpty) {
+        return buffer.toString().toUpperCase();
+      }
     }
 
-    widget.onLike?.call();
+    final handle = widget.entry.authorHandle.replaceAll('@', '').trim();
+    if (handle.length >= 2) {
+      return handle.substring(0, 2).toUpperCase();
+    }
+
+    if (name.isNotEmpty) {
+      return name[0].toUpperCase();
+    }
+
+    return 'CR';
   }
 
   String _formatTimestamp(DateTime dateTime) {
@@ -314,9 +331,5 @@ class _ModernCringeCardState extends State<ModernCringeCard>
     if (count < 1000) return count.toString();
     if (count < 1000000) return '${(count / 1000).toStringAsFixed(1)}B';
     return '${(count / 1000000).toStringAsFixed(1)}M';
-  }
-
-  String _getCategoryName(CringeCategory category) {
-    return category.displayName;
   }
 }

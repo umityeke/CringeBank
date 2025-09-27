@@ -11,11 +11,13 @@ import '../services/cringe_entry_service.dart';
 import '../services/user_service.dart';
 
 class ModernCringeDepositScreen extends StatefulWidget {
+  final CringeEntry? existingEntry;
   final VoidCallback? onCringeSubmitted;
   final VoidCallback? onCloseRequested;
   
   const ModernCringeDepositScreen({
     super.key,
+    this.existingEntry,
     this.onCringeSubmitted,
     this.onCloseRequested,
   });
@@ -46,6 +48,9 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
   Uint8List? _selectedImageBytes;
   String? _selectedImageName;
   bool _isImageLoading = false;
+  List<String> _existingImageUrls = [];
+
+  bool get _isEditing => widget.existingEntry != null;
 
   @override
   void initState() {
@@ -74,6 +79,16 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
       parent: _controller,
       curve: const Interval(0.3, 1.0, curve: Curves.easeInOut),
     ));
+
+    if (_isEditing) {
+      final entry = widget.existingEntry!;
+      _titleController.text = entry.baslik;
+      _descriptionController.text = entry.aciklama;
+      _selectedCategory = entry.kategori;
+      _severity = entry.krepSeviyesi.clamp(1, 10).round();
+      _isAnonymous = entry.isAnonim;
+      _existingImageUrls = List<String>.from(entry.imageUrls);
+    }
 
     _controller.forward();
   }
@@ -128,7 +143,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         backgroundColor: const Color(0xFF000000),
         body: AnimatedBubbleBackground(
           bubbleCount: 40,
-          bubbleColor: AppTheme.accentColor.withValues(alpha: 0.3),
+          bubbleColor: AppTheme.accentColor.withOpacity(0.3),
           child: SafeArea(
             child: Column(
               children: [
@@ -171,13 +186,13 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    const Color(0xFF2A2A2A).withValues(alpha: 0.9),
-                    const Color(0xFF1A1A1A).withValues(alpha: 0.7),
+                    const Color(0xFF2A2A2A).withOpacity(0.9),
+                    const Color(0xFF1A1A1A).withOpacity(0.7),
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
+                    color: Colors.black.withOpacity(0.3),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -194,12 +209,12 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                         shape: BoxShape.circle,
                         gradient: LinearGradient(
                           colors: [
-                            AppTheme.accentColor.withValues(alpha: 0.2),
-                            AppTheme.accentColor.withValues(alpha: 0.1),
+                            AppTheme.accentColor.withOpacity(0.2),
+                            AppTheme.accentColor.withOpacity(0.1),
                           ],
                         ),
                         border: Border.all(
-                          color: AppTheme.accentColor.withValues(alpha: 0.3),
+                          color: AppTheme.accentColor.withOpacity(0.3),
                           width: 1,
                         ),
                       ),
@@ -219,9 +234,9 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                           shaderCallback: (bounds) => LinearGradient(
                             colors: [AppTheme.accentColor, Colors.white],
                           ).createShader(bounds),
-                          child: const Text(
-                            'Yeni Krep Paylaş',
-                            style: TextStyle(
+                          child: Text(
+                            _isEditing ? 'Krepi Güncelle' : 'Yeni Krep Paylaş',
+                            style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
@@ -230,10 +245,12 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Utanç verici anınızı toplulukla paylaşın',
+                          _isEditing
+                              ? 'Paylaşımını düzenleyip topluluğa tekrar sun'
+                              : 'Utanç verici anınızı toplulukla paylaşın',
                           style: TextStyle(
                             fontSize: 14,
-                            color: Colors.white.withValues(alpha: 0.7),
+                            color: Colors.white.withOpacity(0.7),
                             fontWeight: FontWeight.w300,
                           ),
                         ),
@@ -264,17 +281,17 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                 borderRadius: BorderRadius.circular(20),
                 gradient: LinearGradient(
                   colors: [
-                    const Color(0xFF2A2A2A).withValues(alpha: 0.8),
-                    const Color(0xFF1A1A1A).withValues(alpha: 0.6),
+                    const Color(0xFF2A2A2A).withOpacity(0.8),
+                    const Color(0xFF1A1A1A).withOpacity(0.6),
                   ],
                 ),
                 border: Border.all(
-                  color: AppTheme.accentColor.withValues(alpha: 0.2),
+                  color: AppTheme.accentColor.withOpacity(0.2),
                   width: 1,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
+                    color: Colors.black.withOpacity(0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -295,7 +312,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                     borderRadius: BorderRadius.circular(8),
                     child: LinearProgressIndicator(
                       value: (_currentStep + 1) / 3,
-                      backgroundColor: Colors.white.withValues(alpha: 0.1),
+                      backgroundColor: Colors.white.withOpacity(0.1),
                       valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accentColor),
                       minHeight: 4,
                     ),
@@ -322,14 +339,14 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
             shape: BoxShape.circle,
             gradient: isCompleted || isActive
                 ? LinearGradient(
-                    colors: [AppTheme.accentColor, AppTheme.accentColor.withValues(alpha: 0.7)],
+                    colors: [AppTheme.accentColor, AppTheme.accentColor.withOpacity(0.7)],
                   )
                 : null,
-            color: isCompleted || isActive ? null : Colors.white.withValues(alpha: 0.2),
+            color: isCompleted || isActive ? null : Colors.white.withOpacity(0.2),
             border: Border.all(
               color: isCompleted || isActive 
                   ? AppTheme.accentColor 
-                  : Colors.white.withValues(alpha: 0.3),
+                  : Colors.white.withOpacity(0.3),
               width: 2,
             ),
           ),
@@ -348,7 +365,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
           title,
           style: TextStyle(
             fontSize: 12,
-            color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.6),
+            color: isActive ? Colors.white : Colors.white.withOpacity(0.6),
             fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
           ),
         ),
@@ -424,13 +441,13 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                         ),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(20),
-                          color: isSelected
-                              ? AppTheme.accentColor.withValues(alpha: 0.8)
-                              : Colors.white.withValues(alpha: 0.1),
+              color: isSelected
+                ? AppTheme.accentColor.withOpacity(0.8)
+                : Colors.white.withOpacity(0.1),
                           border: Border.all(
-                            color: isSelected
-                                ? AppTheme.accentColor
-                                : Colors.white.withValues(alpha: 0.2),
+              color: isSelected
+                ? AppTheme.accentColor
+                : Colors.white.withOpacity(0.2),
                             width: 1,
                           ),
                         ),
@@ -482,7 +499,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                       height: 50,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: _getSeverityColor().withValues(alpha: 0.2),
+                        color: _getSeverityColor().withOpacity(0.2),
                       ),
                       child: Icon(
                         _getSeverityIcon(),
@@ -507,7 +524,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                             '$_severity/10 - ${_getSeverityDescription()}',
                             style: TextStyle(
                               fontSize: 14,
-                              color: Colors.white.withValues(alpha: 0.7),
+                              color: Colors.white.withOpacity(0.7),
                             ),
                           ),
                         ],
@@ -519,9 +536,9 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     activeTrackColor: _getSeverityColor(),
-                    inactiveTrackColor: Colors.white.withValues(alpha: 0.2),
+                    inactiveTrackColor: Colors.white.withOpacity(0.2),
                     thumbColor: _getSeverityColor(),
-                    overlayColor: _getSeverityColor().withValues(alpha: 0.2),
+                    overlayColor: _getSeverityColor().withOpacity(0.2),
                     thumbShape: const RoundSliderThumbShape(
                       enabledThumbRadius: 12,
                     ),
@@ -544,21 +561,21 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                     Text(
                       'Hafif',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
+                        color: Colors.white.withOpacity(0.6),
                         fontSize: 12,
                       ),
                     ),
                     Text(
                       'Orta',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
+                        color: Colors.white.withOpacity(0.6),
                         fontSize: 12,
                       ),
                     ),
                     Text(
                       'Aşırı',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
+                        color: Colors.white.withOpacity(0.6),
                         fontSize: 12,
                       ),
                     ),
@@ -589,7 +606,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                     height: 200,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
+                      border: Border.all(color: AppTheme.accentColor.withOpacity(0.3)),
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
@@ -606,7 +623,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                         child: Text(
                           _selectedImageName ?? 'Seçili fotoğraf',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.8),
+                            color: Colors.white.withOpacity(0.8),
                             fontSize: 14,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -619,6 +636,66 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                       ),
                     ],
                   ),
+                ] else if (_existingImageUrls.isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppTheme.accentColor.withOpacity(0.3),
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.network(
+                            _existingImageUrls.first,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: Colors.black26,
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Icons.broken_image_outlined,
+                                  color: Colors.white70,
+                                ),
+                              );
+                            },
+                          ),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: GestureDetector(
+                              onTap: () => _removeExistingImage(),
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.6),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.close,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Mevcut fotoğraf korunacak',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 14,
+                    ),
+                  ),
                 ] else ...[
                   // Fotoğraf seçme butonu
                   GestureDetector(
@@ -629,10 +706,10 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: Colors.white.withOpacity(0.3),
                           style: BorderStyle.solid,
                         ),
-                        color: Colors.white.withValues(alpha: 0.05),
+                        color: Colors.white.withOpacity(0.05),
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -646,13 +723,13 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                             Icon(
                               Icons.add_photo_alternate_outlined,
                               size: 40,
-                              color: Colors.white.withValues(alpha: 0.7),
+                              color: Colors.white.withOpacity(0.7),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               'Fotoğraf Ekle',
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.7),
+                                color: Colors.white.withOpacity(0.7),
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -661,7 +738,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                             Text(
                               'Dokunarak fotoğraf seçin',
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.5),
+                                color: Colors.white.withOpacity(0.5),
                                 fontSize: 12,
                               ),
                             ),
@@ -710,7 +787,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                   subtitle: Text(
                     'İsminiz gözükmeyecek, sadece "Anonim" yazacak',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
+                      color: Colors.white.withOpacity(0.7),
                       fontSize: 14,
                     ),
                   ),
@@ -760,7 +837,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
             child: Text(
               label,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: Colors.white.withOpacity(0.7),
                 fontSize: 14,
               ),
             ),
@@ -789,9 +866,9 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        color: Colors.white.withValues(alpha: 0.1),
+  color: Colors.white.withOpacity(0.1),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.2),
+          color: Colors.white.withOpacity(0.2),
           width: 1,
         ),
       ),
@@ -832,20 +909,20 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
+              color: Colors.white.withOpacity(0.5),
             ),
             filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.1),
+            fillColor: Colors.white.withOpacity(0.1),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withOpacity(0.2),
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withOpacity(0.2),
               ),
             ),
             focusedBorder: OutlineInputBorder(
@@ -856,7 +933,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
               ),
             ),
             counterStyle: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
+              color: Colors.white.withOpacity(0.7),
             ),
           ),
         ),
@@ -865,6 +942,11 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
   }
 
   Widget _buildNavigationButtons() {
+    final isLastStep = _currentStep == 2;
+    final primaryLabel = isLastStep
+        ? (_isEditing ? 'Güncelle' : 'Paylaş')
+        : 'İleri';
+
     return AnimatedBuilder(
       animation: _scaleAnimation,
       builder: (context, child) {
@@ -880,12 +962,12 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.transparent,
-                    const Color(0xFF1A1A1A).withValues(alpha: 0.8),
+                    const Color(0xFF1A1A1A).withOpacity(0.8),
                   ],
                 ),
                 border: Border(
                   top: BorderSide(
-                    color: AppTheme.accentColor.withValues(alpha: 0.2),
+                    color: AppTheme.accentColor.withOpacity(0.2),
                     width: 1,
                   ),
                 ),
@@ -898,9 +980,9 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                         onPressed: _goToPreviousStep,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
-                          backgroundColor: Colors.white.withValues(alpha: 0.1),
+                          backgroundColor: Colors.white.withOpacity(0.1),
                           side: BorderSide(
-                            color: AppTheme.accentColor.withValues(alpha: 0.4),
+                            color: AppTheme.accentColor.withOpacity(0.4),
                             width: 1.5,
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -925,7 +1007,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                           borderRadius: BorderRadius.circular(16),
                         ),
                         elevation: 8,
-                        shadowColor: AppTheme.accentColor.withValues(alpha: 0.4),
+                        shadowColor: AppTheme.accentColor.withOpacity(0.4),
                       ),
                       child: _isSubmitting
                           ? const SizedBox(
@@ -937,7 +1019,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                               ),
                             )
                           : Text(
-                              _currentStep == 2 ? 'Paylaş' : 'İleri',
+                              primaryLabel,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
@@ -969,9 +1051,8 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
   void _submitEntry() async {
     if (!mounted) return;
     setState(() => _isSubmitting = true);
-    
+
     try {
-      // Kullanıcı bilgilerini al
       var currentUser = UserService.instance.currentUser;
       if (currentUser == null) {
         final firebaseUser = UserService.instance.firebaseUser;
@@ -984,11 +1065,13 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
       if (currentUser == null) {
         throw Exception('Kullanıcı oturum açmamış');
       }
-      
-      // Fotoğraf varsa base64'e çevir ve imageUrls listesine ekle
-      List<String> imageUrls = [];
+
+      final imageUrls = <String>[];
+      if (_existingImageUrls.isNotEmpty) {
+        imageUrls.addAll(_existingImageUrls);
+      }
       if (_selectedImageBytes != null) {
-        String base64Image = base64Encode(_selectedImageBytes!);
+        final base64Image = base64Encode(_selectedImageBytes!);
         imageUrls.add('data:image/jpeg;base64,$base64Image');
       }
 
@@ -1006,9 +1089,38 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
 
       final authorAvatar = _isAnonymous
           ? null
-          : (currentUser.avatar.trim().isNotEmpty ? currentUser.avatar.trim() : null);
-      
-      // Krep entry'sini oluştur
+          : (currentUser.avatar.trim().isNotEmpty
+              ? currentUser.avatar.trim()
+              : null);
+
+      if (_isEditing) {
+        final updatedEntry = widget.existingEntry!.copyWith(
+          authorName: _isAnonymous ? 'Anonim' : displayName,
+          authorHandle: _isAnonymous ? '@anonim' : '@$usernameHandle',
+          baslik: _titleController.text.trim(),
+          aciklama: _descriptionController.text.trim(),
+          kategori: _selectedCategory,
+          krepSeviyesi: _severity.toDouble(),
+          isAnonim: _isAnonymous,
+          imageUrls: imageUrls,
+          authorAvatarUrl: authorAvatar,
+        );
+
+        final success = await CringeEntryService.instance.updateEntry(updatedEntry);
+
+        if (!success) {
+          throw Exception('Krep güncellenemedi, tekrar deneyin');
+        }
+
+        widget.onCringeSubmitted?.call();
+
+        if (mounted) {
+          setState(() => _isSubmitting = false);
+          Navigator.of(context).pop(true);
+        }
+        return;
+      }
+
       final entry = CringeEntry(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         userId: currentUser.id,
@@ -1023,23 +1135,46 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         imageUrls: imageUrls,
         authorAvatarUrl: authorAvatar,
       );
-      
-  debugPrint('Krep entry oluşturuldu: ${entry.baslik}');
-      if (imageUrls.isNotEmpty) {
-  debugPrint('Fotoğraf eklendi: ${imageUrls.length} adet');
-      }
-      
-      // Firestore'a kaydet
+
       final success = await CringeEntryService.instance.addEntry(entry);
-      
+
       if (!success) {
         throw Exception('Krep paylaşılamadı, tekrar deneyin');
       }
-      
-  debugPrint('Krep başarıyla Firestore\'a kaydedildi!');
-      
-    } catch (e) {
-  debugPrint('Krep paylaşma hatası: $e');
+
+      widget.onCringeSubmitted?.call();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(imageUrls.isNotEmpty
+              ? 'Fotoğraflı krep başarıyla paylaşıldı!'
+              : 'Krep başarıyla paylaşıldı!'),
+          backgroundColor: AppTheme.accentColor,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      _titleController.clear();
+      _descriptionController.clear();
+      _selectedImageBytes = null;
+      _selectedImageName = null;
+      _existingImageUrls = [];
+      setState(() {
+        _currentStep = 0;
+        _severity = 5;
+        _isAnonymous = false;
+      });
+
+      _pageController.animateToPage(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } catch (e, stack) {
+      debugPrint('Krep paylaşma hatası: $e');
+      debugPrint('$stack');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1049,44 +1184,10 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
           ),
         );
       }
-    }
-    
-    if (mounted) {
-      setState(() => _isSubmitting = false);
-    }
-    
-    if (mounted) {
-      // Form'u temizle
-      _titleController.clear();
-      _descriptionController.clear();
-      _selectedImageBytes = null;
-      _selectedImageName = null;
-      setState(() {
-        _currentStep = 0;
-        _severity = 5;
-        _isAnonymous = false;
-      });
-      
-      // İlk adıma geri dön
-      _pageController.animateToPage(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-      
-      // Ana sayfaya geç (eğer callback varsa)
-      widget.onCringeSubmitted?.call();
-      
-      // Başarı mesajını göster
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_selectedImageBytes != null 
-            ? 'Fotoğraflı krep başarıyla paylaşıldı!'
-            : 'Krep başarıyla paylaşıldı!'),
-          backgroundColor: AppTheme.accentColor,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
@@ -1142,6 +1243,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
           _selectedImageBytes = compressedBytes;
           _selectedImageName = fileName;
           _isImageLoading = false;
+          _existingImageUrls = [];
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1191,6 +1293,12 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
     setState(() {
       _selectedImageBytes = null;
       _selectedImageName = null;
+    });
+  }
+
+  void _removeExistingImage() {
+    setState(() {
+      _existingImageUrls = [];
     });
   }
 }

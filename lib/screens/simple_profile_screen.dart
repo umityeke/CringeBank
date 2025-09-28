@@ -3,41 +3,135 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import '../data/store_catalog.dart';
 import '../models/cringe_entry.dart';
 import '../models/user_model.dart';
 import '../services/cringe_entry_service.dart';
+import '../services/store_service.dart';
 import '../services/user_service.dart';
 import '../widgets/animated_bubble_background.dart';
 import '../widgets/modern_cringe_card.dart';
+import '../widgets/store_inventory_card.dart';
+import 'cringe_store_screen.dart';
 import 'modern_login_screen.dart';
 import 'profile_edit_screen.dart';
 
 class SimpleProfileScreen extends StatefulWidget {
-  const SimpleProfileScreen({super.key});
+  final String? userId;
+  final User? initialUser;
+
+  const SimpleProfileScreen({super.key, this.userId, this.initialUser});
 
   @override
   State<SimpleProfileScreen> createState() => _SimpleProfileScreenState();
 }
 
+class _BadgeChip extends StatelessWidget {
+  final StoreItemEffect effect;
+
+  const _BadgeChip({required this.effect});
+
+  @override
+  Widget build(BuildContext context) {
+    final background = effect.badgeColor ?? const Color(0xFF7C4DFF);
+    final textColor = effect.badgeTextColor ?? Colors.white;
+    final icon = effect.badgeIcon ?? Icons.auto_awesome;
+    final label = effect.badgeLabel ?? 'Rozet';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: background.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: background.withValues(alpha: 0.6)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: textColor),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: textColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
-  Future<User?> _getCurrentUser() async {
-    final currentUser = UserService.instance.currentUser;
-    if (currentUser != null) {
-      print('_getCurrentUser - Using cached user: ${currentUser.username}');
-      return currentUser;
+  late Future<User?> _profileFuture;
+  final StoreService _storeService = StoreService.instance;
+
+  String? get _requestedUserId => widget.userId ?? widget.initialUser?.id;
+
+  bool _isSelfProfileTarget(String? targetId) {
+    if (targetId == null || targetId.isEmpty) return true;
+    final currentId = UserService.instance.currentUser?.id;
+    if (currentId != null && currentId == targetId) return true;
+    final firebaseId = UserService.instance.firebaseUser?.uid;
+    if (firebaseId != null && firebaseId == targetId) return true;
+    return false;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _profileFuture = _loadProfileUser();
+  }
+
+  @override
+  void didUpdateWidget(covariant SimpleProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldId = oldWidget.userId ?? oldWidget.initialUser?.id;
+    final newId = _requestedUserId;
+    if (oldId != newId) {
+      _profileFuture = _loadProfileUser();
+    }
+  }
+
+  Future<User?> _loadProfileUser() async {
+    final targetId = _requestedUserId;
+    if (_isSelfProfileTarget(targetId)) {
+      final currentUser = UserService.instance.currentUser;
+      if (currentUser != null) {
+        print('_loadProfileUser - Using cached self: ${currentUser.username}');
+        return currentUser;
+      }
+
+      final firebaseUser = UserService.instance.firebaseUser;
+      if (firebaseUser != null) {
+        print(
+          '_loadProfileUser - Loading Firebase user: ${firebaseUser.uid}',
+        );
+        await UserService.instance.loadUserData(firebaseUser.uid);
+        return UserService.instance.currentUser;
+      }
+
+      print('_loadProfileUser - No authenticated user found');
+      return null;
     }
 
-    final firebaseUser = UserService.instance.firebaseUser;
-    if (firebaseUser != null) {
-      print(
-        '_getCurrentUser - Firebase user exists, loading data for: ${firebaseUser.uid}',
-      );
-      await UserService.instance.loadUserData(firebaseUser.uid);
-      return UserService.instance.currentUser;
+    final resolvedId = targetId?.trim() ?? '';
+    if (resolvedId.isEmpty) {
+      return widget.initialUser;
     }
 
-    print('_getCurrentUser - No user found');
-    return null;
+    final fetched = await UserService.instance.getUserById(
+      resolvedId,
+      forceRefresh: widget.initialUser == null,
+    );
+
+    if (fetched != null) {
+      return fetched;
+    }
+
+    return widget.initialUser;
   }
 
   void _navigateToEditProfile(User user) async {
@@ -53,7 +147,10 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
         await UserService.instance.loadUserData(firebaseUser.uid);
       }
       // Sayfayı yenile
-      setState(() {});
+      if (!mounted) return;
+      setState(() {
+        _profileFuture = _loadProfileUser();
+      });
     }
   }
 
@@ -64,7 +161,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     print('Profile Screen - Firebase User: ${firebaseUser?.uid}');
 
     return FutureBuilder<User?>(
-      future: _getCurrentUser(),
+      future: _profileFuture,
       builder: (context, snapshot) {
         print('Profile Screen - Future data: ${snapshot.data?.username}');
         print(
@@ -83,9 +180,13 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
         }
 
         final user = snapshot.data;
+        final targetId = _requestedUserId;
+        final isOwnProfileTarget = _isSelfProfileTarget(targetId);
 
         if (user == null) {
-          return _buildLoginScreen();
+          return isOwnProfileTarget
+              ? _buildLoginScreen()
+              : _buildUserNotFoundScreen();
         }
 
         return _buildProfileScreen(user);
@@ -105,7 +206,9 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                border: Border.all(
+                  color: Colors.orange.withValues(alpha: 0.3),
+                ),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -160,6 +263,58 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     );
   }
 
+  Widget _buildUserNotFoundScreen() {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: AnimatedBubbleBackground(
+        child: SafeArea(
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.12),
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(
+                    Icons.person_off_outlined,
+                    color: Colors.orange,
+                    size: 56,
+                  ),
+                  SizedBox(height: 20),
+                  Text(
+                    'Kullanıcı bulunamadı',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'Aradığınız kullanıcı kaldırılmış veya mevcut değil.',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 15,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildProfileScreen(User user) {
     return Scaffold(
       backgroundColor: Colors.black,
@@ -188,7 +343,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                 height: 240,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.orange.withOpacity(0.18),
+                  color: Colors.orange.withValues(alpha: 0.18),
                 ),
               ),
             ),
@@ -200,7 +355,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                 height: 220,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.pinkAccent.withOpacity(0.12),
+                  color: Colors.pinkAccent.withValues(alpha: 0.12),
                 ),
               ),
             ),
@@ -221,24 +376,43 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                       fit: BoxFit.contain,
                     ),
                     actions: [
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        tooltip: 'Profili düzenle',
-                        onPressed: () => _navigateToEditProfile(user),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-                        tooltip: 'Çıkış yap',
-                        onPressed: () async {
-                          await UserService.instance.logout();
-                          if (!mounted) return;
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ModernLoginScreen(),
+                      Container(
+                        margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+                        child: ElevatedButton.icon(
+                          icon: const Icon(
+                            Icons.store_rounded,
+                            size: 18,
+                            color: Colors.black,
+                          ),
+                          label: const Text(
+                            'Cringe Store',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: Colors.black,
                             ),
-                          );
-                        },
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            elevation: 3,
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const CringeStoreScreen(),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ],
                   ),
@@ -251,6 +425,8 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                           _buildHeaderCard(user),
                           const SizedBox(height: 12),
                           _buildStatsGrid(user),
+                          const SizedBox(height: 16),
+                          StoreInventoryCard(user: user),
                           const SizedBox(height: 16),
                           _buildUserEntriesSection(user),
                           const SizedBox(height: 32),
@@ -271,16 +447,32 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
 
   Widget _buildHeaderCard(User user) {
     final theme = Theme.of(context);
-    final displayName = user.fullName.isNotEmpty ? user.fullName : user.username;
+    final displayName =
+        user.fullName.isNotEmpty ? user.fullName : user.username;
+    final frameEffect = _storeService.resolveFrameEffect(user);
+    final backgroundEffect = _storeService.resolveBackgroundEffect(user);
+    final badgeEffects = _storeService.resolveBadgeEffects(user);
+    final nameColor = _storeService.resolveNameColor(user);
+    final backgroundGlow = backgroundEffect.backgroundGlow ?? const <Color>[];
+
+    const baseGradient = LinearGradient(
+      colors: [Color(0xFF1C1A24), Color(0xFF14111C)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.orange.withOpacity(0.18),
-            blurRadius: 40,
-            offset: const Offset(0, 24),
+      color: (backgroundGlow.isNotEmpty
+          ? backgroundGlow.first
+          : Colors.orange)
+        .withValues(alpha: 0.25),
+            blurRadius: 42,
+            spreadRadius: 2,
+            offset: const Offset(0, 28),
           ),
         ],
       ),
@@ -289,15 +481,33 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
         child: Stack(
           children: [
             Positioned.fill(
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.transparent,
-                ),
+              child: DecoratedBox(
+                decoration: const BoxDecoration(gradient: baseGradient),
               ),
             ),
+            if (backgroundGlow.isNotEmpty)
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      colors: [
+            ...backgroundGlow
+              .map((color) => color.withValues(alpha: 0.35)),
+                        Colors.transparent,
+                      ],
+                      radius: 1.05,
+                      center: Alignment.topLeft,
+                    ),
+                  ),
+                ),
+              ),
             Positioned.fill(
-              child: Container(
-                color: Colors.transparent,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.04),
+                  ),
+                ),
               ),
             ),
             Padding(
@@ -310,7 +520,11 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                     children: [
                       Transform.translate(
                         offset: const Offset(0, -24),
-                        child: _buildAvatar(user),
+                        child: _buildAvatar(
+                          user,
+                          frameEffect: frameEffect,
+                          backgroundEffect: backgroundEffect,
+                        ),
                       ),
                       const SizedBox(width: 20),
                       Expanded(
@@ -322,8 +536,17 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.headlineSmall?.copyWith(
-                                color: Colors.white,
+                                color: nameColor ?? Colors.white,
                                 fontWeight: FontWeight.w700,
+                                shadows: nameColor != null
+                                    ? [
+                                        Shadow(
+                      color:
+                        nameColor.withValues(alpha: 0.35),
+                                          blurRadius: 16,
+                                        ),
+                                      ]
+                                    : null,
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -332,31 +555,40 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                                 Text(
                                   '@${user.username}',
                                   style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: Colors.white.withOpacity(0.7),
+                                    color: Colors.white.withValues(alpha: 0.7),
                                   ),
                                 ),
                                 if (user.isVerified) ...[
                                   const SizedBox(width: 6),
-                                  Icon(
+                                  const Icon(
                                     Icons.verified_rounded,
                                     size: 16,
-                                    color: Colors.purple,
+                                    color: Colors.purpleAccent,
                                   ),
                                 ],
                               ],
                             ),
-
+                            if (badgeEffects.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: badgeEffects
+                                    .map((effect) => _BadgeChip(effect: effect))
+                                    .toList(),
+                              ),
+                            ],
                           ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 6),
                   if (user.bio.trim().isNotEmpty)
                     Text(
                       user.bio,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withOpacity(0.84),
+                        color: Colors.white.withValues(alpha: 0.84),
                         height: 1.5,
                       ),
                     )
@@ -364,7 +596,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                     Text(
                       'Profiline birkaç cümle ile renk kat. Kendini tanıt, ilgi alanlarını paylaş.',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withOpacity(0.6),
+                        color: Colors.white.withValues(alpha: 0.6),
                         fontStyle: FontStyle.italic,
                         height: 1.5,
                       ),
@@ -379,8 +611,10 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFFFFB74D),
                             foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 16),
+                            textStyle:
+                                const TextStyle(fontWeight: FontWeight.w600),
                           ),
                           onPressed: () => _navigateToEditProfile(user),
                         ),
@@ -392,14 +626,20 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                           label: const Text('Krep Paylaş'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.white,
-                            side: BorderSide(color: Colors.white.withOpacity(0.35)),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                            side: BorderSide(
+                              color: Colors.white.withValues(alpha: 0.35),
+                            ),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 16),
+                            textStyle:
+                                const TextStyle(fontWeight: FontWeight.w600),
                           ),
                           onPressed: () {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: const Text('Yakında: Hızlı krep paylaşımı!'),
+                                content: const Text(
+                                  'Yakında: Hızlı krep paylaşımı!',
+                                ),
                                 backgroundColor: Colors.orange.shade400,
                                 behavior: SnackBarBehavior.floating,
                                 duration: const Duration(seconds: 2),
@@ -419,56 +659,93 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     );
   }
 
-  Widget _buildAvatar(User user) {
+  Widget _buildAvatar(
+    User user, {
+    required StoreItemEffect frameEffect,
+    required StoreItemEffect backgroundEffect,
+  }) {
     final avatarRadius = 46.0;
     final bytes = _decodeAvatar(user.avatar);
 
-    return Container(
-      width: avatarRadius * 2,
-      height: avatarRadius * 2,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
+    final frameGradient = frameEffect.frameGradient ??
+        const LinearGradient(
           colors: [Color(0xFFFFA726), Color(0xFFFF7043)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.orange.withOpacity(0.35),
-            blurRadius: 32,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Container(
-        margin: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withOpacity(0.45), width: 2.4),
-        ),
-        child: ClipOval(
-          child: bytes != null
-              ? Image.memory(bytes, fit: BoxFit.cover)
-              : Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF2C3350), Color(0xFF1F2538)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+        );
+  final frameBorder =
+    frameEffect.frameBorderWidth.clamp(2.0, 12.0).toDouble();
+    final glowColors = backgroundEffect.backgroundGlow ?? const <Color>[];
+    final glowColor =
+        glowColors.isNotEmpty ? glowColors.first : const Color(0xFFFFA726);
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        if (glowColors.isNotEmpty)
+          Container(
+            width: avatarRadius * 2 + 36,
+            height: avatarRadius * 2 + 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  ...glowColors.map(
+                    (color) => color.withValues(alpha: 0.35),
                   ),
-                  child: Center(
-                    child: Text(
-                      _buildAvatarFallbackInitial(user),
-                      style: const TextStyle(
-                        fontSize: 28,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                  Colors.transparent,
+                ],
+                radius: 0.9,
+              ),
+            ),
+          ),
+        Container(
+          width: avatarRadius * 2,
+          height: avatarRadius * 2,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: frameGradient,
+            boxShadow: [
+              BoxShadow(
+                color: glowColor.withValues(alpha: 0.35),
+                blurRadius: 32,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Container(
+            margin: EdgeInsets.all(frameBorder),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.45),
+                  width: 2.4,
+                ),
+            ),
+            child: ClipOval(
+              child: bytes != null
+                  ? Image.memory(bytes, fit: BoxFit.cover)
+                  : Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF2C3350), Color(0xFF1F2538)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          _buildAvatarFallbackInitial(user),
+                          style: const TextStyle(
+                            fontSize: 28,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -538,15 +815,12 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
       },
     ];
 
-    return GridView.builder(
+    return MasonryGridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 3,
-        mainAxisSpacing: 3,
-        childAspectRatio: 2.2,
-      ),
+      crossAxisCount: 3,
+      mainAxisSpacing: 3,
+      crossAxisSpacing: 3,
       itemCount: stats.length,
       itemBuilder: (context, index) {
         final stat = stats[index];
@@ -558,7 +832,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
               CircleAvatar(
                 radius: 8,
         backgroundColor:
-          (stat['color'] as Color).withOpacity(0.18),
+          (stat['color'] as Color).withValues(alpha: 0.18),
                 child: Icon(
                   stat['icon'] as IconData,
                   color: stat['color'] as Color,
@@ -577,7 +851,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
               Text(
                 stat['label'] as String,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0,
@@ -597,6 +871,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
 
 
   Widget _buildUserEntriesSection(User user) {
+    final isOwnProfile = _isSelfProfileTarget(user.id);
     final fallbackUserId = UserService.instance.firebaseUser?.uid ?? '';
     final userId = user.id.isNotEmpty ? user.id : fallbackUserId;
 
@@ -641,10 +916,13 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
             ),
           );
         } else if (entries.isEmpty) {
+          final emptyMessage = isOwnProfile
+              ? 'Henüz paylaştığın bir krep yok. İlk kremini paylaşarak topluluğa katıl!'
+              : 'Bu kullanıcı henüz krep paylaşmamış.';
           content = KeyedSubtree(
             key: const ValueKey('entries-empty'),
             child: _buildSimpleEntriesInfoMessage(
-              'Henüz paylaştığın bir krep yok. İlk kremini paylaşarak topluluğa katıl!',
+              emptyMessage,
               icon: Icons.bakery_dining_outlined,
             ),
           );
@@ -692,7 +970,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.orange.withOpacity(0.18),
+              color: Colors.orange.withValues(alpha: 0.18),
             ),
             child: Icon(icon, color: Colors.orangeAccent, size: 28),
           ),

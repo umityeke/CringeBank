@@ -20,6 +20,7 @@ class CringeBankApp extends StatelessWidget {
     return MaterialApp(
       title: 'CringeBank',
       theme: AppTheme.lightTheme,
+      scrollBehavior: const _NoScrollbarScrollBehavior(),
       debugShowCheckedModeBanner: false,
       home: StreamBuilder<firebase_auth.User?>(
         stream: UserService.instance.authStateChanges,
@@ -42,6 +43,28 @@ class CringeBankApp extends StatelessWidget {
         '/login': (context) => const ModernLoginScreen(),
       },
     );
+  }
+}
+
+class _NoScrollbarScrollBehavior extends MaterialScrollBehavior {
+  const _NoScrollbarScrollBehavior();
+
+  @override
+  Widget buildScrollbar(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
+  }
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
   }
 }
 

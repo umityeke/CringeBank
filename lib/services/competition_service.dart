@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import '../models/cringe_comment.dart';
 import '../models/cringe_entry.dart';
 import '../services/cringe_notification_service.dart';
 
@@ -15,6 +16,105 @@ enum CompetitionType {
   communityChoice,
   speedRound,
   legendary,
+}
+
+enum CompetitionJoinResult {
+  success,
+  limitReached,
+  alreadyJoined,
+  notFound,
+  unauthorized,
+  closed,
+  full,
+}
+
+enum CompetitionLeaveResult {
+  success,
+  notParticipant,
+  notFound,
+  unauthorized,
+}
+
+class CompetitionCommentWinner {
+  const CompetitionCommentWinner({
+    required this.commentId,
+    required this.entryId,
+    required this.userId,
+    required this.authorName,
+    required this.authorHandle,
+    required this.content,
+    required this.likeCount,
+    required this.createdAt,
+    this.authorAvatarUrl,
+  });
+
+  final String commentId;
+  final String entryId;
+  final String userId;
+  final String authorName;
+  final String authorHandle;
+  final String content;
+  final int likeCount;
+  final DateTime createdAt;
+  final String? authorAvatarUrl;
+
+  factory CompetitionCommentWinner.fromMap(Map<String, dynamic> data) {
+    DateTime parseCreatedAt(dynamic value) {
+      if (value is Timestamp) return value.toDate();
+      if (value is String) {
+        final parsed = DateTime.tryParse(value);
+        if (parsed != null) return parsed;
+      }
+      return DateTime.now();
+    }
+
+    return CompetitionCommentWinner(
+      commentId: (data['commentId'] ?? '').toString(),
+      entryId: (data['entryId'] ?? '').toString(),
+      userId: (data['userId'] ?? '').toString(),
+      authorName: (data['authorName'] ?? 'Anonim').toString(),
+      authorHandle: (data['authorHandle'] ?? '@anonim').toString(),
+      content: (data['content'] ?? '').toString(),
+      likeCount: (data['likeCount'] as num?)?.toInt() ?? 0,
+      createdAt: parseCreatedAt(data['createdAt']),
+      authorAvatarUrl: data['authorAvatarUrl'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'commentId': commentId,
+      'entryId': entryId,
+      'userId': userId,
+      'authorName': authorName,
+      'authorHandle': authorHandle,
+      'authorAvatarUrl': authorAvatarUrl,
+      'content': content,
+      'likeCount': likeCount,
+      'createdAt': Timestamp.fromDate(createdAt),
+    };
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'commentId': commentId,
+      'entryId': entryId,
+      'userId': userId,
+      'authorName': authorName,
+      'authorHandle': authorHandle,
+      'authorAvatarUrl': authorAvatarUrl,
+      'content': content,
+      'likeCount': likeCount,
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+}
+
+class _CompetitionCommentWinnerCacheEntry {
+  const _CompetitionCommentWinnerCacheEntry(this.winner, this.fetchedAt);
+
+  final CompetitionCommentWinner? winner;
+  final DateTime fetchedAt;
 }
 
 class Competition {
@@ -33,6 +133,9 @@ class Competition {
   final CringeCategory? specificCategory;
   final double? targetKrepLevel;
   final String? sponsor;
+  final String? createdByUserId;
+  final List<String> participantUserIds;
+  final int totalCommentCount;
 
   Competition({
     required this.id,
@@ -50,6 +153,9 @@ class Competition {
     this.specificCategory,
     this.targetKrepLevel,
     this.sponsor,
+    this.createdByUserId,
+    this.participantUserIds = const [],
+    this.totalCommentCount = 0,
   });
 
   Competition copyWith({
@@ -68,6 +174,9 @@ class Competition {
     CringeCategory? specificCategory,
     double? targetKrepLevel,
     String? sponsor,
+    String? createdByUserId,
+    List<String>? participantUserIds,
+    int? totalCommentCount,
   }) {
     return Competition(
       id: id ?? this.id,
@@ -85,6 +194,9 @@ class Competition {
       specificCategory: specificCategory ?? this.specificCategory,
       targetKrepLevel: targetKrepLevel ?? this.targetKrepLevel,
       sponsor: sponsor ?? this.sponsor,
+      createdByUserId: createdByUserId ?? this.createdByUserId,
+      participantUserIds: participantUserIds ?? this.participantUserIds,
+      totalCommentCount: totalCommentCount ?? this.totalCommentCount,
     );
   }
 
@@ -136,6 +248,8 @@ class Competition {
         .whereType<CringeEntry>()
         .toList();
 
+  final entryCommentSum = entries.fold<int>(0, (sum, entry) => sum + entry.yorumSayisi);
+
     final votesData = (data['votes'] as Map<String, dynamic>?) ?? {};
     final votes = votesData.map(
       (key, value) => MapEntry(key, (value as num?)?.toInt() ?? 0),
@@ -157,6 +271,14 @@ class Competition {
       specificCategory: parseCategory(data['specificCategory'] as String?),
       targetKrepLevel: (data['targetKrepLevel'] as num?)?.toDouble(),
       sponsor: data['sponsor'] as String?,
+      createdByUserId: data['createdByUserId'] as String?,
+      participantUserIds: ((data['participantUserIds'] ?? data['participants'])
+              as List?)
+              ?.map((value) => value.toString())
+              .toList() ??
+          const [],
+    totalCommentCount:
+      (data['totalCommentCount'] as num?)?.toInt() ?? entryCommentSum,
     );
   }
 
@@ -177,6 +299,9 @@ class Competition {
       'specificCategory': specificCategory?.name,
       'targetKrepLevel': targetKrepLevel,
       'sponsor': sponsor,
+      'createdByUserId': createdByUserId,
+      'participantUserIds': participantUserIds,
+      'totalCommentCount': totalCommentCount,
     };
   }
 
@@ -197,11 +322,16 @@ class Competition {
       'specificCategory': specificCategory?.name,
       'targetKrepLevel': targetKrepLevel,
       'sponsor': sponsor,
+      'createdByUserId': createdByUserId,
+      'participantUserIds': participantUserIds,
+      'totalCommentCount': totalCommentCount,
     };
   }
 }
 
 class CompetitionService {
+  static const int maxCompetitionDurationDays = 10;
+
   static final List<Competition> _competitions = [];
   static final StreamController<List<Competition>> _competitionsController =
       StreamController<List<Competition>>.broadcast();
@@ -210,10 +340,16 @@ class CompetitionService {
   static StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
   _firestoreSubscription;
   static bool _isInitialized = false;
+  static final Map<String, _CompetitionCommentWinnerCacheEntry>
+    _commentWinnerCache = <String, _CompetitionCommentWinnerCacheEntry>{};
+  static const Duration _commentWinnerCacheTTL = Duration(minutes: 3);
 
   // Competition stream
   static Stream<List<Competition>> get competitionsStream =>
       _competitionsController.stream;
+
+  static List<Competition> get currentCompetitions =>
+    List.unmodifiable(_competitions);
 
   // Initialize competition service
   static Future<void> initialize() async {
@@ -387,9 +523,12 @@ class CompetitionService {
     updatedVotes['mock_2'] = 23;
     updatedVotes['mock_3'] = 8;
 
+    final mergedEntries = [...competition.entries, ...mockEntries];
     final updatedCompetition = competition.copyWith(
-      entries: [...competition.entries, ...mockEntries],
+      entries: mergedEntries,
       votes: updatedVotes,
+      totalCommentCount:
+          mergedEntries.fold<int>(0, (sum, entry) => sum + entry.yorumSayisi),
     );
 
     final index = _competitions.indexWhere((c) => c.id == competitionId);
@@ -443,12 +582,16 @@ class CompetitionService {
         newStatus = CompetitionStatus.results;
 
         // Sonuçlar açıklandığında bildirim gönder
-        final winner = _getCompetitionWinner(competition);
+        final winner = await fetchCommentWinner(
+          competition,
+          forceRefresh: true,
+        );
+        final notificationBody = winner != null
+            ? 'Kazanan: ${winner.authorName} – ${winner.likeCount} beğeni kazandı!'
+            : '"${competition.title}" sonuçları açıklandı!';
         _sendCompetitionNotification(
           title: '🎉 Sonuçlar Açıklandı!',
-          body: winner != null
-              ? 'Kazanan: "\${winner.title}" - \${competition.prizeKrepCoins} Krep Coin!'
-              : '"\${competition.title}" sonuçları açıklandı!',
+          body: notificationBody,
         );
       }
 
@@ -464,29 +607,6 @@ class CompetitionService {
     }
   }
 
-  // Get competition winner
-  static CringeEntry? _getCompetitionWinner(Competition competition) {
-    if (competition.votes.isEmpty) return null;
-
-    // En çok oy alan entry'yi bul
-    String winnerEntryId = '';
-    int maxVotes = 0;
-
-    competition.votes.forEach((entryId, voteCount) {
-      if (voteCount > maxVotes) {
-        maxVotes = voteCount;
-        winnerEntryId = entryId;
-      }
-    });
-
-    if (winnerEntryId.isEmpty) return null;
-
-    return competition.entries.firstWhere(
-      (entry) => entry.id == winnerEntryId,
-      orElse: () => competition.entries.first,
-    );
-  }
-
   // Send competition notification
   static void _sendCompetitionNotification({
     required String title,
@@ -496,6 +616,122 @@ class CompetitionService {
       title: title,
       body: body,
     );
+  }
+
+  static Future<CompetitionCommentWinner?> fetchCommentWinner(
+    Competition competition, {
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh) {
+      final cacheEntry = _commentWinnerCache[competition.id];
+      if (cacheEntry != null) {
+        final isFresh =
+            DateTime.now().difference(cacheEntry.fetchedAt) <=
+                _commentWinnerCacheTTL;
+        if (isFresh) {
+          return cacheEntry.winner;
+        }
+      }
+    }
+
+    final winner = await _calculateCommentWinner(competition);
+    _commentWinnerCache[competition.id] =
+        _CompetitionCommentWinnerCacheEntry(winner, DateTime.now());
+    return winner;
+  }
+
+  static Future<CompetitionCommentWinner?> _calculateCommentWinner(
+    Competition competition,
+  ) async {
+    if (competition.entries.isEmpty) {
+      return null;
+    }
+
+    final futures = <Future<QuerySnapshot<Map<String, dynamic>>>>[];
+    for (final entry in competition.entries) {
+      futures.add(
+        _firestore
+            .collection('cringe_entries')
+            .doc(entry.id)
+            .collection('comments')
+            .orderBy('likeCount', descending: true)
+            .limit(25)
+            .get(),
+      );
+    }
+
+    final snapshots = await Future.wait(futures, eagerError: false);
+
+    CompetitionCommentWinner? currentWinner;
+    for (var i = 0; i < snapshots.length; i++) {
+      final entry = competition.entries[i];
+      final snapshot = snapshots[i];
+
+      for (final doc in snapshot.docs) {
+        final comment = CringeComment.fromFirestore(
+          doc.data(),
+          documentId: doc.id,
+          entryId: entry.id,
+        );
+
+        final candidate = CompetitionCommentWinner(
+          commentId: comment.id,
+          entryId: entry.id,
+          userId: comment.userId,
+          authorName: comment.authorName,
+          authorHandle: comment.authorHandle,
+          content: comment.content,
+          likeCount: comment.likeCount,
+          createdAt: comment.createdAt,
+          authorAvatarUrl: comment.authorAvatarUrl,
+        );
+
+        currentWinner = _selectBetterWinner(currentWinner, candidate);
+      }
+    }
+
+    return currentWinner;
+  }
+
+  static CompetitionCommentWinner? _selectBetterWinner(
+    CompetitionCommentWinner? current,
+    CompetitionCommentWinner candidate,
+  ) {
+    if (current == null) {
+      return candidate;
+    }
+
+    if (candidate.likeCount > current.likeCount) {
+      return candidate;
+    }
+    if (candidate.likeCount < current.likeCount) {
+      return current;
+    }
+
+    if (candidate.createdAt.isBefore(current.createdAt)) {
+      return candidate;
+    }
+    if (candidate.createdAt.isAfter(current.createdAt)) {
+      return current;
+    }
+
+    return candidate.commentId.compareTo(current.commentId) < 0
+        ? candidate
+        : current;
+  }
+
+  static void invalidateCommentWinnerForEntry(String entryId) {
+    final affectedCompetitions = _competitions.where((competition) {
+      return competition.entries.any((entry) => entry.id == entryId);
+    });
+
+    for (final competition in affectedCompetitions) {
+      _commentWinnerCache.remove(competition.id);
+    }
+  }
+
+  static void invalidateCommentWinner(String competitionId) {
+    _commentWinnerCache.remove(competitionId);
   }
 
   // Get all competitions
@@ -574,12 +810,29 @@ class CompetitionService {
         return false;
       }
 
+      if (_hasActiveParticipation(entry.userId,
+          exceptCompetitionId: competitionId)) {
+        return false;
+      }
+
+      if (competition.entries.any((e) => e.userId == entry.userId)) {
+        return false;
+      }
+
       final updatedEntries = [...competition.entries, entry];
+      final updatedParticipants = {
+        ...competition.participantUserIds,
+        entry.userId,
+      }.toList();
       _competitions[competitionIndex] = competition.copyWith(
         entries: updatedEntries,
+        participantUserIds: updatedParticipants,
+        totalCommentCount:
+            competition.totalCommentCount + entry.yorumSayisi,
       );
       _competitionsController.add(List.unmodifiable(_competitions));
       await _persistCompetitionsToFirestore(_competitions);
+      invalidateCommentWinner(competitionId);
 
       return true;
     } catch (e) {
@@ -611,14 +864,29 @@ class CompetitionService {
   // Create new competition (admin function)
   static Future<bool> createCompetition(Competition competition) async {
     try {
-      _competitions.add(competition);
+      if (!_isDurationWithinLimit(competition.startDate, competition.endDate)) {
+        return false;
+      }
+
+      final createdBy =
+          competition.createdByUserId ?? firebase_auth.FirebaseAuth.instance.currentUser?.uid;
+      if (createdBy != null && _hasOngoingCompetition(createdBy)) {
+        return false;
+      }
+
+      final competitionToPersist = createdBy != null
+          ? competition.copyWith(createdByUserId: createdBy)
+          : competition;
+
+      _competitions.add(competitionToPersist);
       _competitionsController.add(List.unmodifiable(_competitions));
       await _persistCompetitionsToFirestore(_competitions);
 
       // Yeni yarışma bildirimini gönder
       _sendCompetitionNotification(
         title: '🆕 Yeni Yarışma!',
-        body: '"\${competition.title}" yarışması eklendi. Katılmayı unutma!',
+        body:
+            '"${competitionToPersist.title}" yarışması eklendi. Katılmayı unutma!',
       );
 
       return true;
@@ -626,6 +894,318 @@ class CompetitionService {
       // Debug: 'Create competition error: \$e'
       return false;
     }
+  }
+
+  static Future<bool> deleteCompetition(String competitionId) async {
+    try {
+      final index = _competitions.indexWhere((c) => c.id == competitionId);
+      if (index == -1) return false;
+
+      final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return false;
+
+      final competition = _competitions[index];
+      if (competition.createdByUserId != currentUser.uid) {
+        return false;
+      }
+
+      _competitions.removeAt(index);
+      _competitionsController.add(List.unmodifiable(_competitions));
+      await _persistCompetitionsToFirestore(_competitions);
+
+      return true;
+    } catch (e) {
+      // Debug: 'Delete competition error: $e'
+      return false;
+    }
+  }
+
+  static bool hasOngoingCompetitionForCurrentUser() {
+    final user = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    return _hasOngoingCompetition(user.uid);
+  }
+
+  static bool hasActiveParticipationForCurrentUser() {
+    final user = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    return _hasActiveParticipation(user.uid);
+  }
+
+  static Future<CompetitionJoinResult> joinCompetition(
+      String competitionId) async {
+    final user = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return CompetitionJoinResult.unauthorized;
+    }
+
+    final index = _competitions.indexWhere((c) => c.id == competitionId);
+    if (index == -1) {
+      return CompetitionJoinResult.notFound;
+    }
+
+    final competition = _competitions[index];
+
+    if (competition.status != CompetitionStatus.active &&
+        competition.status != CompetitionStatus.upcoming) {
+      return CompetitionJoinResult.closed;
+    }
+
+    if (competition.participantUserIds.contains(user.uid)) {
+      return CompetitionJoinResult.alreadyJoined;
+    }
+
+    if (_hasActiveParticipation(user.uid)) {
+      return CompetitionJoinResult.limitReached;
+    }
+
+    if (competition.participantUserIds.length >= competition.maxEntries) {
+      return CompetitionJoinResult.full;
+    }
+
+    final updatedParticipants = [...competition.participantUserIds, user.uid];
+    _competitions[index] = competition.copyWith(
+      participantUserIds: updatedParticipants,
+    );
+    _competitionsController.add(List.unmodifiable(_competitions));
+    await _persistCompetitionsToFirestore(_competitions);
+
+    return CompetitionJoinResult.success;
+  }
+
+  static Future<CompetitionLeaveResult> leaveCompetition(
+      String competitionId) async {
+    final user = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return CompetitionLeaveResult.unauthorized;
+    }
+
+    final index = _competitions.indexWhere((c) => c.id == competitionId);
+    if (index == -1) {
+      return CompetitionLeaveResult.notFound;
+    }
+
+    final competition = _competitions[index];
+
+    if (!competition.participantUserIds.contains(user.uid)) {
+      return CompetitionLeaveResult.notParticipant;
+    }
+
+    final updatedParticipants =
+        competition.participantUserIds.where((id) => id != user.uid).toList();
+    final updatedEntries =
+        competition.entries.where((entry) => entry.userId != user.uid).toList();
+    final removedCommentTotal = competition.entries
+        .where((entry) => entry.userId == user.uid)
+        .fold<int>(0, (sum, entry) => sum + entry.yorumSayisi);
+    final updatedTotalCommentCount = max(
+      0,
+      competition.totalCommentCount - removedCommentTotal,
+    );
+
+    _competitions[index] = competition.copyWith(
+      participantUserIds: updatedParticipants,
+      entries: updatedEntries,
+      totalCommentCount: updatedTotalCommentCount,
+    );
+    _competitionsController.add(List.unmodifiable(_competitions));
+    await _persistCompetitionsToFirestore(_competitions);
+    invalidateCommentWinner(competitionId);
+
+    return CompetitionLeaveResult.success;
+  }
+
+  static Future<void> replaceEntryIdIfPresent({
+    required String oldEntryId,
+    required String newEntryId,
+  }) async {
+    if (oldEntryId.isEmpty || newEntryId.isEmpty || oldEntryId == newEntryId) {
+      return;
+    }
+
+    bool hasChanges = false;
+
+    for (var i = 0; i < _competitions.length; i++) {
+      final competition = _competitions[i];
+      final entryIndex = competition.entries.indexWhere(
+        (entry) => entry.id == oldEntryId,
+      );
+
+      if (entryIndex == -1) {
+        continue;
+      }
+
+      final updatedEntries = [...competition.entries];
+      final updatedEntry = updatedEntries[entryIndex].copyWith(id: newEntryId);
+      updatedEntries[entryIndex] = updatedEntry;
+
+      final updatedVotes = Map<String, int>.from(competition.votes);
+      if (updatedVotes.containsKey(oldEntryId)) {
+        final voteCount = updatedVotes.remove(oldEntryId)!;
+        updatedVotes[newEntryId] = voteCount;
+      }
+
+      _competitions[i] = competition.copyWith(
+        entries: updatedEntries,
+        votes: updatedVotes,
+      );
+      hasChanges = true;
+
+      try {
+        await _firestore.collection('competitions').doc(competition.id).update({
+          'entries': updatedEntries.map((entry) => entry.toJson()).toList(),
+          'votes': updatedVotes,
+        });
+      } catch (e) {
+        // ignore: avoid_print
+        print('CompetitionService entry ID sync error: $e');
+      }
+    }
+
+    if (hasChanges) {
+      _competitionsController.add(List.unmodifiable(_competitions));
+    }
+  }
+
+  static Future<void> incrementEntryCommentCount(
+    String entryId, {
+    int delta = 1,
+  }) async {
+    if (delta == 0) return;
+
+    bool updated = false;
+
+    for (var i = 0; i < _competitions.length; i++) {
+      final competition = _competitions[i];
+      if (competition.entries.isEmpty) continue;
+
+      final entryIndex = competition.entries.indexWhere(
+        (entry) => entry.id == entryId,
+      );
+
+      if (entryIndex == -1) {
+        continue;
+      }
+
+      final entry = competition.entries[entryIndex];
+      final newCount = max(0, entry.yorumSayisi + delta);
+
+      if (newCount == entry.yorumSayisi) {
+        continue;
+      }
+
+      final appliedDelta = newCount - entry.yorumSayisi;
+
+      final updatedEntries = [...competition.entries];
+      updatedEntries[entryIndex] = entry.copyWith(yorumSayisi: newCount);
+
+      final updatedTotalCommentCount = max(
+        0,
+        competition.totalCommentCount + appliedDelta,
+      );
+
+      _competitions[i] = competition.copyWith(
+        entries: updatedEntries,
+        totalCommentCount: updatedTotalCommentCount,
+      );
+      updated = true;
+
+      try {
+        await _firestore.collection('competitions').doc(competition.id).update({
+          'entries': updatedEntries.map((e) => e.toJson()).toList(),
+          'totalCommentCount': updatedTotalCommentCount,
+        });
+      } catch (e) {
+        // ignore: avoid_print
+        print('CompetitionService comment update error: $e');
+      }
+    }
+
+    if (updated) {
+      _competitionsController.add(List.unmodifiable(_competitions));
+    }
+  }
+
+  static Future<void> incrementEntryLikeCount(
+    String entryId, {
+    int delta = 1,
+  }) async {
+    if (delta == 0) return;
+
+    bool updated = false;
+
+    for (var i = 0; i < _competitions.length; i++) {
+      final competition = _competitions[i];
+      if (competition.entries.isEmpty) continue;
+
+      final entryIndex = competition.entries.indexWhere(
+        (entry) => entry.id == entryId,
+      );
+
+      if (entryIndex == -1) {
+        continue;
+      }
+
+      final entry = competition.entries[entryIndex];
+      final newCount = max(0, entry.begeniSayisi + delta);
+
+      if (newCount == entry.begeniSayisi) {
+        continue;
+      }
+
+      final updatedEntries = [...competition.entries];
+      updatedEntries[entryIndex] = entry.copyWith(begeniSayisi: newCount);
+
+      _competitions[i] = competition.copyWith(entries: updatedEntries);
+      updated = true;
+
+      try {
+        await _firestore.collection('competitions').doc(competition.id).update({
+          'entries': updatedEntries.map((e) => e.toJson()).toList(),
+        });
+      } catch (e) {
+        // ignore: avoid_print
+        print('CompetitionService like update error: $e');
+      }
+    }
+
+    if (updated) {
+      _competitionsController.add(List.unmodifiable(_competitions));
+    }
+  }
+
+  static bool _hasOngoingCompetition(String userId) {
+    final now = DateTime.now();
+    return _competitions.any((competition) {
+      if (competition.createdByUserId != userId) return false;
+      if (now.isAfter(competition.endDate)) return false;
+      return competition.status == CompetitionStatus.active ||
+          competition.status == CompetitionStatus.upcoming ||
+          competition.status == CompetitionStatus.voting ||
+          competition.status == CompetitionStatus.results;
+    });
+  }
+
+  static bool _hasActiveParticipation(String userId,
+      {String? exceptCompetitionId}) {
+    final now = DateTime.now();
+    return _competitions.any((competition) {
+      if (competition.id == exceptCompetitionId) return false;
+      if (!competition.participantUserIds.contains(userId)) return false;
+      if (now.isAfter(competition.endDate)) return false;
+      return competition.status == CompetitionStatus.active ||
+          competition.status == CompetitionStatus.upcoming ||
+          competition.status == CompetitionStatus.voting ||
+          competition.status == CompetitionStatus.results;
+    });
+  }
+
+  static bool _isDurationWithinLimit(DateTime start, DateTime end) {
+    if (!end.isAfter(start)) {
+      return false;
+    }
+    final maxEnd = start.add(const Duration(days: maxCompetitionDurationDays));
+    return !end.isAfter(maxEnd);
   }
 
   static Future<List<Competition>> _loadCompetitionsFromFirestore() async {

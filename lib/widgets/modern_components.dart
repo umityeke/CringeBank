@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
@@ -36,23 +37,36 @@ class ModernAvatar extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            CircleAvatar(
-              radius: size / 2,
-              backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
-              backgroundImage: imageUrl != null
-                  ? NetworkImage(imageUrl!)
-                  : null,
-              child: imageUrl == null
-                  ? Text(
-                      initials,
-                      style: TextStyle(
+              ClipOval(
+                child: (imageUrl != null && imageUrl!.isNotEmpty)
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl!,
+                        fit: BoxFit.cover,
+                        width: size,
+                        height: size,
+                        placeholder: (_, __) => _AvatarInitialsPlaceholder(
+                          initials: initials,
+                          backgroundColor:
+                              AppTheme.primaryColor.withOpacity(0.08),
+                          textColor: AppTheme.primaryColor,
+                          fontSize: size / 2.5,
+                        ),
+                        errorWidget: (_, __, ___) => _AvatarInitialsPlaceholder(
+                          initials: initials,
+                          backgroundColor:
+                              AppTheme.primaryColor.withOpacity(0.08),
+                          textColor: AppTheme.primaryColor,
+                          fontSize: size / 2.5,
+                        ),
+                      )
+                    : _AvatarInitialsPlaceholder(
+                        initials: initials,
+                        backgroundColor:
+                            AppTheme.primaryColor.withOpacity(0.08),
+                        textColor: AppTheme.primaryColor,
                         fontSize: size / 2.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.primaryColor,
                       ),
-                    )
-                  : null,
-            ),
+              ),
             if (isOnline)
               Positioned(
                 bottom: 0,
@@ -73,6 +87,37 @@ class ModernAvatar extends StatelessWidget {
     );
   }
 }
+
+class _AvatarInitialsPlaceholder extends StatelessWidget {
+  final String initials;
+  final Color backgroundColor;
+  final Color textColor;
+  final double fontSize;
+
+  const _AvatarInitialsPlaceholder({
+    required this.initials,
+    required this.backgroundColor,
+    required this.textColor,
+    required this.fontSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: backgroundColor,
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: TextStyle(
+          fontSize: fontSize,
+          fontWeight: FontWeight.w600,
+          color: textColor,
+        ),
+      ),
+    );
+  }
+}
+
 
 /// Modern Button with loading state
 class ModernButton extends StatelessWidget {

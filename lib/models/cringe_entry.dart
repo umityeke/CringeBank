@@ -124,6 +124,19 @@ class CringeEntry {
     this.authorAvatarUrl,
   });
 
+  static int _parseInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) {
+      final parsed = int.tryParse(value);
+      if (parsed != null) {
+        return parsed;
+      }
+    }
+    return 0;
+  }
+
   // Krep puanını hesapla (gamification)
   int get krepPuani {
     double puan = krepSeviyesi * 10;
@@ -221,9 +234,9 @@ class CringeEntry {
       createdAt: DateTime.parse(json['createdAt']),
       etiketler: List<String>.from(json['etiketler'] ?? []),
       isAnonim: json['isAnonim'] ?? false,
-      begeniSayisi: json['begeniSayisi'] ?? 0,
-      yorumSayisi: json['yorumSayisi'] ?? 0,
-      retweetSayisi: json['retweetSayisi'] ?? 0,
+      begeniSayisi: _parseInt(json['begeniSayisi']),
+      yorumSayisi: _parseInt(json['yorumSayisi']),
+      retweetSayisi: _parseInt(json['retweetSayisi']),
       imageUrls: List<String>.from(json['imageUrls'] ?? []),
       audioUrl: json['audioUrl'],
       videoUrl: json['videoUrl'],
@@ -324,9 +337,9 @@ class CringeEntry {
       createdAt: data['createdAt'] != null 
           ? (data['createdAt'] as dynamic).toDate()
           : DateTime.now(),
-      begeniSayisi: data['begeniSayisi'] ?? data['likes'] ?? 0,
-      yorumSayisi: data['yorumSayisi'] ?? data['comments'] ?? 0,
-      retweetSayisi: data['retweetSayisi'] ?? data['retweets'] ?? 0,
+      begeniSayisi: _parseInt(data['begeniSayisi'] ?? data['likes']),
+      yorumSayisi: _parseInt(data['yorumSayisi'] ?? data['comments']),
+      retweetSayisi: _parseInt(data['retweetSayisi'] ?? data['retweets']),
       imageUrls: List<String>.from(data['imageUrls'] ?? []),
       authorAvatarUrl: data['authorAvatarUrl'],
       isAnonim: data['isAnonim'] ?? false,

@@ -4,7 +4,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user_model.dart';
+import '../utils/search_normalizer.dart';
 
 // 🏢 ENTERPRISE USER SERVICE WITH ADVANCED AUTHENTICATION & MONITORING
 class UserService {
@@ -14,13 +17,19 @@ class UserService {
     _initializeEnterpriseService();
   }
 
+  static const String _lastUserIdKey = 'cb_last_user_id';
+  static const String _lastUserEmailKey = 'cb_last_user_email';
+
   final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  final DeviceInfoPlugin _deviceInfoPlugin = DeviceInfoPlugin();
 
   User? _currentUser;
   final Map<String, User> _userCache = {}; // Enterprise user cache
   DateTime? _lastCacheUpdate;
   bool _isInitialized = false;
+  Map<String, dynamic>? _cachedDeviceFingerprint;
 
   // Enterprise getters with monitoring
   User? get currentUser {
@@ -87,10 +96,12 @@ class UserService {
       print('✅ USER SIGNED IN: ${user.uid} - ${user.email}');
       await _loadEnterpriseUserData(user.uid);
       await _updateUserActivity(user.uid);
+      await _persistUserIdentity(user);
     } else {
       print('🚪 USER SIGNED OUT: Clearing enterprise cache');
       _currentUser = null;
       _clearEnterpriseCache();
+      await _clearStoredIdentity();
     }
 
     await _logAuthActivity(user, 'AUTH_STATE_CHANGE');
@@ -117,10 +128,7 @@ class UserService {
 
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
-        final user = User.fromMap({
-          ...data,
-          'id': doc.id,
-        });
+        final user = User.fromMap({...data, 'id': doc.id});
         _currentUser = user;
         _userCache[userId] = user;
         _lastCacheUpdate = DateTime.now();
@@ -166,6 +174,7 @@ class UserService {
   // Log authentication activity
   Future<void> _logAuthActivity(firebase_auth.User? user, String action) async {
     try {
+      final deviceFingerprint = await _getDeviceFingerprint();
       await _firestore.collection('auth_logs').add({
         'userId': user?.uid,
         'email': user?.email,
@@ -173,6 +182,7 @@ class UserService {
         'timestamp': FieldValue.serverTimestamp(),
         'platform': 'web',
         'verified': user?.emailVerified ?? false,
+        'device': deviceFingerprint,
       });
 
       print('📋 AUTH LOG: Logged $action for ${user?.uid ?? 'anonymous'}');
@@ -352,10 +362,7 @@ class UserService {
 
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
-        final user = User.fromMap({
-          ...data,
-          'id': doc.id,
-        });
+        final user = User.fromMap({...data, 'id': doc.id});
         _currentUser = user;
         _userCache[userId] = user;
         _lastCacheUpdate = DateTime.now();
@@ -384,10 +391,7 @@ class UserService {
 
       if (doc.exists && doc.data() != null) {
         final data = doc.data() as Map<String, dynamic>;
-        final user = User.fromMap({
-          ...data,
-          'id': doc.id,
-        });
+        final user = User.fromMap({...data, 'id': doc.id});
 
         // Update cache and current user
         _currentUser = user;
@@ -677,10 +681,7 @@ class UserService {
       if (doc.exists) {
         print('User document exists, loading data...');
         final data = doc.data()!;
-        _currentUser = User.fromMap({
-          ...data,
-          'id': doc.id,
-        });
+        _currentUser = User.fromMap({...data, 'id': doc.id});
         print('User loaded: ${_currentUser?.username}');
         // Son aktif zamanını güncelle
         await _updateLastActive();
@@ -728,12 +729,69 @@ class UserService {
     }
   }
 
+  Future<User?> getUserById(String userId, {bool forceRefresh = false}) async {
+    final normalizedId = userId.trim();
+    if (normalizedId.isEmpty) {
+      print('⚠️ getUserById called with empty userId');
+      return null;
+    }
+
+    if (!forceRefresh && _userCache.containsKey(normalizedId)) {
+      print('💾 getUserById cache hit for $normalizedId');
+      return _userCache[normalizedId];
+    }
+
+    try {
+      print('🔍 Fetching user data for $normalizedId');
+      final doc = await _firestore.collection('users').doc(normalizedId).get();
+
+      if (!doc.exists || doc.data() == null) {
+        print('⚠️ getUserById: No document found for $normalizedId');
+        return _userCache[normalizedId];
+      }
+
+      final data = doc.data()!;
+      final user = User.fromMap({...data, 'id': doc.id});
+
+      _userCache[normalizedId] = user;
+      _lastCacheUpdate = DateTime.now();
+
+      if (_currentUser?.id == normalizedId) {
+        _currentUser = user;
+      }
+
+      print('✅ getUserById success for $normalizedId');
+      return user;
+    } catch (e) {
+      print('❌ getUserById error for $normalizedId: $e');
+      return _userCache[normalizedId];
+    }
+  }
+
   // Firestore'a kullanıcı verilerini kaydet
   Future<void> _saveUserData(User user) async {
     try {
       final data = user.toMap();
-      data['usernameLower'] = user.username.toLowerCase();
-      data['emailLower'] = user.email.toLowerCase();
+      final normalizedUsername = SearchNormalizer.normalizeForSearch(
+        user.username,
+      ).replaceAll(RegExp(r'[@\s]+'), '');
+      final normalizedFullName = SearchNormalizer.normalizeForSearch(
+        user.fullName,
+      );
+      final normalizedEmail = user.email.trim().toLowerCase();
+
+      data['usernameLower'] = normalizedUsername;
+      data['fullNameLower'] = normalizedFullName;
+      data['emailLower'] = normalizedEmail;
+      data['fullNameTokens'] = normalizedFullName
+          .split(' ')
+          .where((token) => token.isNotEmpty)
+          .toList(growable: false);
+      data['searchKeywords'] = SearchNormalizer.generateUserSearchKeywords(
+        fullName: user.fullName,
+        username: user.username,
+        email: user.email,
+      );
 
       final existing = await _firestore
           .collection('users')
@@ -906,10 +964,7 @@ class UserService {
           .get();
       return query.docs.map((doc) {
         final data = doc.data();
-        return User.fromMap({
-          ...data,
-          'id': doc.id,
-        });
+        return User.fromMap({...data, 'id': doc.id});
       }).toList();
     } catch (e) {
       print('Get all users error: $e');
@@ -961,5 +1016,58 @@ class UserService {
     });
 
     // Otomatik başlangıç kullanıcısı oluşturmayı kaldırdık; gerekliysa manuel tetikleyin.
+  }
+
+  Future<void> _persistUserIdentity(firebase_auth.User user) async {
+    try {
+      await _secureStorage.write(key: _lastUserIdKey, value: user.uid);
+      if (user.email != null) {
+        await _secureStorage.write(key: _lastUserEmailKey, value: user.email);
+      }
+    } catch (error) {
+      print('⚠️ SECURE STORAGE WRITE FAILED: $error');
+    }
+  }
+
+  Future<void> _clearStoredIdentity() async {
+    try {
+      await _secureStorage.delete(key: _lastUserIdKey);
+      await _secureStorage.delete(key: _lastUserEmailKey);
+    } catch (error) {
+      print('⚠️ SECURE STORAGE CLEAR FAILED: $error');
+    }
+  }
+
+  Future<Map<String, dynamic>> _getDeviceFingerprint() async {
+    if (_cachedDeviceFingerprint != null) {
+      return _cachedDeviceFingerprint!;
+    }
+
+    try {
+      if (kIsWeb) {
+        final info = await _deviceInfoPlugin.webBrowserInfo;
+        _cachedDeviceFingerprint = {
+          'browserName': info.browserName.name,
+          'userAgent': info.userAgent,
+          'platform': info.platform,
+        };
+      } else {
+        final info = await _deviceInfoPlugin.deviceInfo;
+        final data = Map<String, dynamic>.from(info.data);
+        _cachedDeviceFingerprint = {
+          'model': data['model'] ?? data['name'] ?? 'unknown',
+          'manufacturer': data['manufacturer'] ?? data['brand'] ?? 'unknown',
+          'os':
+              data['operatingSystem'] ??
+              data['systemVersion'] ??
+              data['version'],
+        };
+      }
+    } catch (error) {
+      print('⚠️ DEVICE INFO ERROR: $error');
+      _cachedDeviceFingerprint = {'error': error.toString()};
+    }
+
+    return _cachedDeviceFingerprint!;
   }
 }

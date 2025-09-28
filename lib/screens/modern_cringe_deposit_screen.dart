@@ -1,12 +1,13 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:ui';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:image/image.dart' as img;
-import '../theme/app_theme.dart';
 import '../models/cringe_entry.dart';
 import '../widgets/animated_bubble_background.dart';
+import '../services/competition_service.dart';
 import '../services/cringe_entry_service.dart';
 import '../services/user_service.dart';
 
@@ -14,12 +15,14 @@ class ModernCringeDepositScreen extends StatefulWidget {
   final CringeEntry? existingEntry;
   final VoidCallback? onCringeSubmitted;
   final VoidCallback? onCloseRequested;
+  final Competition? competition;
   
   const ModernCringeDepositScreen({
     super.key,
     this.existingEntry,
     this.onCringeSubmitted,
     this.onCloseRequested,
+    this.competition,
   });
 
   @override
@@ -51,6 +54,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
   List<String> _existingImageUrls = [];
 
   bool get _isEditing => widget.existingEntry != null;
+  bool get _isCompetitionEntry => widget.competition != null && !_isEditing;
 
   @override
   void initState() {
@@ -140,29 +144,69 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         }
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF000000),
+        backgroundColor: Colors.black,
         body: AnimatedBubbleBackground(
-          bubbleCount: 40,
-          bubbleColor: AppTheme.accentColor.withOpacity(0.3),
-          child: SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(),
-                _buildProgressIndicator(),
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      _buildStepOne(),
-                      _buildStepTwo(),
-                      _buildStepThree(),
-                    ],
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Color(0xFF121B2E),
+                        Color(0xFF090C14),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
                   ),
                 ),
-                _buildNavigationButtons(),
-              ],
-            ),
+              ),
+              Positioned(
+                top: -120,
+                left: -80,
+                child: Container(
+                  width: 240,
+                  height: 240,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.orange.withValues(alpha: 0.18),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: -100,
+                right: -60,
+                child: Container(
+                  width: 220,
+                  height: 220,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.pinkAccent.withValues(alpha: 0.12),
+                  ),
+                ),
+              ),
+              SafeArea(
+                child: Column(
+                  children: [
+                    _buildHeader(),
+                    _buildProgressIndicator(),
+                    Expanded(
+                      child: PageView(
+                        controller: _pageController,
+                        physics: const NeverScrollableScrollPhysics(),
+                        children: [
+                          _buildStepOne(),
+                          _buildStepTwo(),
+                          _buildStepThree(),
+                        ],
+                      ),
+                    ),
+                    _buildNavigationButtons(),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -209,12 +253,12 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                         shape: BoxShape.circle,
                         gradient: LinearGradient(
                           colors: [
-                            AppTheme.accentColor.withOpacity(0.2),
-                            AppTheme.accentColor.withOpacity(0.1),
+                            Colors.orange.withOpacity(0.2),
+                            Colors.orange.withOpacity(0.1),
                           ],
                         ),
                         border: Border.all(
-                          color: AppTheme.accentColor.withOpacity(0.3),
+                          color: Colors.orange.withOpacity(0.3),
                           width: 1,
                         ),
                       ),
@@ -232,10 +276,14 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                       children: [
                         ShaderMask(
                           shaderCallback: (bounds) => LinearGradient(
-                            colors: [AppTheme.accentColor, Colors.white],
+                            colors: [Colors.orange, Colors.white],
                           ).createShader(bounds),
                           child: Text(
-                            _isEditing ? 'Krepi Güncelle' : 'Yeni Krep Paylaş',
+                            _isEditing
+                                ? 'Krepi Güncelle'
+                                : (_isCompetitionEntry
+                                    ? 'Yarışma Anısı Paylaş'
+                                    : 'Yeni Krep Paylaş'),
                             style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -245,9 +293,11 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _isEditing
-                              ? 'Paylaşımını düzenleyip topluluğa tekrar sun'
-                              : 'Utanç verici anınızı toplulukla paylaşın',
+              _isEditing
+                ? 'Paylaşımını düzenleyip topluluğa tekrar sun'
+                : (_isCompetitionEntry
+                  ? '"${widget.competition!.title}" yarışması için anını hazırla'
+                  : 'Utanç verici anınızı toplulukla paylaşın'),
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.white.withOpacity(0.7),
@@ -286,7 +336,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                   ],
                 ),
                 border: Border.all(
-                  color: AppTheme.accentColor.withOpacity(0.2),
+                  color: Colors.orange.withOpacity(0.2),
                   width: 1,
                 ),
                 boxShadow: [
@@ -313,7 +363,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                     child: LinearProgressIndicator(
                       value: (_currentStep + 1) / 3,
                       backgroundColor: Colors.white.withOpacity(0.1),
-                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accentColor),
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
                       minHeight: 4,
                     ),
                   ),
@@ -339,13 +389,13 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
             shape: BoxShape.circle,
             gradient: isCompleted || isActive
                 ? LinearGradient(
-                    colors: [AppTheme.accentColor, AppTheme.accentColor.withOpacity(0.7)],
+                    colors: [Colors.orange, Colors.orange.withOpacity(0.7)],
                   )
                 : null,
             color: isCompleted || isActive ? null : Colors.white.withOpacity(0.2),
             border: Border.all(
               color: isCompleted || isActive 
-                  ? AppTheme.accentColor 
+                  ? Colors.orange 
                   : Colors.white.withOpacity(0.3),
               width: 2,
             ),
@@ -382,6 +432,10 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 20),
+          if (_isCompetitionEntry) ...[
+            _buildCompetitionBanner(widget.competition!),
+            const SizedBox(height: 20),
+          ],
           _buildGlassCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -442,11 +496,11 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(20),
               color: isSelected
-                ? AppTheme.accentColor.withOpacity(0.8)
+                ? Colors.orange.withOpacity(0.8)
                 : Colors.white.withOpacity(0.1),
                           border: Border.all(
               color: isSelected
-                ? AppTheme.accentColor
+                ? Colors.orange
                 : Colors.white.withOpacity(0.2),
                             width: 1,
                           ),
@@ -606,7 +660,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                     height: 200,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.accentColor.withOpacity(0.3)),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
@@ -643,7 +697,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: AppTheme.accentColor.withOpacity(0.3),
+                        color: Colors.orange.withOpacity(0.3),
                       ),
                     ),
                     child: ClipRRect(
@@ -651,10 +705,19 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          Image.network(
-                            _existingImageUrls.first,
+                          CachedNetworkImage(
+                            imageUrl: _existingImageUrls.first,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
+                            placeholder: (context, url) => Container(
+                              color: Colors.black26,
+                              alignment: Alignment.center,
+                              child: const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            ),
+                            errorWidget: (context, error, stackTrace) {
                               return Container(
                                 color: Colors.black26,
                                 alignment: Alignment.center,
@@ -793,7 +856,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                   ),
                   value: _isAnonymous,
                   onChanged: (value) => setState(() => _isAnonymous = value),
-                  activeThumbColor: AppTheme.accentColor,
+                  activeThumbColor: Colors.orange,
                   contentPadding: EdgeInsets.zero,
                 ),
               ],
@@ -928,7 +991,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: AppTheme.accentColor,
+                color: Colors.orange,
                 width: 2,
               ),
             ),
@@ -967,7 +1030,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                 ),
                 border: Border(
                   top: BorderSide(
-                    color: AppTheme.accentColor.withOpacity(0.2),
+                    color: Colors.orange.withOpacity(0.2),
                     width: 1,
                   ),
                 ),
@@ -982,7 +1045,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                           foregroundColor: Colors.white,
                           backgroundColor: Colors.white.withOpacity(0.1),
                           side: BorderSide(
-                            color: AppTheme.accentColor.withOpacity(0.4),
+                            color: Colors.orange.withOpacity(0.4),
                             width: 1.5,
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1000,14 +1063,14 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                     child: ElevatedButton(
                       onPressed: _isSubmitting ? null : _handleNext,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.accentColor,
+                        backgroundColor: Colors.orange,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
                         elevation: 8,
-                        shadowColor: AppTheme.accentColor.withOpacity(0.4),
+                        shadowColor: Colors.orange.withOpacity(0.4),
                       ),
                       child: _isSubmitting
                           ? const SizedBox(
@@ -1037,6 +1100,30 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
   }
 
   void _handleNext() {
+    // Form validasyonu
+    if (_currentStep == 0) {
+      if (_titleController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Lütfen bir başlık girin'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      if (_descriptionController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Lütfen bir açıklama girin'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
+    
     if (_currentStep < 2) {
       setState(() => _currentStep++);
       _pageController.nextPage(
@@ -1066,6 +1153,8 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         throw Exception('Kullanıcı oturum açmamış');
       }
 
+  final user = currentUser;
+
       final imageUrls = <String>[];
       if (_existingImageUrls.isNotEmpty) {
         imageUrls.addAll(_existingImageUrls);
@@ -1075,22 +1164,22 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         imageUrls.add('data:image/jpeg;base64,$base64Image');
       }
 
-      final displayName = currentUser.displayName.trim().isNotEmpty
-          ? currentUser.displayName.trim()
-          : currentUser.username.trim().isNotEmpty
-              ? currentUser.username.trim()
+    final displayName = user.displayName.trim().isNotEmpty
+      ? user.displayName.trim()
+      : user.username.trim().isNotEmpty
+        ? user.username.trim()
               : 'Anonim';
 
-      final usernameHandle = currentUser.username.trim().isNotEmpty
-          ? currentUser.username.trim()
-          : (currentUser.email.contains('@')
-              ? currentUser.email.split('@').first
-              : currentUser.id.substring(0, 6));
+    final usernameHandle = user.username.trim().isNotEmpty
+      ? user.username.trim()
+      : (user.email.contains('@')
+        ? user.email.split('@').first
+        : user.id.substring(0, 6));
 
       final authorAvatar = _isAnonymous
           ? null
-          : (currentUser.avatar.trim().isNotEmpty
-              ? currentUser.avatar.trim()
+      : (user.avatar.trim().isNotEmpty
+        ? user.avatar.trim()
               : null);
 
       if (_isEditing) {
@@ -1121,9 +1210,11 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         return;
       }
 
+      final competition = widget.competition;
+
       final entry = CringeEntry(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        userId: currentUser.id,
+  userId: user.id,
         authorName: _isAnonymous ? 'Anonim' : displayName,
         authorHandle: _isAnonymous ? '@anonim' : '@$usernameHandle',
         baslik: _titleController.text.trim(),
@@ -1136,6 +1227,30 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         authorAvatarUrl: authorAvatar,
       );
 
+      if (_isCompetitionEntry) {
+        if (competition == null) {
+          throw Exception('Yarışma bilgisi eksik.');
+        }
+
+        if (!competition.participantUserIds.contains(user.id)) {
+          throw Exception('Anı paylaşmak için önce yarışmaya katılmalısın.');
+        }
+
+        final hasSubmitted = competition.entries
+            .any((existing) => existing.userId == user.id);
+        if (hasSubmitted) {
+          throw Exception('Bu yarışmaya zaten bir anı gönderdin.');
+        }
+
+        final submitted =
+            await CompetitionService.submitEntry(competition.id, entry);
+        if (!submitted) {
+          throw Exception(
+            'Anı yarışmaya gönderilemedi. Daha önce bir anı eklemiş olabilirsin.',
+          );
+        }
+      }
+
       final success = await CringeEntryService.instance.addEntry(entry);
 
       if (!success) {
@@ -1146,12 +1261,17 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
 
       if (!mounted) return;
 
+      if (_isCompetitionEntry) {
+        Navigator.of(context).pop(true);
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(imageUrls.isNotEmpty
               ? 'Fotoğraflı krep başarıyla paylaşıldı!'
               : 'Krep başarıyla paylaşıldı!'),
-          backgroundColor: AppTheme.accentColor,
+          backgroundColor: Colors.orange,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -1219,6 +1339,58 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
     return 'Çok fazla utanç verici';
   }
 
+  Widget _buildCompetitionBanner(Competition competition) {
+    return _buildGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.orange.withOpacity(0.15),
+                ),
+                child: const Icon(
+                  Icons.emoji_events,
+                  color: Colors.orange,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      competition.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Bu anı "${competition.title}" yarışmasına ekleyeceksin. '
+                      'Paylaşım tamamlandığında otomatik olarak yarışmaya kaydedilecek.',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   // Fotoğraf seçme fonksiyonu
   Future<void> _pickImage() async {
     setState(() => _isImageLoading = true);
@@ -1249,7 +1421,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Fotoğraf eklendi: ${(compressedBytes.length / 1024).toStringAsFixed(1)}KB'),
-            backgroundColor: AppTheme.accentColor,
+            backgroundColor: Colors.orange,
             behavior: SnackBarBehavior.floating,
           ),
         );

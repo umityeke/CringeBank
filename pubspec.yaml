@@ -70,6 +70,12 @@ dependencies:
   lottie: ^2.7.0
   shimmer: ^3.0.0
   pull_to_refresh: ^2.0.0
+  cached_network_image: ^3.4.1
+  flutter_cache_manager: ^3.3.1
+  flutter_animate: ^4.5.0
+  auto_size_text: ^3.0.0
+  smooth_page_indicator: ^1.2.0
+  flutter_staggered_grid_view: ^0.7.0
   
   # Social Media & Sharing
   share_plus: ^7.2.2
@@ -78,11 +84,17 @@ dependencies:
   # Blockchain & NFT (Web3)
   web3dart: ^2.7.3
   google_fonts: ^6.1.0
+  connectivity_plus: ^6.0.3
+  firebase_crashlytics: ^4.2.4
+  sentry_flutter: ^8.5.0
+  flutter_secure_storage: ^9.2.2
+  device_info_plus: ^11.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   mocktail: ^1.0.3
+  flutter_native_splash: ^2.4.2
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -131,3 +143,12 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_native_splash:
+  color: "#100720"
+  image: assets/images/logo.png
+  android_gravity: center
+  ios_content_mode: scaleAspectFit
+  android_12:
+    image: assets/images/logo.png
+    icon_background_color: "#100720"

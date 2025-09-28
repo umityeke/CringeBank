@@ -8,8 +8,12 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/cringe_comment.dart';
 import '../models/cringe_entry.dart';
 import '../models/user_model.dart';
+import 'competition_service.dart';
+import 'connectivity_service.dart';
+import 'user_service.dart';
 
 enum CringeStreamStatus { initializing, connecting, healthy, degraded, error }
 
@@ -22,6 +26,8 @@ class CringeEntryService {
   final firebase_auth.FirebaseAuth _auth;
   final FirebaseStorage _storage;
   final FirebaseAnalytics _analytics;
+  bool _isDisposed = false;
+  StreamSubscription<ConnectivityStatus>? _connectivitySubscription;
   CringeEntryService._({
     FirebaseFirestore? firestore,
     firebase_auth.FirebaseAuth? auth,
@@ -30,7 +36,14 @@ class CringeEntryService {
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _auth = auth ?? firebase_auth.FirebaseAuth.instance,
         _storage = storage ?? FirebaseStorage.instance,
-        _analytics = analytics ?? FirebaseAnalytics.instance;
+        _analytics = analytics ?? FirebaseAnalytics.instance {
+    _connectivitySubscription =
+        ConnectivityService.instance.statusStream.listen(
+      _handleConnectivityStatus,
+      onError: (error) =>
+          print('⚠️ CONNECTIVITY LISTEN ERROR: $error'),
+    );
+  }
 
   @visibleForTesting
   static void configureForTesting({
@@ -55,6 +68,8 @@ class CringeEntryService {
   }
 
   void dispose() {
+    _isDisposed = true;
+    _connectivitySubscription?.cancel();
     streamStatusNotifier.dispose();
     timeoutExceptionCountNotifier.dispose();
     streamHintNotifier.dispose();
@@ -706,7 +721,15 @@ class CringeEntryService {
       final docRef = await _executeEnterpriseTransaction(
         optimizedData,
         transactionId,
+        preferredId: entry.id.isNotEmpty ? entry.id : null,
       );
+
+      if (entry.id.isNotEmpty && entry.id != docRef.id) {
+        await CompetitionService.replaceEntryIdIfPresent(
+          oldEntryId: entry.id,
+          newEntryId: docRef.id,
+        );
+      }
 
       // Phase 5: Post-Creation Analytics & Monitoring
       await _performPostCreationAnalytics(docRef.id, entry, transactionId);
@@ -744,15 +767,15 @@ class CringeEntryService {
     );
 
     // Business rule validation
-    if (entry.baslik.isEmpty || entry.baslik.length < 5) {
+    if (entry.baslik.isEmpty || entry.baslik.length < 2) {
       throw Exception(
-        'VALIDATION_ERROR: Title too short - minimum 5 characters required',
+        'VALIDATION_ERROR: Başlık en az 2 karakter olmalıdır',
       );
     }
 
-    if (entry.aciklama.isEmpty || entry.aciklama.length < 10) {
+    if (entry.aciklama.isEmpty || entry.aciklama.length < 3) {
       throw Exception(
-        'VALIDATION_ERROR: Description too short - minimum 10 characters required',
+        'VALIDATION_ERROR: Açıklama en az 3 karakter olmalıdır',
       );
     }
 
@@ -985,14 +1008,27 @@ class CringeEntryService {
   // Execute enterprise Firestore transaction
   Future<DocumentReference> _executeEnterpriseTransaction(
     Map<String, dynamic> data,
-    String transactionId,
-  ) async {
+    String transactionId, {
+    String? preferredId,
+  }) async {
     print(
       '💾 TRANSACTION: Executing enterprise Firestore transaction (Transaction: $transactionId)',
     );
 
     try {
-      final docRef = await _firestore.collection('cringe_entries').add(data);
+      final collection = _firestore.collection('cringe_entries');
+      final DocumentReference<Map<String, dynamic>> docRef;
+
+      if (preferredId != null && preferredId.trim().isNotEmpty) {
+        docRef = collection.doc(preferredId);
+      } else {
+        docRef = collection.doc();
+      }
+
+      final payload = Map<String, dynamic>.from(data)
+        ..['id'] = docRef.id;
+
+      await docRef.set(payload);
 
       // Additional enterprise operations
       await _updateUserStats(data['userId'], transactionId);
@@ -1221,9 +1257,222 @@ class CringeEntryService {
         'likes': FieldValue.increment(1),
       });
 
+      unawaited(
+        CompetitionService.incrementEntryLikeCount(entryId, delta: 1),
+      );
+
       return true;
     } catch (e) {
       print('Like entry error: $e');
+      return false;
+    }
+  }
+
+  // Entry yorumu akışı
+  Stream<List<CringeComment>> commentsStream(String entryId) {
+    return _firestore
+        .collection('cringe_entries')
+        .doc(entryId)
+        .collection('comments')
+        .orderBy('createdAt', descending: false)
+        .snapshots()
+        .map((snapshot) {
+          final comments = snapshot.docs
+              .map(
+                (doc) => CringeComment.fromFirestore(
+                  doc.data(),
+                  documentId: doc.id,
+                  entryId: entryId,
+                ),
+              )
+              .toList();
+
+          final topLevelComments = <CringeComment>[];
+          final repliesByParent = <String, List<CringeComment>>{};
+
+          for (final comment in comments) {
+            final parentId = comment.parentCommentId;
+            if (parentId == null) {
+              topLevelComments.add(comment);
+            } else {
+              repliesByParent
+                  .putIfAbsent(parentId, () => <CringeComment>[])
+                  .add(comment);
+            }
+          }
+
+          topLevelComments.sort(
+            (a, b) => a.createdAt.compareTo(b.createdAt),
+          );
+
+          for (final replyList in repliesByParent.values) {
+            replyList.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          }
+
+          final orderedComments = <CringeComment>[];
+          final remainingReplyParents = repliesByParent.keys.toSet();
+
+          for (final parent in topLevelComments) {
+            orderedComments.add(parent);
+
+            final replies = repliesByParent[parent.id];
+            if (replies != null) {
+              orderedComments.addAll(replies);
+              remainingReplyParents.remove(parent.id);
+            }
+          }
+
+          if (remainingReplyParents.isNotEmpty) {
+            final orphanParentIds = remainingReplyParents.toList()
+              ..sort();
+            for (final parentId in orphanParentIds) {
+              orderedComments.addAll(repliesByParent[parentId]!);
+            }
+          }
+
+          return List<CringeComment>.unmodifiable(orderedComments);
+        });
+  }
+
+  Future<bool> addComment({
+    required String entryId,
+    required String content,
+    String? parentCommentId,
+  }) async {
+    final firebaseUser = _auth.currentUser;
+    if (firebaseUser == null) return false;
+
+    final trimmedContent = content.trim();
+    if (trimmedContent.isEmpty) return false;
+
+    final normalizedParentId = () {
+      if (parentCommentId == null) return null;
+      final value = parentCommentId.trim();
+      return value.isEmpty ? null : value;
+    }();
+
+    try {
+      User? currentUser = UserService.instance.currentUser;
+      if (currentUser == null || currentUser.id.isEmpty) {
+        await UserService.instance.loadUserData(firebaseUser.uid);
+        currentUser = UserService.instance.currentUser;
+      }
+
+      final displayName = currentUser != null &&
+              currentUser.fullName.trim().isNotEmpty
+          ? currentUser.fullName.trim()
+          : (firebaseUser.displayName?.trim().isNotEmpty ?? false)
+              ? firebaseUser.displayName!.trim()
+              : 'Anonim';
+
+      final username = currentUser != null &&
+              currentUser.username.trim().isNotEmpty
+          ? currentUser.username.trim()
+          : firebaseUser.email != null && firebaseUser.email!.contains('@')
+              ? firebaseUser.email!.split('@').first
+              : firebaseUser.uid.substring(0, 6);
+
+      final avatar = currentUser != null && currentUser.avatar.trim().isNotEmpty
+          ? currentUser.avatar.trim()
+          : firebaseUser.photoURL;
+
+      final entryRef = _firestore.collection('cringe_entries').doc(entryId);
+      final commentRef = entryRef.collection('comments').doc();
+
+      await _firestore.runTransaction((transaction) async {
+        final entrySnapshot = await transaction.get(entryRef);
+        if (!entrySnapshot.exists) {
+          throw StateError('ENTRY_NOT_FOUND');
+        }
+
+        if (normalizedParentId != null) {
+          final parentRef = entryRef.collection('comments').doc(normalizedParentId);
+          final parentSnapshot = await transaction.get(parentRef);
+          if (!parentSnapshot.exists) {
+            throw StateError('PARENT_COMMENT_NOT_FOUND');
+          }
+        }
+
+        final commentData = <String, dynamic>{
+          'userId': firebaseUser.uid,
+          'authorName': displayName,
+          'authorHandle': '@$username',
+          'authorAvatarUrl': avatar,
+          'content': trimmedContent,
+          'createdAt': FieldValue.serverTimestamp(),
+          'likeCount': 0,
+          'likedByUserIds': <String>[],
+        };
+
+        if (normalizedParentId != null) {
+          commentData['parentCommentId'] = normalizedParentId;
+        }
+
+        transaction.set(commentRef, commentData);
+
+        transaction.update(entryRef, {
+          'comments': FieldValue.increment(1),
+          'yorumSayisi': FieldValue.increment(1),
+        });
+      });
+
+      unawaited(
+        CompetitionService.incrementEntryCommentCount(entryId, delta: 1),
+      );
+      CompetitionService.invalidateCommentWinnerForEntry(entryId);
+
+      return true;
+    } catch (e) {
+      print('Add comment error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> toggleCommentLike({
+    required String entryId,
+    required String commentId,
+  }) async {
+    final firebaseUser = _auth.currentUser;
+    if (firebaseUser == null) return false;
+
+    final commentRef = _firestore
+        .collection('cringe_entries')
+        .doc(entryId)
+        .collection('comments')
+        .doc(commentId);
+
+    try {
+      final didLike = await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(commentRef);
+        if (!snapshot.exists) {
+          throw StateError('COMMENT_NOT_FOUND');
+        }
+
+    final Map<String, dynamic> data =
+      snapshot.data() ?? <String, dynamic>{};
+        final likedBy = (data['likedByUserIds'] as List<dynamic>? ?? const <dynamic>[])
+            .whereType<String>()
+            .toSet();
+
+        final currentLikeCount = (data['likeCount'] as num?)?.toInt() ?? likedBy.length;
+        final hasLiked = likedBy.contains(firebaseUser.uid);
+        final nextLikeCount = hasLiked
+            ? (currentLikeCount > 0 ? currentLikeCount - 1 : 0)
+            : currentLikeCount + 1;
+
+        transaction.update(commentRef, {
+          'likeCount': nextLikeCount,
+          'likedByUserIds': hasLiked
+              ? FieldValue.arrayRemove([firebaseUser.uid])
+              : FieldValue.arrayUnion([firebaseUser.uid]),
+        });
+
+        return !hasLiked;
+      });
+      CompetitionService.invalidateCommentWinnerForEntry(entryId);
+      return didLike;
+    } catch (e) {
+      print('Toggle comment like error: $e');
       return false;
     }
   }
@@ -1283,5 +1532,39 @@ class CringeEntryService {
     await _logAuditTrailDelete(entryId, currentUserId, transactionId);
 
     return true;
+  }
+
+  void _handleConnectivityStatus(ConnectivityStatus status) {
+    if (_isDisposed) return;
+
+    if (status == ConnectivityStatus.offline) {
+      if (streamStatusNotifier.value == CringeStreamStatus.healthy) {
+        streamStatusNotifier.value = CringeStreamStatus.degraded;
+      }
+      if (streamHintNotifier.value == null) {
+        streamHintNotifier.value =
+            'İnternet bağlantısı kesildi. İçerikler önbellekten gösteriliyor.';
+      }
+    } else {
+      if (streamStatusNotifier.value == CringeStreamStatus.degraded) {
+        streamStatusNotifier.value = CringeStreamStatus.connecting;
+        unawaited(warmUp());
+      }
+
+      streamHintNotifier.value =
+          'Bağlantı geri geldi. Akış güncelleniyor...';
+
+  Future.delayed(const Duration(seconds: 4)).then((_) {
+        if (_isDisposed) return;
+        if (streamHintNotifier.value ==
+            'Bağlantı geri geldi. Akış güncelleniyor...') {
+          streamHintNotifier.value = null;
+          if (streamStatusNotifier.value ==
+              CringeStreamStatus.connecting) {
+            streamStatusNotifier.value = CringeStreamStatus.healthy;
+          }
+        }
+      });
+    }
   }
 }

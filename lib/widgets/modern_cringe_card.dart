@@ -1,4 +1,6 @@
+import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../models/cringe_entry.dart';
 import '../theme/app_theme.dart';
 import 'modern_components.dart';
@@ -60,7 +62,9 @@ class _ModernCringeCardState extends State<ModernCringeCard> {
           ],
         ),
       ),
-    );
+    ).animate()
+        .fadeIn(duration: 350.ms, curve: Curves.easeOutCubic)
+        .moveY(begin: 12, end: 0, duration: 450.ms, curve: Curves.easeOut);
   }
 
   Widget _buildHeader() {
@@ -156,12 +160,15 @@ class _ModernCringeCardState extends State<ModernCringeCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        AutoSizeText(
           widget.entry.baslik,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: AppTheme.textPrimary,
               ),
+          maxLines: 2,
+          minFontSize: 14,
+          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: AppTheme.spacingS),
         Text(
@@ -281,11 +288,14 @@ class _ModernCringeCardState extends State<ModernCringeCard> {
   }
 
   void _handleLike() {
+    final nextValue = !_isLiked;
     setState(() {
-      _isLiked = !_isLiked;
+      _isLiked = nextValue;
     });
 
-    widget.onLike?.call();
+    if (nextValue) {
+      widget.onLike?.call();
+    }
   }
 
   String _buildInitials() {

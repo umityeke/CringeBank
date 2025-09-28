@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/cringe_entry.dart';
+import '../models/user_model.dart';
+import '../utils/search_normalizer.dart';
 
 enum SearchSortBy {
   relevance('Relevans'),
@@ -103,6 +105,20 @@ class SearchResult {
     this.relatedSearches = const [],
     this.categoryDistribution = const {},
     required this.searchDuration,
+  });
+}
+
+class UserSearchResult {
+  final List<User> users;
+  final int totalCount;
+  final Duration searchDuration;
+  final List<String> matchedTokens;
+
+  const UserSearchResult({
+    required this.users,
+    required this.totalCount,
+    required this.searchDuration,
+    this.matchedTokens = const [],
   });
 }
 
@@ -218,6 +234,155 @@ class CringeSearchService {
       categoryDistribution: categoryDist,
       searchDuration: searchDuration,
     );
+  }
+
+  static Future<UserSearchResult> searchUsers({
+    required String query,
+    int limit = 20,
+  }) async {
+    final normalizedQuery = SearchNormalizer.normalizeForSearch(query);
+    if (normalizedQuery.length < 2) {
+      return const UserSearchResult(
+        users: [],
+        totalCount: 0,
+        searchDuration: Duration.zero,
+        matchedTokens: [],
+      );
+    }
+
+    final tokens = SearchNormalizer.tokenizeQuery(normalizedQuery, maxTokens: 10);
+    if (tokens.isEmpty) {
+      return const UserSearchResult(
+        users: [],
+        totalCount: 0,
+        searchDuration: Duration.zero,
+        matchedTokens: [],
+      );
+    }
+
+    final startTime = DateTime.now();
+
+    try {
+      final queryTokens = tokens.take(10).toList(growable: false);
+
+      final snapshot = await _firestore
+          .collection('users')
+          .where('searchKeywords', arrayContainsAny: queryTokens)
+          .limit(limit * 3)
+          .get();
+
+      final users = snapshot.docs.map((doc) {
+        final data = doc.data();
+        return User.fromMap({
+          ...data,
+          'id': doc.id,
+        });
+      }).toList(growable: true);
+
+      final fetchedIds = users.map((user) => user.id).toSet();
+      final normalizedQueryNoSpaces = normalizedQuery.replaceAll(' ', '');
+
+      if (users.length < limit && normalizedQueryNoSpaces.isNotEmpty) {
+        final usernameSnapshots = await Future.wait([
+          _firestore
+              .collection('users')
+              .where('usernameLower', isEqualTo: normalizedQueryNoSpaces)
+              .limit(5)
+              .get(),
+          _firestore
+              .collection('users')
+              .where('usernameLower', isEqualTo: '@$normalizedQueryNoSpaces')
+              .limit(5)
+              .get(),
+        ]);
+
+        for (final snap in usernameSnapshots) {
+          for (final doc in snap.docs) {
+            if (fetchedIds.contains(doc.id)) continue;
+            final data = doc.data();
+            final user = User.fromMap({
+              ...data,
+              'id': doc.id,
+            });
+            users.add(user);
+            fetchedIds.add(user.id);
+          }
+        }
+      }
+
+      if (users.length < limit) {
+        final fallbackSnapshot = await _firestore
+            .collection('users')
+            .orderBy('lastActive', descending: true)
+            .limit(limit * 2)
+            .get();
+
+        for (final doc in fallbackSnapshot.docs) {
+          if (fetchedIds.contains(doc.id)) continue;
+          final data = doc.data();
+          final user = User.fromMap({
+            ...data,
+            'id': doc.id,
+          });
+
+          final fallbackScore = _scoreUserMatch(
+            user: user,
+            tokens: tokens,
+            normalizedQuery: normalizedQuery,
+            normalizedQueryNoSpaces: normalizedQueryNoSpaces,
+          );
+
+          if (fallbackScore > 0) {
+            users.add(user);
+            fetchedIds.add(user.id);
+          }
+        }
+      }
+
+      final scored = users
+          .map((user) => _UserScore(
+                user: user,
+                score: _scoreUserMatch(
+                  user: user,
+                  tokens: tokens,
+                  normalizedQuery: normalizedQuery,
+                  normalizedQueryNoSpaces: normalizedQueryNoSpaces,
+                ),
+              ))
+          .toList();
+
+      scored.sort((a, b) {
+        final scoreCompare = b.score.compareTo(a.score);
+        if (scoreCompare != 0) return scoreCompare;
+
+        final verifyCompare = (b.user.isVerified ? 1 : 0)
+            .compareTo(a.user.isVerified ? 1 : 0);
+        if (verifyCompare != 0) return verifyCompare;
+
+        final followerCompare = b.user.followersCount.compareTo(a.user.followersCount);
+        if (followerCompare != 0) return followerCompare;
+
+        return b.user.lastActive.compareTo(a.user.lastActive);
+      });
+
+      final topUsers = scored.take(limit).map((item) => item.user).toList(growable: false);
+
+      return UserSearchResult(
+        users: topUsers,
+        totalCount: scored.length,
+        searchDuration: DateTime.now().difference(startTime),
+        matchedTokens: tokens,
+      );
+    } catch (e) {
+      // ignore: avoid_print
+      print('User search error: $e');
+      return UserSearchResult(
+        users: const [],
+        totalCount: 0,
+        searchDuration: DateTime.now().difference(startTime),
+        matchedTokens: tokens,
+      );
+    }
   }
 
   // Apply search filters
@@ -372,3 +537,81 @@ class CringeSearchService {
     return suggestions.take(8).toList();
   }
 }
+
+  class _UserScore {
+    final User user;
+    final int score;
+
+    const _UserScore({
+      required this.user,
+      required this.score,
+    });
+  }
+
+  int _scoreUserMatch({
+    required User user,
+    required List<String> tokens,
+    required String normalizedQuery,
+    required String normalizedQueryNoSpaces,
+  }) {
+    final keywordSet = SearchNormalizer.generateUserSearchKeywords(
+      fullName: user.fullName,
+      username: user.username,
+      email: user.email,
+    ).toSet();
+
+    final normalizedFullName = SearchNormalizer.normalizeForSearch(user.fullName);
+    final normalizedUsername = SearchNormalizer
+        .normalizeForSearch(user.username)
+        .replaceAll(RegExp(r'[@\s]+'), '');
+
+    var score = 0;
+
+    for (final token in tokens) {
+      if (keywordSet.contains(token)) {
+        score += 8;
+      } else if (keywordSet.any((kw) => kw.contains(token))) {
+        score += 4;
+      }
+
+      if (normalizedFullName.contains(token)) {
+        score += 2;
+      }
+    }
+
+    if (normalizedFullName.startsWith(normalizedQuery) && normalizedQuery.isNotEmpty) {
+      score += 10;
+    }
+
+    if (normalizedUsername.startsWith(normalizedQueryNoSpaces) &&
+        normalizedQueryNoSpaces.isNotEmpty) {
+      score += 12;
+    }
+
+    if (normalizedUsername == normalizedQueryNoSpaces && normalizedUsername.isNotEmpty) {
+      score += 15;
+    }
+
+    if (normalizedFullName == normalizedQuery && normalizedFullName.isNotEmpty) {
+      score += 12;
+    }
+
+    if (user.isVerified) {
+      score += 3;
+    }
+
+    if (user.isPremium) {
+      score += 1;
+    }
+
+    score += (user.followersCount ~/ 1000).clamp(0, 5);
+
+    final daysSinceActive = DateTime.now().difference(user.lastActive).inDays;
+    if (daysSinceActive <= 7) {
+      score += 2;
+    } else if (daysSinceActive <= 30) {
+      score += 1;
+    }
+
+    return score;
+  }

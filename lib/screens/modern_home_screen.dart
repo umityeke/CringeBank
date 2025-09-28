@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../models/cringe_entry.dart';
 import '../models/user_model.dart';
@@ -119,7 +120,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                 height: 240,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.orange.withOpacity(0.18),
+                  color: Colors.orange.withValues(alpha: 0.18),
                 ),
               ),
             ),
@@ -131,7 +132,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                 height: 220,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.pinkAccent.withOpacity(0.12),
+                  color: Colors.pinkAccent.withValues(alpha: 0.12),
                 ),
               ),
             ),
@@ -151,6 +152,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
 
   SliverAppBar _buildHeaderAppBar() {
     final safeTop = MediaQuery.of(context).padding.top;
+    final expandedHeight = _headerExpandedHeight + safeTop;
     final displayName = _resolveDisplayName(_currentUser, fallback: 'Misafir');
 
     return SliverAppBar(
@@ -158,10 +160,10 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
       stretch: true,
       elevation: 0,
       backgroundColor: const Color(0xFF090C14),
-    automaticallyImplyLeading: false,
-    leading: const SizedBox.shrink(),
-    leadingWidth: 0,
-    expandedHeight: _headerExpandedHeight,
+      automaticallyImplyLeading: false,
+      leading: const SizedBox.shrink(),
+      leadingWidth: 0,
+      expandedHeight: expandedHeight,
       toolbarHeight: 60,
       titleSpacing: 0,
       actions: const [],
@@ -189,8 +191,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
       ),
       flexibleSpace: LayoutBuilder(
         builder: (context, constraints) {
-    final t = ((constraints.maxHeight - kToolbarHeight) /
-      (_headerExpandedHeight - kToolbarHeight))
+          final t = ((constraints.maxHeight - kToolbarHeight) /
+                  (expandedHeight - kToolbarHeight))
               .clamp(0.0, 1.0);
 
           return Stack(
@@ -213,7 +215,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                   height: 240,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.orange.withOpacity(0.12),
+                    color: Colors.orange.withValues(alpha: 0.12),
                   ),
                 ),
               ),
@@ -225,22 +227,42 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                   height: 260,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFF4FC3F7).withOpacity(0.08),
+                    color: const Color(0xFF4FC3F7).withValues(alpha: 0.08),
                   ),
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(20, safeTop + 4, 20, 8),
-                child: Align(
-                  alignment: Alignment.bottomLeft,
-                  child: Opacity(
-                    opacity: Curves.easeOut.transform(t),
-                    child: Visibility(
-                      visible: t > 0.05,
-                      maintainState: true,
-                      maintainAnimation: true,
-                      maintainSize: false,
-                      child: _buildHeroCard(displayName),
+              SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(20, 4, 20, 8),
+                  child: Align(
+                    alignment: Alignment.bottomLeft,
+                    child: LayoutBuilder(
+                      builder: (context, cardConstraints) {
+                        return ClipRect(
+                          clipBehavior: Clip.hardEdge,
+                          child: Opacity(
+                            opacity: Curves.easeOut.transform(t),
+                            child: Visibility(
+                              visible: t > 0.05,
+                              maintainState: true,
+                              maintainAnimation: true,
+                              maintainSize: false,
+                              child: OverflowBox(
+                                alignment: Alignment.topLeft,
+                                maxHeight: 72,
+                                maxWidth: cardConstraints.maxWidth - 8,
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxHeight: 72,
+                                    maxWidth: cardConstraints.maxWidth - 8,
+                                  ),
+                                  child: _buildHeroCard(displayName),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -253,7 +275,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
   }
 
   Widget _buildAvatar(User? user) {
-    final size = 52.0;
+    final size = 48.0;
     final borderColor = const Color(0xFFFFA726);
     final avatarData = (user?.avatar ?? '').trim();
 
@@ -315,12 +337,21 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
 
     Widget buildNetworkAvatar(String url) {
       return ClipOval(
-        child: Image.network(
-          url,
+        child: CachedNetworkImage(
+          imageUrl: url,
           width: size,
           height: size,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => buildInitialAvatar(),
+          placeholder: (_, __) => SizedBox(
+            width: size,
+            height: size,
+            child: buildInitialAvatar(),
+          ),
+          errorWidget: (_, __, ___) => SizedBox(
+            width: size,
+            height: size,
+            child: buildInitialAvatar(),
+          ),
         ),
       );
     }
@@ -439,90 +470,94 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
         : 'cringebankasi';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      constraints: const BoxConstraints(
+        maxHeight: 68,
+        minHeight: 68,
+      ),
       decoration: BoxDecoration(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildAvatar(user),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 4),
-                    isLoading
-                        ? _buildSkeletonLine(width: 140, height: 20)
-                        : Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  displayName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                ),
-                              ),
-                              if (user?.isPremium ?? false) ...[
-                                const SizedBox(width: 8),
-                                _buildHeroBadge(
-                                  icon: Icons.workspace_premium_outlined,
-                                  colors: const [
-                                    Color(0xFFFFC107),
-                                    Color(0xFFFF8F00),
-                                  ],
-                                  label: 'Premium',
-                                ),
-                              ],
-                            ],
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: _buildAvatar(user),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                isLoading
+                    ? _buildSkeletonLine(width: 140, height: 20)
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
                           ),
-                    const SizedBox(height: 4),
-                    isLoading
-                        ? _buildSkeletonLine(width: 110)
-                        : Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  '@$username',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                        color:
-                                            Colors.white.withOpacity(0.64),
-                                        letterSpacing: 0.4,
-                                      ),
-                                ),
-                              ),
-                              if (user?.isVerified ?? false) ...[
-                                const SizedBox(width: 4),
-                                const Icon(
-                                  Icons.verified_rounded,
-                                  color: Colors.purple,
-                                  size: 18,
-                                ),
+                          if (user?.isPremium ?? false) ...[
+                            const SizedBox(width: 8),
+                            _buildHeroBadge(
+                              icon: Icons.workspace_premium_outlined,
+                              colors: const [
+                                Color(0xFFFFC107),
+                                Color(0xFFFF8F00),
                               ],
-                            ],
+                              label: 'Premium',
+                            ),
+                          ],
+                        ],
+                      ),
+                const SizedBox(height: 2),
+                isLoading
+                    ? _buildSkeletonLine(width: 110)
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              '@$username',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.64),
+                                    letterSpacing: 0.4,
+                                  ),
+                            ),
                           ),
-                  ],
-                ),
-              ),
-            ],
+                          if (user?.isVerified ?? false) ...[
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.verified_rounded,
+                              color: Colors.purple,
+                              size: 18,
+                            ),
+                          ],
+                        ],
+                      ),
+              ],
+            ),
           ),
         ],
       ),
@@ -655,6 +690,19 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                       _showComingSoonSnack('Geri bildirim gönder');
                     },
                   ),
+                  const SizedBox(height: 24),
+                  _buildSectionTitle('Hesap'),
+                  _buildSettingsTile(
+                    icon: Icons.logout_rounded,
+                    title: 'Çıkış yap',
+                    subtitle: 'Hesabından güvenli şekilde çık',
+                    onTap: () async {
+                      Navigator.of(modalContext).maybePop();
+                      await UserService.instance.logout();
+                      if (!mounted) return;
+                      Navigator.pushReplacementNamed(context, '/login');
+                    },
+                  ),
                 ],
               ),
             ),
@@ -721,7 +769,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: colors.last.withOpacity(0.38),
+            color: colors.last.withValues(alpha: 0.38),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -750,7 +798,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
       width: width,
       height: height,
       decoration: BoxDecoration(
-  color: Colors.white.withOpacity(0.12),
+        color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
       ),
     );
@@ -804,36 +852,31 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                   ? 'Bugünün en taze cringe anıları.'
                   : '${_selectedMood!.replaceFirst('#', '').toUpperCase()} modunda paylaşımları gösteriyoruz.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white.withOpacity(0.68),
+        color: Colors.white.withValues(alpha: 0.68),
                     height: 1.3,
                   ),
             ),
             const SizedBox(height: 6),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              child: Row(
-                children: [
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _buildMoodChip(
+                  value: null,
+                  label: 'Tümü',
+                  emoji: '🌌',
+                  color: const Color(0xFF7C4DFF),
+                  isActive: _selectedMood == null,
+                ),
+                for (final category in _moodCategories)
                   _buildMoodChip(
-                    value: null,
-                    label: 'Tümü',
-                    emoji: '🌌',
-                    color: const Color(0xFF7C4DFF),
-                    isActive: _selectedMood == null,
+                    value: category.label,
+                    label: category.label,
+                    emoji: category.emoji,
+                    color: category.color,
+                    isActive: _selectedMood == category.label,
                   ),
-                  const SizedBox(width: 10),
-                  for (final category in _moodCategories) ...[
-                    _buildMoodChip(
-                      value: category.label,
-                      label: category.label,
-                      emoji: category.emoji,
-                      color: category.color,
-                      isActive: _selectedMood == category.label,
-                    ),
-                    const SizedBox(width: 10),
-                  ],
-                ],
-              ),
+              ],
             ),
           ],
         ),
@@ -867,8 +910,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
           gradient: isActive
               ? LinearGradient(
                   colors: [
-                    color.withOpacity(0.7),
-                    color.withOpacity(0.45),
+                    color.withValues(alpha: 0.7),
+                    color.withValues(alpha: 0.45),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -879,8 +922,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: isActive
-                ? Colors.white.withOpacity(0.5)
-                : Colors.white.withOpacity(0.12),
+                ? Colors.white.withValues(alpha: 0.5)
+                : Colors.white.withValues(alpha: 0.12),
           ),
         ),
         child: Row(
@@ -1208,7 +1251,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                     colors: [
                       _getCringeLevelColor(entry.krepSeviyesi.round()),
                       _getCringeLevelColor(entry.krepSeviyesi.round())
-                          .withOpacity(0.7),
+                          .withValues(alpha: 0.7),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -1342,12 +1385,21 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
 
     Widget buildNetworkAvatar(String url) {
       return ClipOval(
-        child: Image.network(
-          url,
+        child: CachedNetworkImage(
+          imageUrl: url,
           width: size,
           height: size,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => buildInitialAvatar(),
+          placeholder: (_, __) => SizedBox(
+            width: size,
+            height: size,
+            child: buildInitialAvatar(),
+          ),
+          errorWidget: (_, __, ___) => SizedBox(
+            width: size,
+            height: size,
+            child: buildInitialAvatar(),
+          ),
         ),
       );
     }
@@ -1377,7 +1429,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
         border: Border.all(color: borderColor, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: borderColor.withOpacity(0.5),
+            color: borderColor.withValues(alpha: 0.5),
             blurRadius: 10,
             spreadRadius: 2,
             offset: const Offset(0, 0),

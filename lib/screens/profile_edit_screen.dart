@@ -237,10 +237,50 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         ],
       ),
       body: AnimatedBubbleBackground(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Form(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Color(0xFF121B2E),
+                      Color(0xFF090C14),
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: -120,
+              left: -80,
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.orange.withOpacity(0.18),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -100,
+              right: -60,
+              child: Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.pinkAccent.withOpacity(0.12),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Form(
               key: _formKey,
               child: Column(
                 children: [
@@ -489,53 +529,23 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                 width: 2,
                               ),
                             ),
-                            counterStyle: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
+                            counterStyle: const TextStyle(
+                              color: Colors.orange,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-
-                  // Kaydet Butonu (Büyük)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _saveProfile,
-                      icon: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Icon(Icons.save),
-                      label: Text(
-                        _isLoading ? 'Kaydediliyor...' : 'Profili Kaydet',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 20),
                 ],
               ),
             ),
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );

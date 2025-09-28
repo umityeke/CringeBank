@@ -15,6 +15,11 @@ class User {
   final List<String> rozetler;
   final bool isPremium;
   final bool isVerified;
+  final List<String> ownedStoreItems;
+  final String? equippedFrameItemId;
+  final List<String> equippedBadgeItemIds;
+  final String? equippedNameColorItemId;
+  final String? equippedBackgroundItemId;
 
   User({
     required this.id,
@@ -33,6 +38,11 @@ class User {
     this.rozetler = const [],
     this.isPremium = false,
     this.isVerified = false,
+    this.ownedStoreItems = const [],
+    this.equippedFrameItemId,
+    this.equippedBadgeItemIds = const [],
+    this.equippedNameColorItemId,
+    this.equippedBackgroundItemId,
   });
 
   // Seviye hesaplama
@@ -92,6 +102,16 @@ class User {
       rozetler: List<String>.from(json['rozetler'] ?? []),
       isPremium: json['isPremium'] ?? false,
       isVerified: json['isVerified'] ?? false,
+      ownedStoreItems: List<String>.from(json['ownedStoreItems'] ?? const []),
+    equippedFrameItemId:
+      _stringOrNull(json['equippedStoreItems']?['frame']),
+    equippedBadgeItemIds: _safeStringList(
+    json['equippedStoreItems']?['badges'],
+    ),
+    equippedNameColorItemId:
+      _stringOrNull(json['equippedStoreItems']?['nameColor']),
+    equippedBackgroundItemId:
+      _stringOrNull(json['equippedStoreItems']?['background']),
     );
   }
 
@@ -103,6 +123,8 @@ class User {
         : rawId != null
       ? rawId.toString().trim()
             : '';
+
+    final equipped = _asEquippedMap(map['equippedStoreItems']);
 
     return User(
       id: normalizedId,
@@ -125,11 +147,16 @@ class User {
       rozetler: List<String>.from(map['rozetler'] ?? []),
       isPremium: map['isPremium'] ?? false,
       isVerified: map['isVerified'] ?? false,
+      ownedStoreItems: _safeStringList(map['ownedStoreItems']),
+      equippedFrameItemId: _stringOrNull(equipped['frame']),
+      equippedBadgeItemIds: _safeStringList(equipped['badges']),
+      equippedNameColorItemId: _stringOrNull(equipped['nameColor']),
+      equippedBackgroundItemId: _stringOrNull(equipped['background']),
     );
   }
 
   Map<String, dynamic> toMap() {
-    return {
+    final map = {
       'id': id,
       'username': username,
       'email': email,
@@ -146,11 +173,31 @@ class User {
       'rozetler': rozetler,
       'isPremium': isPremium,
       'isVerified': isVerified,
+      'ownedStoreItems': ownedStoreItems,
     };
+
+    final equipped = <String, dynamic>{};
+    if (equippedFrameItemId?.isNotEmpty == true) {
+      equipped['frame'] = equippedFrameItemId;
+    }
+    if (equippedBadgeItemIds.isNotEmpty) {
+      equipped['badges'] = equippedBadgeItemIds;
+    }
+    if (equippedNameColorItemId?.isNotEmpty == true) {
+      equipped['nameColor'] = equippedNameColorItemId;
+    }
+    if (equippedBackgroundItemId?.isNotEmpty == true) {
+      equipped['background'] = equippedBackgroundItemId;
+    }
+    if (equipped.isNotEmpty) {
+      map['equippedStoreItems'] = equipped;
+    }
+
+    return map;
   }
 
   Map<String, dynamic> toJson() {
-    return {
+    final json = {
       'id': id,
       'username': username,
       'email': email,
@@ -167,7 +214,27 @@ class User {
       'rozetler': rozetler,
       'isPremium': isPremium,
       'isVerified': isVerified,
+      'ownedStoreItems': ownedStoreItems,
     };
+
+    final equipped = <String, dynamic>{};
+    if (equippedFrameItemId?.isNotEmpty == true) {
+      equipped['frame'] = equippedFrameItemId;
+    }
+    if (equippedBadgeItemIds.isNotEmpty) {
+      equipped['badges'] = equippedBadgeItemIds;
+    }
+    if (equippedNameColorItemId?.isNotEmpty == true) {
+      equipped['nameColor'] = equippedNameColorItemId;
+    }
+    if (equippedBackgroundItemId?.isNotEmpty == true) {
+      equipped['background'] = equippedBackgroundItemId;
+    }
+    if (equipped.isNotEmpty) {
+      json['equippedStoreItems'] = equipped;
+    }
+
+    return json;
   }
 
   // Copy with method
@@ -188,6 +255,11 @@ class User {
     List<String>? rozetler,
     bool? isPremium,
     bool? isVerified,
+    List<String>? ownedStoreItems,
+    String? equippedFrameItemId,
+    List<String>? equippedBadgeItemIds,
+    String? equippedNameColorItemId,
+    String? equippedBackgroundItemId,
   }) {
     return User(
       id: id ?? this.id,
@@ -206,6 +278,14 @@ class User {
       rozetler: rozetler ?? this.rozetler,
       isPremium: isPremium ?? this.isPremium,
       isVerified: isVerified ?? this.isVerified,
+    ownedStoreItems: ownedStoreItems ?? this.ownedStoreItems,
+    equippedFrameItemId: equippedFrameItemId ?? this.equippedFrameItemId,
+    equippedBadgeItemIds:
+      equippedBadgeItemIds ?? this.equippedBadgeItemIds,
+    equippedNameColorItemId:
+      equippedNameColorItemId ?? this.equippedNameColorItemId,
+    equippedBackgroundItemId:
+      equippedBackgroundItemId ?? this.equippedBackgroundItemId,
     );
   }
 
@@ -262,4 +342,40 @@ class User {
       return '${difference.inDays} gün önce aktifti';
     }
   }
+}
+
+List<String> _safeStringList(dynamic source) {
+  if (source == null) return const [];
+  if (source is String) {
+    return source.isEmpty ? const [] : [source];
+  }
+  if (source is Iterable) {
+    return source.map((value) => value.toString()).where((value) {
+      return value.trim().isNotEmpty;
+    }).toList(growable: false);
+  }
+  return const [];
+}
+
+Map<String, dynamic> _asEquippedMap(dynamic source) {
+  if (source is Map<String, dynamic>) {
+    return source;
+  }
+  if (source is Map) {
+    return source.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return const <String, dynamic>{};
+}
+
+String? _stringOrNull(dynamic value) {
+  if (value == null) return null;
+  String converted;
+  if (value is String) {
+    converted = value;
+  } else {
+    converted = value.toString();
+  }
+  final trimmed = converted.trim();
+  if (trimmed.isEmpty) return null;
+  return trimmed;
 }

@@ -1,0 +1,17 @@
+Add a search service that queries four indices (accounts, hashtags, places, posts) in parallel and returns a sectioned payload: top, accounts, hashtags, places, posts. Include pagination cursors per section and return timing metadata.
+
+Implement Turkish-aware text normalization utilities that: lowercase with ‘tr-TR’ rules, remove diacritics, Unicode-normalize (NFKC/NFKD), and also produce an ASCII-folded variant. Use them to populate search_normalized_tr and search_ascii fields for all searchable names.
+
+Create Cloud Functions that upsert/delete index records on Firestore create/update/delete for users, hashtags, places, and posts. Make the upsert idempotent and push failures to a dead-letter queue.
+
+Define ranking features per entity (e.g., followerCount log-scaled for accounts, recentUsageCount & trendScore for hashtags). Add a simple weighted scoring: textMatch, popularity, personalAffinity, recency; then normalize to [0,1].
+
+Build an autocomplete endpoint returning up to 8 suggestions per entity using prefix search and typo tolerance (1 edit). Add synonyms (GS→Galatasaray, Cimbom→Galatasaray, Ist→İstanbul, etc.).
+
+Implement a trending job that computes trend scores hourly for hashtags and places using time-decayed growth. Return a safe, localized trending list when the query is empty.
+
+On the client, debounce input (250ms), ignore queries shorter than 2 chars, cancel in-flight requests on new keystrokes, and render sectioned results with highlighted matches. Add Recent Searches with clear-all.
+
+Add safety filters to exclude private or suspended entities and downrank reported/spammy accounts. Respect blocks/mutes at retrieval time.
+
+Instrument analytics for query→result→click funnels, store CTR by rank, and expose metrics to tune synonyms and weights. Prepare hooks for future ML re-ranking.

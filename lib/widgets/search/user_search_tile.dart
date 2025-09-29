@@ -7,12 +7,14 @@ class UserSearchTile extends StatelessWidget {
   final User user;
   final VoidCallback? onTap;
   final VoidCallback? onFollow;
+  final Widget? trailing;
 
   const UserSearchTile({
     super.key,
     required this.user,
     this.onTap,
     this.onFollow,
+    this.trailing,
   });
 
   @override
@@ -118,7 +120,7 @@ class UserSearchTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppTheme.spacingM),
-            _buildFollowButton(),
+            trailing ?? _buildFollowButton(),
           ],
         ),
       ),

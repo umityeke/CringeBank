@@ -5,11 +5,91 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isFollowerCountAdjustment(userId) {
+      let existing = resource.data.followersCount;
+      let currentCount = existing is int ? existing : 0;
+      let nextCount = request.resource.data.followersCount;
+
+      return isSignedIn()
+        && request.auth.uid != userId
+        && request.resource.data.keys().hasAny(['followersCount'])
+        && resource.data.diff(request.resource.data).changedKeys().hasOnly(['followersCount'])
+        && nextCount is int
+        && (
+          nextCount == currentCount + 1 ||
+          (currentCount > 0 && nextCount == currentCount - 1)
+        );
+    }
+
+    function walletFieldImmutable(field) {
+      let afterHasField = request.resource.data.keys().hasAny([field]);
+      let beforeHasField = resource.data.keys().hasAny([field]);
+
+      if (!afterHasField && !beforeHasField) {
+        return true;
+      }
+
+      if (!afterHasField && beforeHasField) {
+        return false;
+      }
+
+      return request.resource.data[field] == resource.data[field];
+    }
+
+    function walletFieldsUnchanged() {
+      return walletFieldImmutable('coins')
+        && walletFieldImmutable('ownedItems')
+        && walletFieldImmutable('equippedItems');
+    }
+
+    function fieldUnchanged(field) {
+      return !request.resource.data.keys().hasAny([field])
+        || request.resource.data[field] == resource.data[field];
+    }
+
+    function contactFieldsUnchanged() {
+      return fieldUnchanged('email')
+        && fieldUnchanged('emailLower')
+        && fieldUnchanged('email_lower')
+        && fieldUnchanged('emailVerified')
+        && fieldUnchanged('phoneNumber')
+        && fieldUnchanged('phone_number')
+        && fieldUnchanged('phoneNumberVerified')
+        && fieldUnchanged('phone_number_verified');
+    }
+
     // Kullanıcı profilleri
     match /users/{userId} {
-      allow read: if true;
+      allow read: if isSignedIn() && request.auth.uid == userId;
       allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update, delete: if isSignedIn() && request.auth.uid == userId;
+      allow update: if (isSignedIn()
+          && request.auth.uid == userId
+          && walletFieldsUnchanged()
+          && contactFieldsUnchanged())
+        || isFollowerCountAdjustment(userId);
+      allow delete: if false;
+    }
+
+    match /users/{userId}/followers/{followerId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.auth.uid == followerId
+        && request.auth.uid != userId
+        && request.resource.data.followerId == followerId;
+      allow delete: if isSignedIn() && request.auth.uid == followerId;
+      allow update: if false;
+    }
+
+    match /users/{userId}/following/{followingId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.userId == followingId
+        && followingId != userId;
+      allow delete: if isSignedIn()
+        && request.auth.uid == userId
+        && resource.data.userId == followingId;
+      allow update: if false;
     }
 
     // Entry koleksiyonu
@@ -83,9 +163,30 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /iap_products/{productId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /purchases/{purchaseId} {
+      allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
+      allow write: if false;
+    }
+
+    match /wallet_ledger/{eventId} {
+      allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
+      allow write: if false;
+    }
+
+    match /try_on_sessions/{sessionId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
     // Diğer tüm koleksiyonlar için varsayılan
     match /{document=**} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if false;
     }
   }
 }

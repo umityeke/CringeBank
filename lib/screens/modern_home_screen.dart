@@ -7,6 +7,7 @@ import '../models/user_model.dart';
 import '../services/cringe_entry_service.dart';
 import '../services/user_service.dart';
 import '../widgets/animated_bubble_background.dart';
+import '../widgets/modern_cringe_card.dart';
 
 class ModernHomeScreen extends StatefulWidget {
   const ModernHomeScreen({super.key});
@@ -26,13 +27,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
   String? _selectedMood;
   static const double _headerExpandedHeight = 95;
 
-  static const List<_MoodCategory> _moodCategories = [
-    _MoodCategory(label: '#utanmaz', emoji: '🔥', color: Color(0xFFFF7043)),
-    _MoodCategory(label: '#kampüs', emoji: '🎓', color: Color(0xFF4FC3F7)),
-    _MoodCategory(label: '#işyerinde', emoji: '💼', color: Color(0xFFFFCA28)),
-    _MoodCategory(label: '#ailecek', emoji: '👨‍👩‍👧', color: Color(0xFFA5D6A7)),
-    _MoodCategory(label: '#ilksevgili', emoji: '💔', color: Color(0xFFFF8A80)),
-  ];
+  static const List<_MoodCategory> _moodCategories = [];
 
   @override
   void initState() {
@@ -847,37 +842,31 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
               ],
             ),
             const SizedBox(height: 2),
-            Text(
-              _selectedMood == null
-                  ? 'Bugünün en taze cringe anıları.'
-                  : '${_selectedMood!.replaceFirst('#', '').toUpperCase()} modunda paylaşımları gösteriyoruz.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-        color: Colors.white.withValues(alpha: 0.68),
-                    height: 1.3,
-                  ),
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _buildMoodChip(
-                  value: null,
-                  label: 'Tümü',
-                  emoji: '🌌',
-                  color: const Color(0xFF7C4DFF),
-                  isActive: _selectedMood == null,
+            if (_selectedMood != null)
+              Text(
+                '${_selectedMood!.replaceFirst('#', '').toUpperCase()} modunda paylaşımları gösteriyoruz.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.68),
+                  height: 1.3,
                 ),
-                for (final category in _moodCategories)
-                  _buildMoodChip(
-                    value: category.label,
-                    label: category.label,
-                    emoji: category.emoji,
-                    color: category.color,
-                    isActive: _selectedMood == category.label,
-                  ),
-              ],
-            ),
+              ),
+            if (_moodCategories.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final category in _moodCategories)
+                    _buildMoodChip(
+                      value: category.label,
+                      label: category.label,
+                      emoji: category.emoji,
+                      color: category.color,
+                      isActive: _selectedMood == category.label,
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -1197,259 +1186,17 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
         return SliverList(
           delegate: SliverChildBuilderDelegate((context, index) {
             if (index >= entries.length) return null;
-            return _buildPostCard(entries[index]);
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ModernCringeCard(entry: entries[index]),
+            );
           }, childCount: entries.length),
         );
       },
     );
   }
 
-  Widget _buildPostCard(CringeEntry entry) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white,
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _buildPostAvatar(entry),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      entry.authorName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                    Text(
-                      entry.authorHandle,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      _getCringeLevelColor(entry.krepSeviyesi.round()),
-                      _getCringeLevelColor(entry.krepSeviyesi.round())
-                          .withValues(alpha: 0.7),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${entry.krepSeviyesi.round()}/10',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
 
-          const SizedBox(height: 12),
-
-          Text(
-            entry.baslik,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          Text(
-            entry.aciklama,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              height: 1.5,
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          Row(
-            children: [
-              const Icon(Icons.thumb_up_alt_rounded,
-                  color: Color(0xFF66BB6A), size: 18),
-              const SizedBox(width: 4),
-              Text(
-                entry.begeniSayisi.toString(),
-                style: const TextStyle(
-                  color: Color(0xFF66BB6A),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Icon(Icons.mode_comment_outlined,
-                  color: Color(0xFF4FC3F7), size: 18),
-              const SizedBox(width: 4),
-              Text(
-                entry.yorumSayisi.toString(),
-                style: const TextStyle(
-                  color: Color(0xFF4FC3F7),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Icon(Icons.repeat_rounded,
-                  color: Color(0xFFFFA726), size: 18),
-              const SizedBox(width: 4),
-              Text(
-                entry.retweetSayisi.toString(),
-                style: const TextStyle(
-                  color: Color(0xFFFFA726),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.more_horiz_rounded,
-                    color: Colors.white54),
-                onPressed: () {},
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPostAvatar(CringeEntry entry) {
-    const size = 36.0;
-    final borderColor = const Color(0xFFFFA726);
-    final avatarData = (entry.authorAvatarUrl ?? '').trim();
-
-    Widget buildInitialAvatar() {
-      final initial = entry.authorName.isNotEmpty
-          ? entry.authorName[0].toUpperCase()
-          : 'U';
-
-      return Center(
-        child: Text(
-          initial,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
-          ),
-        ),
-      );
-    }
-
-    Widget buildBase64Avatar(String dataUri) {
-      try {
-        final base64String = dataUri.split(',').last;
-        final bytes = base64Decode(base64String);
-        return ClipOval(
-          child: Image.memory(
-            bytes,
-            width: size,
-            height: size,
-            fit: BoxFit.cover,
-          ),
-        );
-      } catch (_) {
-        return buildInitialAvatar();
-      }
-    }
-
-    Widget buildNetworkAvatar(String url) {
-      return ClipOval(
-        child: CachedNetworkImage(
-          imageUrl: url,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          placeholder: (_, __) => SizedBox(
-            width: size,
-            height: size,
-            child: buildInitialAvatar(),
-          ),
-          errorWidget: (_, __, ___) => SizedBox(
-            width: size,
-            height: size,
-            child: buildInitialAvatar(),
-          ),
-        ),
-      );
-    }
-
-    Widget avatarChild;
-    if (avatarData.startsWith('data:image')) {
-      avatarChild = buildBase64Avatar(avatarData);
-    } else if (avatarData.startsWith('http')) {
-      avatarChild = buildNetworkAvatar(avatarData);
-    } else if (avatarData.isNotEmpty && avatarData.length <= 3) {
-      avatarChild = Center(
-        child: Text(
-          avatarData,
-          style: const TextStyle(color: Colors.white, fontSize: 18),
-        ),
-      );
-    } else {
-      avatarChild = buildInitialAvatar();
-    }
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: const Color(0x33FF6B6B),
-        border: Border.all(color: borderColor, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: borderColor.withValues(alpha: 0.5),
-            blurRadius: 10,
-            spreadRadius: 2,
-            offset: const Offset(0, 0),
-          ),
-          const BoxShadow(
-            color: Color(0x55000000),
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: avatarChild,
-    );
-  }
-
-  Color _getCringeLevelColor(int level) {
-    if (level <= 3) return Colors.green;
-    if (level <= 6) return Colors.orange;
-    return Colors.red;
-  }
 }
 
 class _MoodCategory {

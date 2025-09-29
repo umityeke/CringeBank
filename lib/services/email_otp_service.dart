@@ -181,6 +181,29 @@ class EmailOtpService {
     }
   }
 
+  static Future<EmailOtpVerificationResult> confirmEmailUpdate(
+    String email,
+    String code,
+  ) async {
+    final normalizedEmail = _normalizeEmail(email);
+    final sanitizedCode = code.trim();
+
+    try {
+      final callable = _functions.httpsCallable('confirmEmailUpdate');
+      final result = await callable.call({
+        'email': normalizedEmail,
+        'code': sanitizedCode,
+      });
+      return EmailOtpVerificationResult.fromResponse(result.data);
+    } on FirebaseFunctionsException catch (e, stack) {
+      debugPrint('Cloud Function confirmEmailUpdate failed: ${e.message}\n$stack');
+      rethrow;
+    } catch (e, stack) {
+      debugPrint('Unexpected error calling confirmEmailUpdate: $e\n$stack');
+      rethrow;
+    }
+  }
+
   static Future<dynamic> _verifyOtpViaCallable(
     String email,
     String code,

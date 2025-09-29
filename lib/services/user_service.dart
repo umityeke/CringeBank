@@ -30,6 +30,9 @@ class UserService {
   DateTime? _lastCacheUpdate;
   bool _isInitialized = false;
   Map<String, dynamic>? _cachedDeviceFingerprint;
+  final Set<String> _followingIds = <String>{};
+  DateTime? _followingCacheUpdatedAt;
+  bool _isFollowingCacheLoaded = false;
 
   // Enterprise getters with monitoring
   User? get currentUser {
@@ -216,11 +219,18 @@ class UserService {
     print('✅ CLEANUP COMPLETE: Enterprise cache maintenance finished');
   }
 
+  void _clearFollowingCache() {
+    _followingIds.clear();
+    _followingCacheUpdatedAt = null;
+    _isFollowingCacheLoaded = false;
+  }
+
   // Clear enterprise cache
   void _clearEnterpriseCache() {
     print('🧹 CLEARING: Enterprise cache data');
     _userCache.clear();
     _lastCacheUpdate = null;
+    _clearFollowingCache();
   }
 
   // 🏢 ENTERPRISE REAL-TIME USER DATA STREAM WITH ADVANCED MONITORING
@@ -677,6 +687,7 @@ class UserService {
   Future<void> loadUserData(String uid) async {
     try {
       print('Loading user data for UID: $uid');
+      final firebaseUser = _auth.currentUser;
       final doc = await _firestore.collection('users').doc(uid).get();
       if (doc.exists) {
         print('User document exists, loading data...');
@@ -685,10 +696,12 @@ class UserService {
         print('User loaded: ${_currentUser?.username}');
         // Son aktif zamanını güncelle
         await _updateLastActive();
+        if (firebaseUser != null &&
+            firebaseUser.uid.trim() == _currentUser?.id.trim()) {
+          await getFollowingIds(forceRefresh: true);
+        }
       } else {
         print('User document does not exist for UID: $uid');
-
-        final firebaseUser = _auth.currentUser;
         if (firebaseUser != null) {
           final email = firebaseUser.email ?? '';
           final username = firebaseUser.displayName?.trim().isNotEmpty == true
@@ -722,6 +735,7 @@ class UserService {
 
           _currentUser = fallbackUser;
           await _updateLastActive();
+          await getFollowingIds(forceRefresh: true);
         }
       }
     } catch (e) {
@@ -765,6 +779,269 @@ class UserService {
     } catch (e) {
       print('❌ getUserById error for $normalizedId: $e');
       return _userCache[normalizedId];
+    }
+  }
+
+  Future<Set<String>> getFollowingIds({bool forceRefresh = false}) async {
+    final firebaseUser = _auth.currentUser;
+    if (firebaseUser == null) {
+      _clearFollowingCache();
+      return const <String>{};
+    }
+
+    final normalizedUid = firebaseUser.uid.trim();
+    if (normalizedUid.isEmpty) {
+      _clearFollowingCache();
+      return const <String>{};
+    }
+
+    final now = DateTime.now();
+    const cacheTtl = Duration(minutes: 5);
+
+    if (!forceRefresh && _isFollowingCacheLoaded) {
+      final cacheAge = _followingCacheUpdatedAt != null
+          ? now.difference(_followingCacheUpdatedAt!)
+          : cacheTtl + const Duration(seconds: 1);
+
+      if (cacheAge <= cacheTtl) {
+        return Set.unmodifiable(_followingIds);
+      }
+    }
+
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(normalizedUid)
+          .collection('following')
+          .get();
+
+      _followingIds
+        ..clear()
+        ..addAll(
+          snapshot.docs
+              .map((doc) => doc.id.trim())
+              .where((id) => id.isNotEmpty),
+        );
+
+      _followingCacheUpdatedAt = now;
+      _isFollowingCacheLoaded = true;
+
+      return Set.unmodifiable(_followingIds);
+    } catch (e) {
+      print('❌ Following cache load error: $e');
+      return Set.unmodifiable(_followingIds);
+    }
+  }
+
+  bool isFollowingCached(String userId) {
+    final normalizedId = userId.trim();
+    if (normalizedId.isEmpty) return false;
+    return _followingIds.contains(normalizedId);
+  }
+
+  Future<bool> isFollowing(String userId, {bool forceRefresh = false}) async {
+    final firebaseUser = _auth.currentUser;
+    final normalizedId = userId.trim();
+
+    if (firebaseUser == null || normalizedId.isEmpty) {
+      return false;
+    }
+
+    if (firebaseUser.uid.trim() == normalizedId) {
+      return false;
+    }
+
+    if (!forceRefresh && _isFollowingCacheLoaded) {
+      return _followingIds.contains(normalizedId);
+    }
+
+    final ids = await getFollowingIds(forceRefresh: forceRefresh);
+    return ids.contains(normalizedId);
+  }
+
+  Future<bool> followUser(String targetUserId) async {
+    final firebaseUser = _auth.currentUser;
+    if (firebaseUser == null) {
+      throw StateError('Takip işlemi için önce giriş yapmalısın.');
+    }
+
+    final currentUserId = firebaseUser.uid.trim();
+    final normalizedTargetId = targetUserId.trim();
+
+    if (normalizedTargetId.isEmpty) {
+      throw ArgumentError('Takip edilecek kullanıcı kimliği geçersiz.');
+    }
+
+    if (normalizedTargetId == currentUserId) {
+      throw StateError('Kendini takip edemezsin.');
+    }
+
+    if (_followingIds.contains(normalizedTargetId)) {
+      print('ℹ️ followUser: already following $normalizedTargetId');
+      return false;
+    }
+
+    try {
+      final result = await _firestore.runTransaction<bool>((transaction) async {
+        final followerRef = _firestore
+            .collection('users')
+            .doc(normalizedTargetId)
+            .collection('followers')
+            .doc(currentUserId);
+
+        final followingRef = _firestore
+            .collection('users')
+            .doc(currentUserId)
+            .collection('following')
+            .doc(normalizedTargetId);
+
+        final followerSnapshot = await transaction.get(followerRef);
+        if (followerSnapshot.exists) {
+          return false;
+        }
+
+        final timestamp = FieldValue.serverTimestamp();
+
+        transaction.set(followerRef, {
+          'followerId': currentUserId,
+          'followedAt': timestamp,
+        });
+
+        transaction.set(followingRef, {
+          'userId': normalizedTargetId,
+          'followedAt': timestamp,
+        });
+
+        transaction.update(
+          _firestore.collection('users').doc(normalizedTargetId),
+          {'followersCount': FieldValue.increment(1)},
+        );
+
+        transaction.update(
+          _firestore.collection('users').doc(currentUserId),
+          {'followingCount': FieldValue.increment(1)},
+        );
+
+        return true;
+      });
+
+      if (result) {
+        _followingIds.add(normalizedTargetId);
+        _followingCacheUpdatedAt = DateTime.now();
+        _isFollowingCacheLoaded = true;
+
+        final currentCached = _currentUser;
+        if (currentCached != null && currentCached.id.trim() == currentUserId) {
+          final updatedCurrent = currentCached.copyWith(
+            followingCount: currentCached.followingCount + 1,
+          );
+          _currentUser = updatedCurrent;
+          _userCache[currentUserId] = updatedCurrent;
+        }
+
+        final cachedTarget = _userCache[normalizedTargetId];
+        if (cachedTarget != null) {
+          final updatedTarget = cachedTarget.copyWith(
+            followersCount: cachedTarget.followersCount + 1,
+          );
+          _userCache[normalizedTargetId] = updatedTarget;
+        }
+      }
+
+      return result;
+    } catch (e) {
+      print('❌ followUser error for $targetUserId: $e');
+      throw StateError('Takip işlemi başarısız oldu. Lütfen tekrar dene.');
+    }
+  }
+
+  Future<bool> unfollowUser(String targetUserId) async {
+    final firebaseUser = _auth.currentUser;
+    if (firebaseUser == null) {
+      throw StateError('Takibi bırakmak için önce giriş yapmalısın.');
+    }
+
+    final currentUserId = firebaseUser.uid.trim();
+    final normalizedTargetId = targetUserId.trim();
+
+    if (normalizedTargetId.isEmpty) {
+      return false;
+    }
+
+    if (normalizedTargetId == currentUserId) {
+      return false;
+    }
+
+    try {
+      final result = await _firestore.runTransaction<bool>((transaction) async {
+        final followerRef = _firestore
+            .collection('users')
+            .doc(normalizedTargetId)
+            .collection('followers')
+            .doc(currentUserId);
+
+        final followingRef = _firestore
+            .collection('users')
+            .doc(currentUserId)
+            .collection('following')
+            .doc(normalizedTargetId);
+
+        final followerSnapshot = await transaction.get(followerRef);
+        if (!followerSnapshot.exists) {
+          return false;
+        }
+
+        transaction.delete(followerRef);
+        transaction.delete(followingRef);
+
+        transaction.update(
+          _firestore.collection('users').doc(normalizedTargetId),
+          {'followersCount': FieldValue.increment(-1)},
+        );
+
+        transaction.update(
+          _firestore.collection('users').doc(currentUserId),
+          {'followingCount': FieldValue.increment(-1)},
+        );
+
+        return true;
+      });
+
+      if (result) {
+        _followingIds.remove(normalizedTargetId);
+        _followingCacheUpdatedAt = DateTime.now();
+        _isFollowingCacheLoaded = true;
+
+        final currentCached = _currentUser;
+        if (currentCached != null && currentCached.id.trim() == currentUserId) {
+          final updatedFollowingCount =
+              currentCached.followingCount > 0
+                  ? currentCached.followingCount - 1
+                  : 0;
+          final updatedCurrent = currentCached.copyWith(
+            followingCount: updatedFollowingCount,
+          );
+          _currentUser = updatedCurrent;
+          _userCache[currentUserId] = updatedCurrent;
+        }
+
+        final cachedTarget = _userCache[normalizedTargetId];
+        if (cachedTarget != null) {
+          final updatedFollowersCount =
+              cachedTarget.followersCount > 0
+                  ? cachedTarget.followersCount - 1
+                  : 0;
+          final updatedTarget = cachedTarget.copyWith(
+            followersCount: updatedFollowersCount,
+          );
+          _userCache[normalizedTargetId] = updatedTarget;
+        }
+      }
+
+      return result;
+    } catch (e) {
+      print('❌ unfollowUser error for $targetUserId: $e');
+      throw StateError('Takibi bırakma işlemi başarısız oldu. Lütfen tekrar dene.');
     }
   }
 
@@ -893,6 +1170,28 @@ class UserService {
   // Profil güncelle
   Future<bool> updateProfile(User updatedUser) async {
     try {
+      final firebaseUserId = _auth.currentUser?.uid.trim();
+      final targetUserId = updatedUser.id.trim();
+
+      if (firebaseUserId == null || firebaseUserId.isEmpty) {
+        print('❌ Update profile denied: No authenticated Firebase user');
+        throw StateError('Profil güncellemek için giriş yapmalısın.');
+      }
+
+      if (targetUserId.isEmpty || targetUserId != firebaseUserId) {
+        print(
+          '🚫 Unauthorized profile update attempt: auth=$firebaseUserId target=$targetUserId',
+        );
+        throw StateError('Yalnızca kendi profilini güncelleyebilirsin.');
+      }
+
+      if (_currentUser != null && _currentUser!.id.trim() != targetUserId) {
+        print(
+          '🚫 Mismatched current user during update: current=${_currentUser!.id} target=$targetUserId',
+        );
+        throw StateError('Yalnızca kendi profilini güncelleyebilirsin.');
+      }
+
       print('Updating user profile for: ${updatedUser.username}');
 
       // Firestore'a güncellenen verileri kaydet

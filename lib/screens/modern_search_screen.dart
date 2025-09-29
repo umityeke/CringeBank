@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/cringe_entry_service.dart';
 import '../services/cringe_search_service.dart';
+import '../services/style_search_service.dart';
 import '../models/cringe_entry.dart';
 import '../models/user_model.dart';
 import '../widgets/entry_comments_sheet.dart';
@@ -27,6 +29,7 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
 
   SearchResult? _searchResult;
   UserSearchResult? _userSearchResult;
+  StyleSearchResponse? _styleSearchResponse;
   SearchFilter _currentFilter = SearchFilter();
   final SearchSortBy _currentSort = SearchSortBy.newest;
   SearchResultView _currentView = SearchResultView.entries;
@@ -35,6 +38,7 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
   bool _showSearchSuggestions = false;
   List<String> _currentSuggestions = [];
   final Set<String> _locallyLikedEntryIds = <String>{};
+  Timer? _suggestionDebounce;
 
   late AnimationController _backgroundController;
   late AnimationController _searchBarController;
@@ -53,14 +57,25 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
   void _initializeSearch() async {
     setState(() => _isLoading = true);
     try {
-      final result = await CringeSearchService.search(
+      final response = await StyleSearchService.search(
         query: '',
         filter: _currentFilter,
         sortBy: _currentSort,
+        limitPerSection: 12,
+        postsLimit: 20,
       );
       setState(() {
-        _searchResult = result;
-        _userSearchResult = null;
+        _styleSearchResponse = response;
+        _searchResult = SearchResult(
+          entries: response.posts.items,
+          totalCount: response.posts.totalCount,
+          searchDuration: response.posts.fetchDuration,
+        );
+        _userSearchResult = UserSearchResult(
+          users: response.accounts.items,
+          totalCount: response.accounts.totalCount,
+          searchDuration: response.accounts.fetchDuration,
+        );
         _currentView = SearchResultView.entries;
         _isLoading = false;
       });
@@ -108,6 +123,7 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
 
   @override
   void dispose() {
+    _suggestionDebounce?.cancel();
     _backgroundController.dispose();
     _searchBarController.dispose();
     _filterController.dispose();
@@ -529,10 +545,13 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
       return _buildLoadingState();
     }
 
+    final style = _styleSearchResponse;
     final hasEntries = _searchResult?.entries.isNotEmpty ?? false;
     final hasUsers = _userSearchResult?.users.isNotEmpty ?? false;
+    final hasHashtags = style?.hashtags.items.isNotEmpty ?? false;
+    final hasTop = style?.top.isNotEmpty ?? false;
 
-    if (!hasEntries && !hasUsers) {
+    if (!hasEntries && !hasUsers && !hasHashtags && !hasTop) {
       return _buildEmptyState();
     }
 
@@ -630,6 +649,7 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
     required bool showEntries,
     required bool showUsers,
   }) {
+    final style = _styleSearchResponse;
     final entryList = showEntries
         ? (_searchResult?.entries ?? const <CringeEntry>[])
         : const <CringeEntry>[];
@@ -644,18 +664,50 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
         ? userList.take(6).toList()
         : userList;
 
-    return ListView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      children: [
-        if (showUsers && userPreview.isNotEmpty) ...[
+    final children = <Widget>[];
+
+    if (style != null && style.top.isNotEmpty) {
+      children
+        ..add(_buildTopResultsSection(style))
+        ..add(const SizedBox(height: 24));
+    }
+
+    if (style != null && style.hashtags.items.isNotEmpty) {
+      children
+        ..add(_buildSectionHeader(
+          title: 'Etiketler',
+          count: style.hashtags.items.length,
+          totalCount: style.hashtags.totalCount,
+        ))
+        ..add(const SizedBox(height: 12))
+        ..add(_buildHashtagWrap(style.hashtags.items))
+        ..add(const SizedBox(height: 24));
+    }
+
+    if (style != null && style.places.items.isNotEmpty) {
+      children
+        ..add(_buildSectionHeader(
+          title: 'Mekanlar',
+          count: style.places.items.length,
+          totalCount: style.places.totalCount,
+        ))
+        ..add(const SizedBox(height: 12))
+        ..addAll(style.places.items.map(_buildPlaceTile))
+        ..add(const SizedBox(height: 24));
+    }
+
+    if (showUsers && userPreview.isNotEmpty) {
+      children
+        ..add(
           _buildSectionHeader(
             title: 'Kullanıcılar',
             count: userPreview.length,
             totalCount: _userSearchResult?.totalCount,
           ),
-          const SizedBox(height: 12),
-          ...userPreview.map(
+        )
+        ..add(const SizedBox(height: 12))
+        ..addAll(
+          userPreview.map(
             (user) => Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: UserSearchTile(
@@ -665,20 +717,30 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
               ),
             ),
           ),
-          if (_userSearchResult != null &&
-              _userSearchResult!.totalCount > userPreview.length)
-            _buildSeeAllButton(SearchResultView.users),
-          if (showEntries && entryPreview.isNotEmpty)
-            const SizedBox(height: 24),
-        ],
-        if (showEntries && entryPreview.isNotEmpty) ...[
+        );
+
+      if (_userSearchResult != null &&
+          _userSearchResult!.totalCount > userPreview.length) {
+        children.add(_buildSeeAllButton(SearchResultView.users));
+      }
+
+      if (showEntries && entryPreview.isNotEmpty) {
+        children.add(const SizedBox(height: 24));
+      }
+    }
+
+    if (showEntries && entryPreview.isNotEmpty) {
+      children
+        ..add(
           _buildSectionHeader(
             title: 'Krepler',
             count: entryPreview.length,
             totalCount: _searchResult?.totalCount,
           ),
-          const SizedBox(height: 12),
-          ...entryPreview.map(
+        )
+        ..add(const SizedBox(height: 12))
+        ..addAll(
+          entryPreview.map(
             (entry) => Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: ModernCringeCard(
@@ -690,11 +752,22 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
               ),
             ),
           ),
-          if (_searchResult != null &&
-              _searchResult!.totalCount > entryPreview.length)
-            _buildSeeAllButton(SearchResultView.entries),
-        ],
-      ],
+        );
+
+      if (_searchResult != null &&
+          _searchResult!.totalCount > entryPreview.length) {
+        children.add(_buildSeeAllButton(SearchResultView.entries));
+      }
+    }
+
+    if (children.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      children: children,
     );
   }
 
@@ -740,6 +813,148 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
         style: TextButton.styleFrom(foregroundColor: Colors.white),
         child: const Text('Tümünü gör'),
       ),
+    );
+  }
+
+  Widget _buildTopResultsSection(StyleSearchResponse response) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(
+          title: 'Öne Çıkanlar',
+          count: response.top.length,
+          totalCount: response.top.length,
+        ),
+        const SizedBox(height: 12),
+        ...response.top.map(
+          (result) => Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _buildTopResultTile(result),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTopResultTile(StyleSearchTopResult result) {
+    switch (result.type) {
+      case StyleSearchEntityType.account:
+        final user = result.item as User;
+        return UserSearchTile(
+          user: user,
+          onTap: () => _openUserProfile(user),
+          onFollow: () => _openUserProfile(user),
+          trailing: _buildScoreBadge(result.score),
+        );
+      case StyleSearchEntityType.hashtag:
+        final hashtag = result.item as StyleSearchHashtag;
+        return _buildHashtagChip('#${hashtag.tag}',
+            subtitle: 'Trend puanı: ${hashtag.trendScore.toStringAsFixed(2)}');
+      case StyleSearchEntityType.place:
+        final place = result.item as StyleSearchPlace;
+        return _buildPlaceTile(place);
+      case StyleSearchEntityType.post:
+        final entry = result.item as CringeEntry;
+        return ModernCringeCard(
+          entry: entry,
+          onTap: () => _openCringeDetail(entry),
+          onLike: () => _likeCringe(entry),
+          onComment: () => _commentCringe(entry),
+          onShare: () => _shareCringe(entry),
+        );
+    }
+  }
+
+  Widget _buildScoreBadge(double score) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.orangeAccent.withOpacity(0.6)),
+      ),
+      child: Text(
+        score.toStringAsFixed(2),
+        style: const TextStyle(
+          color: Colors.orange,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHashtagWrap(List<StyleSearchHashtag> hashtags) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: hashtags
+          .map(
+            (item) => _buildHashtagChip(
+              '#${item.tag}',
+              subtitle: item.isTrending
+                  ? '🔥 Trend puanı ${item.trendScore.toStringAsFixed(2)}'
+                  : 'Paylaşım: ${item.postCount}',
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  Widget _buildHashtagChip(String label, {String? subtitle}) {
+    return InputChip(
+      label: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (subtitle != null)
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 10,
+              ),
+            ),
+        ],
+      ),
+      side: BorderSide(color: Colors.white.withOpacity(0.4)),
+      backgroundColor: Colors.white.withOpacity(0.08),
+      onPressed: () => _selectSuggestion(label),
+    );
+  }
+
+  Widget _buildPlaceTile(StyleSearchPlace place) {
+    final location = [place.city, place.country]
+        .where((value) => value != null && value.trim().isNotEmpty)
+        .join(', ');
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+      tileColor: Colors.white.withOpacity(0.05),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      leading: const Icon(Icons.place_outlined, color: Colors.white),
+      title: Text(
+        place.name,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      subtitle: location.isNotEmpty
+          ? Text(
+              location,
+              style: TextStyle(color: Colors.white.withOpacity(0.7)),
+            )
+          : null,
+      trailing: _buildScoreBadge(place.popularityScore),
+      onTap: () => _selectSuggestion(place.name),
     );
   }
 
@@ -836,22 +1051,30 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
     });
 
     try {
-      final results = await Future.wait([
-        CringeSearchService.search(
-          query: formattedQuery,
-          filter: _currentFilter,
-          sortBy: _currentSort,
-        ),
-        CringeSearchService.searchUsers(query: formattedQuery),
-      ]);
+      final styleResponse = await StyleSearchService.search(
+        query: formattedQuery,
+        filter: _currentFilter,
+        sortBy: _currentSort,
+        limitPerSection: 12,
+        postsLimit: 20,
+      );
 
       if (!mounted) return;
 
-      final entryResult = results[0] as SearchResult;
-      final userResult = results[1] as UserSearchResult;
+      final entryResult = SearchResult(
+        entries: styleResponse.posts.items,
+        totalCount: styleResponse.posts.totalCount,
+        searchDuration: styleResponse.posts.fetchDuration,
+      );
+      final userResult = UserSearchResult(
+        users: styleResponse.accounts.items,
+        totalCount: styleResponse.accounts.totalCount,
+        searchDuration: styleResponse.accounts.fetchDuration,
+        matchedTokens: [],
+      );
 
-      final hasEntries = entryResult.entries.isNotEmpty;
-      final hasUsers = userResult.users.isNotEmpty;
+      final hasEntries = styleResponse.posts.items.isNotEmpty;
+      final hasUsers = styleResponse.accounts.items.isNotEmpty;
       final nextView = hasEntries && hasUsers
           ? SearchResultView.all
           : hasUsers
@@ -861,6 +1084,7 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
       setState(() {
         _searchResult = entryResult;
         _userSearchResult = userResult;
+        _styleSearchResponse = styleResponse;
         _currentView = nextView;
         _isLoading = false;
       });
@@ -885,10 +1109,55 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
   }
 
   void _showSuggestions() {
-    // Simulated suggestions - now empty since we removed trending searches
-    setState(() {
-      _currentSuggestions = [];
-      _showSearchSuggestions = false;
+    final rawQuery = _searchController.text;
+    final trimmed = rawQuery.trim();
+
+    _suggestionDebounce?.cancel();
+
+    if (trimmed.length < 2) {
+      final fallback = <String>[];
+      if (_styleSearchResponse?.suggestions.isNotEmpty == true) {
+        fallback.addAll(_styleSearchResponse!.suggestions);
+      } else {
+        fallback.addAll(
+          CringeSearchService.trendingTags.take(8).map((tag) => '#$tag'),
+        );
+      }
+
+      setState(() {
+        _currentSuggestions = fallback;
+        _showSearchSuggestions = fallback.isNotEmpty;
+      });
+      return;
+    }
+
+    _suggestionDebounce = Timer(const Duration(milliseconds: 250), () async {
+      try {
+        final response = await StyleSearchService.search(
+          query: trimmed,
+          filter: _currentFilter,
+          sortBy: _currentSort,
+          limitPerSection: 6,
+          postsLimit: 8,
+        );
+
+        if (!mounted) return;
+        if (_searchController.text.trim() != trimmed) {
+          return;
+        }
+
+        setState(() {
+          _styleSearchResponse = response;
+          _currentSuggestions = response.suggestions;
+          _showSearchSuggestions = _currentSuggestions.isNotEmpty;
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _currentSuggestions = const [];
+          _showSearchSuggestions = false;
+        });
+      }
     });
   }
 

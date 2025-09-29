@@ -130,6 +130,9 @@ class CringeSearchService {
   static final List<String> _recentSearches = [];
   static final Set<String> _trendingTags = {};
 
+  static List<String> get recentSearches => List.unmodifiable(_recentSearches);
+  static List<String> get trendingTags => List.unmodifiable(_trendingTags);
+
   // Initialize search service
   static Future<void> initialize() async {
     if (_isInitialized) return;

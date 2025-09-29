@@ -1,12 +1,17 @@
+import 'dart:async';
+
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../data/store_catalog.dart';
+import '../models/try_on_session.dart';
 import '../models/user_model.dart';
 import '../services/store_service.dart';
 import '../services/user_service.dart';
 import '../widgets/animated_bubble_background.dart';
 import '../widgets/store_inventory_card.dart';
 import '../widgets/store_item_artwork.dart';
+import '../widgets/try_on_preview_sheet.dart';
 
 class CringeStoreScreen extends StatefulWidget {
   const CringeStoreScreen({super.key});
@@ -19,6 +24,30 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
   final StoreService _storeService = StoreService.instance;
   final UserService _userService = UserService.instance;
   final Set<String> _processingItems = <String>{};
+  final Set<String> _tryOnLoadingItems = <String>{};
+  final Map<String, List<String>> _previewUrlCache =
+      <String, List<String>>{};
+  StreamSubscription<TryOnSession?>? _tryOnSubscription;
+  TryOnSession? _currentTryOnSession;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentTryOnSession = _storeService.activeTryOnSession;
+    _tryOnSubscription =
+        _storeService.tryOnSessionStream.listen((TryOnSession? session) {
+      if (!mounted) return;
+      setState(() {
+        _currentTryOnSession = session;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _tryOnSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -106,9 +135,10 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
   }
 
   Widget _buildHeroBanner(User? user) {
-    final subtitle = user != null
-        ? 'Envanterinde ${user.ownedStoreItems.length} ürün var. Yeni efektlerle profilini güçlendir.'
-        : 'Giriş yaparak satın aldığın efektleri profilinde hemen kullan.';
+  final ownedCount = user?.ownedStoreItems.length ?? 0;
+  final subtitle = user != null
+    ? 'Envanterinde $ownedCount ürün var. Yeni efektlerle profilini güçlendir.'
+    : 'Giriş yaparak satın aldığın efektleri profilinde hemen kullan.';
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -272,12 +302,16 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
     required User? user,
     EdgeInsetsGeometry margin = const EdgeInsets.only(top: 14),
   }) {
-    final owned = user?.ownedStoreItems.contains(item.id) ?? false;
+  final ownedItems = user?.ownedStoreItems ?? const <String>[];
+  final owned = ownedItems.contains(item.id);
     final isEquipped =
         user != null ? _storeService.isEquipped(user, item) : false;
     final canEquip =
         user != null ? _storeService.canEquip(user, item) : false;
     final busy = _processingItems.contains(item.id);
+  final tryOnBusy = _tryOnLoadingItems.contains(item.id);
+  final tryOnActive = _currentTryOnSession?.itemId == item.id &&
+    (_currentTryOnSession?.isActive ?? false);
 
     final statusChips = <Widget>[];
     if (owned) {
@@ -304,6 +338,15 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
           label: 'Popüler',
           color: Color(0xFF7C4DFF),
           textColor: Colors.white,
+        ),
+      );
+    }
+    if (!owned && tryOnActive) {
+      statusChips.add(
+        _StatusPill(
+          label: 'Deneme aktif',
+          color: accentColor.withValues(alpha: 0.16),
+          textColor: accentColor,
         ),
       );
     }
@@ -430,9 +473,11 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
             user: user,
             accentColor: accentColor,
             busy: busy,
+            tryOnBusy: tryOnBusy,
             owned: owned,
             isEquipped: isEquipped,
             canEquip: canEquip,
+            tryOnActive: tryOnActive,
           ),
         ],
       ),
@@ -444,9 +489,11 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
     required User? user,
     required Color accentColor,
     required bool busy,
+    required bool tryOnBusy,
     required bool owned,
     required bool isEquipped,
     required bool canEquip,
+    required bool tryOnActive,
   }) {
     if (busy) {
       return const SizedBox(
@@ -459,18 +506,49 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
     }
 
     if (user == null) {
-      return _primaryButton(
-        label: 'Satın al',
-        color: accentColor,
-        onPressed: _showRequiresLogin,
+      return SizedBox(
+        width: 140,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _primaryButton(
+              label: 'Satın al',
+              color: accentColor,
+              onPressed: _showRequiresLogin,
+            ),
+            const SizedBox(height: 10),
+            _secondaryButton(
+              label: 'Önizle & Dene',
+              color: accentColor,
+              onPressed: _showRequiresLogin,
+            ),
+          ],
+        ),
       );
     }
 
     if (!owned) {
-      return _primaryButton(
-        label: 'Satın al',
-        color: accentColor,
-        onPressed: () => _showPurchaseSheet(item),
+      final tryOnLabel = tryOnActive ? 'Önizlemeyi Aç' : 'Önizle & Dene';
+      return SizedBox(
+        width: 140,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _primaryButton(
+              label: 'Satın al',
+              color: accentColor,
+              onPressed: () => _showPurchaseSheet(item),
+            ),
+            const SizedBox(height: 10),
+            _secondaryButton(
+              label: tryOnLabel,
+              color: accentColor,
+              onPressed: tryOnBusy ? () {} : () => _handleTryOn(item),
+              busy: tryOnBusy,
+              active: tryOnActive,
+            ),
+          ],
+        ),
       );
     }
 
@@ -536,6 +614,60 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
           style: const TextStyle(
             fontWeight: FontWeight.w700,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _secondaryButton({
+    required String label,
+    required Color color,
+    VoidCallback? onPressed,
+    bool busy = false,
+    bool active = false,
+  }) {
+    if (busy) {
+      return const SizedBox(
+        width: 140,
+        height: 42,
+        child: Center(
+          child: CircularProgressIndicator(strokeWidth: 2.0),
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: 140,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: active ? color : color,
+          backgroundColor:
+              active ? color.withValues(alpha: 0.12) : Colors.transparent,
+          side: BorderSide(color: color.withValues(alpha: 0.6)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              active ? Icons.timelapse_rounded : Icons.visibility_outlined,
+              size: 16,
+              color: color,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -623,6 +755,118 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
         _processingItems.remove(item.id);
       }
     }
+  }
+
+  Future<void> _handleTryOn(StoreItem item) async {
+    final user = _userService.currentUser;
+    if (user == null) {
+      _showRequiresLogin();
+      return;
+    }
+
+    final existingSession = _currentTryOnSession;
+    if (existingSession != null &&
+        existingSession.itemId == item.id &&
+        existingSession.isActive) {
+      final previewUrls = await _ensurePreviewUrls(item);
+      if (!mounted) return;
+      await _showTryOnSheet(
+        item: item,
+        session: existingSession,
+        previewUrls: previewUrls,
+      );
+      return;
+    }
+
+    setState(() {
+      _tryOnLoadingItems.add(item.id);
+    });
+
+    try {
+      final session = await _storeService.startTryOn(item);
+      final previewUrls = await _ensurePreviewUrls(item);
+      if (!mounted) return;
+      await _showTryOnSheet(
+        item: item,
+        session: session,
+        previewUrls: previewUrls,
+      );
+    } on FirebaseFunctionsException catch (error) {
+      if (!mounted) return;
+      final message = error.message ?? 'Try-on oturumu başlatılamadı.';
+      _showSnack(
+        message,
+        icon: Icons.error_outline,
+        accentColor: Colors.redAccent,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showErrorSnack(error);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _tryOnLoadingItems.remove(item.id);
+        });
+      } else {
+        _tryOnLoadingItems.remove(item.id);
+      }
+    }
+  }
+
+  Future<List<String>> _ensurePreviewUrls(StoreItem item) async {
+    final cached = _previewUrlCache[item.id];
+    if (cached != null && cached.isNotEmpty) {
+      return cached;
+    }
+
+    final urls = await _storeService.resolvePreviewImageUrls(item);
+    _previewUrlCache[item.id] = urls;
+    return urls;
+  }
+
+  Future<void> _showTryOnSheet({
+    required StoreItem item,
+    required TryOnSession session,
+    required List<String> previewUrls,
+  }) async {
+    final previewAssets = _storeService.previewAssetsFor(item);
+    final config = _storeService.activeTryOnConfig ?? item.tryOnConfig;
+    var triesRemaining = _storeService.activeTryOnTriesRemainingToday;
+    if (triesRemaining < 0) {
+      triesRemaining = 0;
+    } else if (triesRemaining > config.maxDailyTries) {
+      triesRemaining = config.maxDailyTries;
+    }
+
+    var cooldownRemaining = _storeService.activeTryOnCooldownRemainingSec;
+    if (cooldownRemaining < 0) {
+      cooldownRemaining = 0;
+    } else if (cooldownRemaining > config.cooldownSec) {
+      cooldownRemaining = config.cooldownSec;
+    }
+    final reusedSession = _storeService.reusedTryOnSession;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return TryOnPreviewSheet(
+          item: item,
+          session: session,
+          previewUrls: previewUrls,
+          previewAssets: previewAssets,
+          config: config,
+          triesRemaining: triesRemaining,
+          cooldownRemaining: cooldownRemaining,
+          reusedSession: reusedSession,
+          onPurchase: () {
+            Navigator.of(context).pop();
+            _showPurchaseSheet(item);
+          },
+        );
+      },
+    );
   }
 
   Future<void> _handleEquip(StoreItem item) async {

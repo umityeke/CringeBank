@@ -12,7 +12,6 @@ import '../services/store_service.dart';
 import '../services/user_service.dart';
 import '../widgets/animated_bubble_background.dart';
 import '../widgets/modern_cringe_card.dart';
-import '../widgets/store_inventory_card.dart';
 import 'cringe_store_screen.dart';
 import 'modern_login_screen.dart';
 import 'profile_edit_screen.dart';
@@ -67,6 +66,10 @@ class _BadgeChip extends StatelessWidget {
 class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
   late Future<User?> _profileFuture;
   final StoreService _storeService = StoreService.instance;
+  bool _isFollowingTarget = false;
+  bool _isFollowStateLoading = false;
+  bool _isFollowActionInProgress = false;
+  String? _activeProfileUserId;
 
   String? get _requestedUserId => widget.userId ?? widget.initialUser?.id;
 
@@ -77,6 +80,58 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     final firebaseId = UserService.instance.firebaseUser?.uid;
     if (firebaseId != null && firebaseId == targetId) return true;
     return false;
+  }
+
+  bool _isViewingOwnProfile(User user) {
+    final candidateIds = <String>{
+      user.id.trim(),
+      if (widget.userId != null && widget.userId!.trim().isNotEmpty)
+        widget.userId!.trim(),
+      if (widget.initialUser != null &&
+          widget.initialUser!.id.trim().isNotEmpty)
+        widget.initialUser!.id.trim(),
+    }..removeWhere((id) => id.isEmpty);
+
+    final firebaseUserId = UserService.instance.firebaseUser?.uid.trim();
+    if (firebaseUserId != null &&
+        firebaseUserId.isNotEmpty &&
+        candidateIds.contains(firebaseUserId)) {
+      return true;
+    }
+
+    final currentUserId = UserService.instance.currentUser?.id.trim();
+    if (currentUserId != null &&
+        currentUserId.isNotEmpty &&
+        candidateIds.contains(currentUserId)) {
+      return true;
+    }
+
+    return candidateIds.isEmpty;
+  }
+
+  bool _canEditProfile(User user) {
+  final firebaseUser = UserService.instance.firebaseUser;
+  final firebaseUserId = firebaseUser?.uid.trim();
+    if (firebaseUserId == null || firebaseUserId.isEmpty) {
+      return false;
+    }
+
+    final candidateIds = <String>{
+      if (user.id.trim().isNotEmpty) user.id.trim(),
+      if (widget.userId != null && widget.userId!.trim().isNotEmpty)
+        widget.userId!.trim(),
+      if (widget.initialUser != null && widget.initialUser!.id.trim().isNotEmpty)
+        widget.initialUser!.id.trim(),
+    };
+
+    if (candidateIds.isEmpty) {
+      final currentUser = UserService.instance.currentUser;
+      if (currentUser != null && currentUser.id.trim().isNotEmpty) {
+        candidateIds.add(currentUser.id.trim());
+      }
+    }
+
+    return candidateIds.contains(firebaseUserId);
   }
 
   @override
@@ -91,6 +146,10 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     final oldId = oldWidget.userId ?? oldWidget.initialUser?.id;
     final newId = _requestedUserId;
     if (oldId != newId) {
+      _activeProfileUserId = null;
+      _isFollowingTarget = false;
+      _isFollowStateLoading = false;
+      _isFollowActionInProgress = false;
       _profileFuture = _loadProfileUser();
     }
   }
@@ -134,10 +193,296 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     return widget.initialUser;
   }
 
+  void _ensureFollowStateInitialized(User user) {
+    final trimmedId = user.id.trim();
+
+    if (_activeProfileUserId == trimmedId) {
+      return;
+    }
+
+    _activeProfileUserId = trimmedId.isNotEmpty ? trimmedId : null;
+
+    if (trimmedId.isEmpty || _isSelfProfileTarget(trimmedId)) {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _isFollowingTarget = false;
+          _isFollowStateLoading = false;
+        });
+      });
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _refreshFollowState(targetUserId: trimmedId, forceRefresh: true);
+    });
+  }
+
+  Future<void> _refreshFollowState({
+    required String targetUserId,
+    bool forceRefresh = false,
+  }) async {
+    if (!mounted) return;
+
+    if (_isSelfProfileTarget(targetUserId)) {
+      setState(() {
+        _isFollowingTarget = false;
+        _isFollowStateLoading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isFollowStateLoading = true;
+    });
+
+    try {
+      final isFollowing = await UserService.instance.isFollowing(
+        targetUserId,
+        forceRefresh: forceRefresh,
+      );
+      if (!mounted) return;
+      setState(() {
+        _isFollowingTarget = isFollowing;
+        _isFollowStateLoading = false;
+      });
+    } catch (e) {
+      print('Follow state load error ($targetUserId): $e');
+      if (!mounted) return;
+      setState(() {
+        _isFollowStateLoading = false;
+      });
+    }
+  }
+
+  Future<void> _onFollowActionPressed(User user) async {
+    final targetId = user.id.trim();
+    if (targetId.isEmpty || _isFollowActionInProgress) {
+      return;
+    }
+
+    if (_isSelfProfileTarget(targetId)) {
+      return;
+    }
+
+    setState(() {
+      _isFollowActionInProgress = true;
+    });
+
+    try {
+      if (_isFollowingTarget) {
+        final result = await UserService.instance.unfollowUser(targetId);
+        if (result) {
+          final updatedFollowers =
+              user.followersCount > 0 ? user.followersCount - 1 : 0;
+          final updatedUser = user.copyWith(
+            followersCount: updatedFollowers,
+          );
+          if (!mounted) return;
+          setState(() {
+            _isFollowingTarget = false;
+            _profileFuture = Future<User?>.value(updatedUser);
+          });
+        } else {
+          await _refreshFollowState(targetUserId: targetId, forceRefresh: true);
+        }
+      } else {
+        final result = await UserService.instance.followUser(targetId);
+        if (result) {
+          final updatedUser = user.copyWith(
+            followersCount: user.followersCount + 1,
+          );
+          if (!mounted) return;
+          setState(() {
+            _isFollowingTarget = true;
+            _profileFuture = Future<User?>.value(updatedUser);
+          });
+        } else {
+          await _refreshFollowState(targetUserId: targetId, forceRefresh: true);
+        }
+      }
+    } on StateError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('İşlem başarısız oldu: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isFollowActionInProgress = false;
+        });
+      }
+    }
+  }
+
+  void _onMessageButtonPressed(User user) {
+    final trimmedId = user.id.trim();
+    if (_isSelfProfileTarget(trimmedId)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kendine mesaj gönderemezsin.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final firebaseUser = UserService.instance.firebaseUser;
+    if (firebaseUser == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mesaj göndermek için önce giriş yapmalısın.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${user.username} ile mesajlaşma çok yakında!'),
+        backgroundColor: Colors.orange.shade400,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Widget _buildFollowActionArea(
+    User user, {
+    required bool isOwnProfile,
+  }) {
+    if (isOwnProfile) {
+      return const SizedBox.shrink();
+    }
+    final isLoading = _isFollowStateLoading || _isFollowActionInProgress;
+    final isFollowing = _isFollowingTarget;
+    final followLabel = isFollowing ? 'Takip Ediliyor' : 'Takip Et';
+    final followIcon = isFollowing
+        ? Icons.check_circle_outline
+        : Icons.person_add_alt_1_rounded;
+
+    return Column(
+      children: [
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed:
+                    isLoading ? null : () => _onFollowActionPressed(user),
+                icon: isLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Icon(followIcon),
+                label: Text(
+                  followLabel,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor:
+                      isFollowing ? const Color(0xFF1E1E1E) : Colors.orange,
+                  foregroundColor: isFollowing ? Colors.white : Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _onMessageButtonPressed(user),
+                icon: const Icon(Icons.mail_outline),
+                label: const Text(
+                  'Mesaj Gönder',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.4),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   void _navigateToEditProfile(User user) async {
+    if (!_canEditProfile(user)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Yalnızca kendi profilini düzenleyebilirsin.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final firebaseUser = UserService.instance.firebaseUser;
+    final firebaseUserId = firebaseUser?.uid;
+    if (firebaseUserId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Devam etmek için yeniden giriş yapmalısın.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    User? currentUser = UserService.instance.currentUser;
+    if (currentUser == null || currentUser.id != firebaseUserId) {
+      await UserService.instance.loadUserData(firebaseUserId);
+      currentUser = UserService.instance.currentUser;
+    }
+
+    if (currentUser == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profil bilgileri alınamadı. Lütfen tekrar dene.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+  final editableUser = currentUser;
+    if (!mounted) return;
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => ProfileEditScreen(user: user)),
+      MaterialPageRoute(
+        builder: (context) => ProfileEditScreen(user: editableUser),
+      ),
     );
 
     if (result != null && result is User) {
@@ -189,6 +534,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
               : _buildUserNotFoundScreen();
         }
 
+        _ensureFollowStateInitialized(user);
         return _buildProfileScreen(user);
       },
     );
@@ -316,6 +662,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
   }
 
   Widget _buildProfileScreen(User user) {
+    final isOwnProfile = _isViewingOwnProfile(user);
     return Scaffold(
       backgroundColor: Colors.black,
       body: AnimatedBubbleBackground(
@@ -422,13 +769,17 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildHeaderCard(user),
+                          _buildHeaderCard(
+                            user,
+                            isOwnProfile: isOwnProfile,
+                          ),
                           const SizedBox(height: 12),
                           _buildStatsGrid(user),
                           const SizedBox(height: 16),
-                          StoreInventoryCard(user: user),
-                          const SizedBox(height: 16),
-                          _buildUserEntriesSection(user),
+                          _buildUserEntriesSection(
+                            user,
+                            isOwnProfile: isOwnProfile,
+                          ),
                           const SizedBox(height: 32),
                         ],
                       ),
@@ -445,7 +796,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
 
 
 
-  Widget _buildHeaderCard(User user) {
+  Widget _buildHeaderCard(User user, {required bool isOwnProfile}) {
     final theme = Theme.of(context);
     final displayName =
         user.fullName.isNotEmpty ? user.fullName : user.username;
@@ -454,6 +805,8 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     final badgeEffects = _storeService.resolveBadgeEffects(user);
     final nameColor = _storeService.resolveNameColor(user);
     final backgroundGlow = backgroundEffect.backgroundGlow ?? const <Color>[];
+  final canEditProfile = _canEditProfile(user);
+  final showOwnerActions = isOwnProfile && canEditProfile;
 
     const baseGradient = LinearGradient(
       colors: [Color(0xFF1C1A24), Color(0xFF14111C)],
@@ -592,7 +945,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                         height: 1.5,
                       ),
                     )
-                  else
+                  else if (isOwnProfile)
                     Text(
                       'Profiline birkaç cümle ile renk kat. Kendini tanıt, ilgi alanlarını paylaş.',
                       style: theme.textTheme.bodyMedium?.copyWith(
@@ -600,56 +953,73 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                         fontStyle: FontStyle.italic,
                         height: 1.5,
                       ),
+                    )
+                  else
+                    Text(
+                      'Bu kullanıcı henüz profilini doldurmadı.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.55),
+                        fontStyle: FontStyle.italic,
+                        height: 1.5,
+                      ),
                     ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          icon: const Icon(Icons.edit_outlined),
-                          label: const Text('Profili Düzenle'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFFFFB74D),
-                            foregroundColor: Colors.black,
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 16),
-                            textStyle:
-                                const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          onPressed: () => _navigateToEditProfile(user),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.rocket_launch_outlined),
-                          label: const Text('Krep Paylaş'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            side: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.35),
+                  if (showOwnerActions) ...[
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('Profili Düzenle'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFFFFB74D),
+                              foregroundColor: Colors.black,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 16),
+                              textStyle:
+                                  const TextStyle(fontWeight: FontWeight.w600),
                             ),
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 16),
-                            textStyle:
-                                const TextStyle(fontWeight: FontWeight.w600),
+                            onPressed: () => _navigateToEditProfile(user),
                           ),
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text(
-                                  'Yakında: Hızlı krep paylaşımı!',
-                                ),
-                                backgroundColor: Colors.orange.shade400,
-                                behavior: SnackBarBehavior.floating,
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                          },
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.rocket_launch_outlined),
+                            label: const Text('Krep Paylaş'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: BorderSide(
+                                color: Colors.white.withValues(alpha: 0.35),
+                              ),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 16),
+                              textStyle:
+                                  const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text(
+                                    'Yakında: Hızlı krep paylaşımı!',
+                                  ),
+                                  backgroundColor: Colors.orange.shade400,
+                                  behavior: SnackBarBehavior.floating,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ]
+                  else if (!isOwnProfile) ...[
+                    _buildFollowActionArea(
+                      user,
+                      isOwnProfile: isOwnProfile,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -866,12 +1236,10 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
 
 
 
-
-
-
-
-  Widget _buildUserEntriesSection(User user) {
-    final isOwnProfile = _isSelfProfileTarget(user.id);
+  Widget _buildUserEntriesSection(
+    User user, {
+    required bool isOwnProfile,
+  }) {
     final fallbackUserId = UserService.instance.firebaseUser?.uid ?? '';
     final userId = user.id.isNotEmpty ? user.id : fallbackUserId;
 

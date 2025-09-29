@@ -60,6 +60,103 @@ class StoreItemArtwork {
   });
 }
 
+class StoreItemPreviewAssets {
+  final List<String> images;
+  final String? video;
+  final bool watermark;
+  final double intensity;
+
+  const StoreItemPreviewAssets({
+    this.images = const [],
+    this.video,
+    this.watermark = true,
+    this.intensity = 0.6,
+  });
+
+  factory StoreItemPreviewAssets.fromMap(Map<String, dynamic>? map) {
+    if (map == null) {
+      return const StoreItemPreviewAssets();
+    }
+
+    return StoreItemPreviewAssets(
+      images: List<String>.from(map['images'] ?? const []),
+      video: map['video'] as String?,
+      watermark: map['watermark'] ?? true,
+      intensity: (map['intensityPreview'] ?? map['intensity'] ?? 0.6)
+          .toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'images': images,
+      if (video != null) 'video': video,
+      'watermark': watermark,
+      'intensityPreview': intensity,
+    };
+  }
+}
+
+class StoreItemFullAssets {
+  final List<String> images;
+  final String? video;
+
+  const StoreItemFullAssets({
+    this.images = const [],
+    this.video,
+  });
+
+  factory StoreItemFullAssets.fromMap(Map<String, dynamic>? map) {
+    if (map == null) {
+      return const StoreItemFullAssets();
+    }
+
+    return StoreItemFullAssets(
+      images: List<String>.from(map['images'] ?? const []),
+      video: map['video'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'images': images,
+      if (video != null) 'video': video,
+    };
+  }
+}
+
+class StoreItemTryOnConfig {
+  final int durationSec;
+  final int cooldownSec;
+  final int maxDailyTries;
+
+  const StoreItemTryOnConfig({
+    this.durationSec = 30,
+    this.cooldownSec = 3600,
+    this.maxDailyTries = 3,
+  });
+
+  factory StoreItemTryOnConfig.fromMap(Map<String, dynamic>? map) {
+    if (map == null) {
+      return const StoreItemTryOnConfig();
+    }
+
+    return StoreItemTryOnConfig(
+      durationSec: (map['durationSec'] ?? 30) as int,
+      cooldownSec: (map['cooldownSec'] ?? 3600) as int,
+      maxDailyTries: (map['maxDailyTries'] ?? 3) as int,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'durationSec': durationSec,
+      'cooldownSec': cooldownSec,
+      'maxDailyTries': maxDailyTries,
+    };
+  }
+}
+
 class StoreItem {
   final String id;
   final String name;
@@ -73,6 +170,9 @@ class StoreItem {
   final String? note;
   final bool highlighted;
   final List<String> features;
+  final StoreItemPreviewAssets? previewAssets;
+  final StoreItemFullAssets? fullAssets;
+  final StoreItemTryOnConfig tryOnConfig;
 
   const StoreItem({
     required this.id,
@@ -87,7 +187,70 @@ class StoreItem {
     this.note,
     this.highlighted = false,
     this.features = const [],
+    this.previewAssets,
+    this.fullAssets,
+    this.tryOnConfig = const StoreItemTryOnConfig(),
   });
+
+  StoreItemPreviewAssets get effectivePreviewAssets => previewAssets ??
+      StoreItemPreviewAssets(
+        images: ['store_items/$id/preview/main.png'],
+      );
+
+  StoreItemFullAssets get effectiveFullAssets => fullAssets ??
+      StoreItemFullAssets(
+        images: ['store_items/$id/full/main.png'],
+      );
+
+  static StoreItemType _typeFromString(String? value) {
+    if (value == null) return StoreItemType.frame;
+    return StoreItemType.values.firstWhere(
+      (type) => type.name == value,
+      orElse: () => StoreItemType.frame,
+    );
+  }
+
+  factory StoreItem.fromMap(String id, Map<String, dynamic> map) {
+    return StoreItem(
+      id: id,
+      name: map['name'] ?? '',
+      priceLabel: map['priceLabel'] ?? '',
+      categoryId: map['categoryId'] ?? 'uncategorized',
+      type: _typeFromString(map['type'] as String?),
+      effect: StoreCatalog.effectFromMap(map['effect'] as Map<String, dynamic>?),
+      artwork: StoreCatalog.artworkFromMap(map['artwork'] as Map<String, dynamic>?),
+      description: map['description'] as String?,
+      tag: map['tag'] as String?,
+      note: map['note'] as String?,
+      highlighted: map['highlighted'] ?? false,
+      features: List<String>.from(map['features'] ?? const []),
+      previewAssets:
+          StoreItemPreviewAssets.fromMap(map['preview'] as Map<String, dynamic>?),
+      fullAssets:
+          StoreItemFullAssets.fromMap(map['full'] as Map<String, dynamic>?),
+      tryOnConfig:
+          StoreItemTryOnConfig.fromMap(map['tryOn'] as Map<String, dynamic>?),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'priceLabel': priceLabel,
+      'categoryId': categoryId,
+      'type': type.name,
+      'description': description,
+      'tag': tag,
+      'note': note,
+      'highlighted': highlighted,
+      'features': features,
+      'effect': StoreCatalog.effectToMap(effect),
+      'artwork': StoreCatalog.artworkToMap(artwork),
+      'preview': previewAssets?.toMap(),
+      'full': fullAssets?.toMap(),
+      'tryOn': tryOnConfig.toMap(),
+    };
+  }
 }
 
 class StoreCategory {
@@ -578,5 +741,164 @@ class StoreCatalog {
 
   static Iterable<StoreItem> itemsFromIds(Iterable<String> ids) {
     return ids.map(_findById).whereType<StoreItem>();
+  }
+
+  static StoreItemEffect effectFromMap(Map<String, dynamic>? map) {
+    if (map == null) return StoreItemEffect.none;
+
+    final typeString = map['type'] as String?;
+    final effectType = StoreItemEffectType.values.firstWhere(
+      (value) => value.name == typeString,
+      orElse: () => StoreItemEffectType.none,
+    );
+
+    switch (effectType) {
+      case StoreItemEffectType.frame:
+        return StoreItemEffect(
+          type: effectType,
+          frameGradient: _gradientFromMap(map['frameGradient']),
+          frameBorderWidth: (map['frameBorderWidth'] ?? 4).toDouble(),
+        );
+      case StoreItemEffectType.badge:
+        return StoreItemEffect(
+          type: effectType,
+          badgeIcon: Icons.emoji_events_outlined,
+          badgeColor: _colorFromAny(map['badgeColor']) ?? const Color(0xFFFFD54F),
+          badgeTextColor:
+              _colorFromAny(map['badgeTextColor']) ?? Colors.white,
+          badgeLabel: map['badgeLabel'] as String?,
+        );
+      case StoreItemEffectType.nameColor:
+        return StoreItemEffect(
+          type: effectType,
+          nameColor: _colorFromAny(map['nameColor']) ?? Colors.white,
+        );
+      case StoreItemEffectType.profileBackground:
+        return StoreItemEffect(
+          type: effectType,
+          backgroundGlow: _colorsFromList(map['backgroundGlow']),
+        );
+      case StoreItemEffectType.none:
+        return StoreItemEffect.none;
+    }
+  }
+
+  static Map<String, dynamic> effectToMap(StoreItemEffect effect) {
+    final map = <String, dynamic>{
+      'type': effect.type.name,
+    };
+
+    switch (effect.type) {
+      case StoreItemEffectType.frame:
+        map['frameGradient'] = _gradientToList(effect.frameGradient);
+        map['frameBorderWidth'] = effect.frameBorderWidth;
+        break;
+      case StoreItemEffectType.badge:
+        map['badgeColor'] = _colorToInt(effect.badgeColor);
+        map['badgeTextColor'] = _colorToInt(effect.badgeTextColor);
+        map['badgeIcon'] = effect.badgeIcon?.codePoint;
+        map['badgeLabel'] = effect.badgeLabel;
+        break;
+      case StoreItemEffectType.nameColor:
+        map['nameColor'] = _colorToInt(effect.nameColor);
+        break;
+      case StoreItemEffectType.profileBackground:
+        map['backgroundGlow'] = effect.backgroundGlow
+            ?.map((color) => color.toARGB32())
+            .toList();
+        break;
+      case StoreItemEffectType.none:
+        break;
+    }
+
+    return map;
+  }
+
+  static StoreItemArtwork artworkFromMap(Map<String, dynamic>? map) {
+    if (map == null) {
+      return const StoreItemArtwork(
+        colors: [Color(0xFF7C4DFF), Color(0xFF9575CD)],
+        icon: Icons.auto_awesome,
+      );
+    }
+
+    return StoreItemArtwork(
+      colors: _colorsFromList(map['colors']) ?? const [Color(0xFF7C4DFF)],
+      icon: _iconFromAny(map['icon']) ?? Icons.auto_awesome,
+      begin: _alignmentFromList(map['begin']) ?? Alignment.topLeft,
+      end: _alignmentFromList(map['end']) ?? Alignment.bottomRight,
+      blurSigma: (map['blurSigma'] ?? 18).toDouble(),
+    );
+  }
+
+  static Map<String, dynamic> artworkToMap(StoreItemArtwork artwork) {
+    return {
+  'colors': artwork.colors.map((color) => color.toARGB32()).toList(),
+      'icon': artwork.icon.codePoint,
+      'begin': [artwork.begin.x, artwork.begin.y],
+      'end': [artwork.end.x, artwork.end.y],
+      'blurSigma': artwork.blurSigma,
+    };
+  }
+
+  static LinearGradient? _gradientFromMap(dynamic value) {
+    if (value == null) return null;
+
+    final colors = _colorsFromList(value);
+    if (colors == null || colors.length < 2) return null;
+
+    return LinearGradient(colors: colors);
+  }
+
+  static List<int>? _intListFrom(dynamic value) {
+    if (value is List) {
+      return value
+          .whereType<num>()
+          .map((number) => number.toInt())
+          .toList(growable: false);
+    }
+    return null;
+  }
+
+  static List<Color>? _colorsFromList(dynamic value) {
+    final ints = _intListFrom(value);
+    if (ints == null) return null;
+    return ints.map((int colorValue) => Color(colorValue)).toList();
+  }
+
+  static Map<String, dynamic>? _gradientToList(LinearGradient? gradient) {
+    if (gradient == null) return null;
+    return {
+      'colors': gradient.colors.map((color) => color.toARGB32()).toList(),
+    };
+  }
+
+  static Color? _colorFromAny(dynamic value) {
+    if (value is int) return Color(value);
+    if (value is String) {
+      final parsed = int.tryParse(value, radix: 16);
+      if (parsed != null) {
+        return Color(parsed);
+      }
+    }
+    return null;
+  }
+
+  static int? _colorToInt(Color? color) => color?.toARGB32();
+
+  static IconData? _iconFromAny(dynamic value) {
+    if (value is int) {
+      return IconData(value, fontFamily: 'MaterialIcons');
+    }
+    return null;
+  }
+
+  static Alignment? _alignmentFromList(dynamic value) {
+    if (value is List && value.length >= 2) {
+      final dx = (value[0] as num?)?.toDouble() ?? 0.0;
+      final dy = (value[1] as num?)?.toDouble() ?? 0.0;
+      return Alignment(dx, dy);
+    }
+    return null;
   }
 }

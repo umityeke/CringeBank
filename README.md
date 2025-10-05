@@ -43,15 +43,23 @@ flutter test test/services/cringe_entry_service_test.dart
 
 ## Firestore Yapılandırması
 
-- `firestore.rules` dosyasında `cringe_entries_by_type/{paylasimTuru}/categories/{kategori}/entries` için okuma erişimi oturum açmış kullanıcılarla sınırlandırılmıştır.
-- `firestore.indexes.json` dosyası `createdAt` alanı için zorunlu indeks tanımını içerir. Değişiklikleri dağıtmak için:
 
 ```powershell
 Set-Location 'c:/Users/Ümit YEKE/CRINGE-BANKASI-2'
 firebase deploy --only firestore:indexes,firestore:rules
 ```
 
+## Windows Firebase SDK Yönetimi
+
+- GitHub dosya boyutu limitine takılmamak ve gizli anahtarları paylaşmamak için `windows/firebase_sdk/` ve `windows/tools/` klasörleri depoya dahil edilmez ( `.gitignore` içerisinde).
+- Windows derlemesi yapmak isteyen geliştiriciler, [Firebase C++ SDK](https://firebase.google.com/download/cpp) paketini indirip `windows/firebase_sdk/` dizinine çıkarmalıdır. ZİP arşivi repo dışında saklanmalıdır.
+- `firebase_app_id_file.json` dosyası da aynı sebeple depoda yoktur; FlutterFire CLI ile yeniden üretilebilir:
+
+```powershell
+flutterfire configure --platforms windows
+```
+
+- Bu dosyalar lokal ortamda oluşturulduktan sonra `git status` çıktısında görünmemelidir. Görünüyorsa `.gitignore` kurallarının doğru uygulandığından emin olun.
+
 ## Faydalı Kaynaklar
 
-- [Flutter Firestore Stream Docs](https://firebase.google.com/docs/firestore/query-data/listen)
-- [Firebase Analytics Custom Events](https://firebase.google.com/docs/analytics/events)

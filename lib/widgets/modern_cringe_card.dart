@@ -11,6 +11,9 @@ class ModernCringeCard extends StatefulWidget {
   final VoidCallback? onLike;
   final VoidCallback? onComment;
   final VoidCallback? onShare;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+  final bool isDeleteInProgress;
 
   const ModernCringeCard({
     super.key,
@@ -19,6 +22,9 @@ class ModernCringeCard extends StatefulWidget {
     this.onLike,
     this.onComment,
     this.onShare,
+    this.onEdit,
+    this.onDelete,
+    this.isDeleteInProgress = false,
   });
 
   @override
@@ -38,31 +44,32 @@ class _ModernCringeCardState extends State<ModernCringeCard> {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: widget.onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: AppTheme.spacingS),
-        padding: const EdgeInsets.all(AppTheme.spacingM),
-        decoration: BoxDecoration(
-          color: Colors.transparent,
+          onTap: widget.onTap,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.6),
-            width: 0.5,
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: AppTheme.spacingS),
+            padding: const EdgeInsets.all(AppTheme.spacingM),
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.6),
+                width: 0.5,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
+                const SizedBox(height: AppTheme.spacingM),
+                _buildContent(),
+                const SizedBox(height: AppTheme.spacingM),
+                _buildActions(),
+              ],
+            ),
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(),
-            const SizedBox(height: AppTheme.spacingM),
-            _buildContent(),
-            const SizedBox(height: AppTheme.spacingM),
-            _buildActions(),
-          ],
-        ),
-      ),
-    ).animate()
+        )
+        .animate()
         .fadeIn(duration: 350.ms, curve: Curves.easeOutCubic)
         .moveY(begin: 12, end: 0, duration: 450.ms, curve: Curves.easeOut);
   }
@@ -85,9 +92,9 @@ class _ModernCringeCardState extends State<ModernCringeCard> {
               Text(
                 widget.entry.isAnonim ? 'Anonim' : widget.entry.authorName,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
-                    ),
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
               ),
               const SizedBox(height: AppTheme.spacingXS),
               Row(
@@ -96,10 +103,9 @@ class _ModernCringeCardState extends State<ModernCringeCard> {
                     Flexible(
                       child: Text(
                         widget.entry.authorHandle,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: AppTheme.textSecondary),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textSecondary,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -107,10 +113,9 @@ class _ModernCringeCardState extends State<ModernCringeCard> {
                   ],
                   Text(
                     _formatTimestamp(widget.entry.createdAt),
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: AppTheme.textMuted),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppTheme.textMuted),
                   ),
                 ],
               ),
@@ -118,7 +123,16 @@ class _ModernCringeCardState extends State<ModernCringeCard> {
           ),
         ),
         const SizedBox(width: AppTheme.spacingS),
-        _buildCringeBadge(),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (widget.onEdit != null || widget.onDelete != null) ...[
+              _buildOwnerActions(),
+              const SizedBox(height: AppTheme.spacingXS),
+            ],
+            _buildCringeBadge(),
+          ],
+        ),
       ],
     );
   }
@@ -133,9 +147,9 @@ class _ModernCringeCardState extends State<ModernCringeCard> {
         vertical: AppTheme.spacingXS,
       ),
       decoration: BoxDecoration(
-  color: color.withOpacity(0.15),
+        color: color.withOpacity(0.15),
         borderRadius: BorderRadius.circular(12),
-  border: Border.all(color: color.withOpacity(0.4)),
+        border: Border.all(color: color.withOpacity(0.4)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -155,6 +169,52 @@ class _ModernCringeCardState extends State<ModernCringeCard> {
     );
   }
 
+  Widget _buildOwnerActions() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.onEdit != null)
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+            icon: const Icon(
+              Icons.edit_outlined,
+              color: AppTheme.textSecondary,
+              size: 20,
+            ),
+            onPressed: widget.onEdit,
+            tooltip: 'Krepi düzenle',
+          ),
+        if (widget.onEdit != null && widget.onDelete != null)
+          const SizedBox(width: AppTheme.spacingS),
+        if (widget.onDelete != null)
+          widget.isDeleteInProgress
+              ? const SizedBox(
+                  height: 32,
+                  width: 32,
+                  child: Padding(
+                    padding: EdgeInsets.all(6),
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 32,
+                    height: 32,
+                  ),
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    color: AppTheme.cringeRed,
+                    size: 20,
+                  ),
+                  onPressed: widget.onDelete,
+                  tooltip: 'Krepi sil',
+                ),
+      ],
+    );
+  }
+
   Widget _buildContent() {
     final category = widget.entry.kategori;
     return Column(
@@ -163,9 +223,9 @@ class _ModernCringeCardState extends State<ModernCringeCard> {
         AutoSizeText(
           widget.entry.baslik,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary,
-              ),
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimary,
+          ),
           maxLines: 2,
           minFontSize: 14,
           overflow: TextOverflow.ellipsis,
@@ -174,9 +234,9 @@ class _ModernCringeCardState extends State<ModernCringeCard> {
         Text(
           widget.entry.aciklama,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppTheme.textSecondary,
-                height: 1.5,
-              ),
+            color: AppTheme.textSecondary,
+            height: 1.5,
+          ),
           maxLines: 4,
           overflow: TextOverflow.ellipsis,
         ),
@@ -188,9 +248,9 @@ class _ModernCringeCardState extends State<ModernCringeCard> {
             const SizedBox(width: AppTheme.spacingXS),
             Text(
               category.displayName,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
             ),
           ],
         ),

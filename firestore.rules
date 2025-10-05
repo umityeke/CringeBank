@@ -1,192 +1,452 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // ====================================================================
+    // HELPER FUNCTIONS - Authentication & Authorization
+    // ====================================================================
+    
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isFollowerCountAdjustment(userId) {
-      let existing = resource.data.followersCount;
-      let currentCount = existing is int ? existing : 0;
-      let nextCount = request.resource.data.followersCount;
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'umityeke@gmail.com' ||
+        request.auth.token.superadmin == true ||
+        request.auth.token.admin == true
+      );
+    }
 
-      return isSignedIn()
-        && request.auth.uid != userId
-        && request.resource.data.keys().hasAny(['followersCount'])
-        && resource.data.diff(request.resource.data).changedKeys().hasOnly(['followersCount'])
-        && nextCount is int
+    function isModerator() {
+      return isSignedIn() && request.auth.token.moderator == true;
+    }
+
+    function isCategoryAdmin(category) {
+      let categoryDoc = get(/databases/$(database)/documents/category_admins/$(category));
+      return categoryDoc != null 
+        && categoryDoc.data != null
+        && categoryDoc.data.admins != null
+        && categoryDoc.data.admins.hasAny([{userId: request.auth.uid, isActive: true}]);
+    }
+
+    function canModerateCategory(category) {
+      return isSuperAdmin() || isModerator() || isCategoryAdmin(category);
+    }
+
+    function isOwner(ownerId) {
+      return isSignedIn() && ownerId is string && request.auth.uid == ownerId;
+    }
+
+    function isOwnerOrModerator(ownerId) {
+      return isOwner(ownerId) || isModerator() || isSuperAdmin();
+    }
+
+    // ====================================================================
+    // HELPER FUNCTIONS - Validation
+    // ====================================================================
+    
+    function validStatus(status) {
+      return status is string &&
+        (status == 'pending' || status == 'approved' || status == 'rejected' || status == 'blocked');
+    }
+
+    function canReadModerated(ownerId, status) {
+      return status == 'approved'
+        || (status == 'pending' && isOwnerOrModerator(ownerId))
+        || (status == 'rejected' && isOwnerOrModerator(ownerId))
+        || (status == 'blocked' && isModerator());
+    }
+
+    function isValidTimestamp(value) {
+      return (value is int && value >= 0)
+        || (value is timestamp);
+    }
+
+    function stringWithin(value, minLength, maxLength) {
+      return value is string && value.size() >= minLength && value.size() <= maxLength;
+    }
+
+    function optionalStringWithin(data, key, maxLength) {
+      return !data.keys().hasAny([key])
+        || stringWithin(data[key], 0, maxLength);
+    }
+
+    function mediaListValid(list, ownerId, postId, minItems, maxItems) {
+      let basePath = 'user_uploads/' + ownerId + '/' + postId + '/';
+      return list is list
+        && list.size() >= minItems
+        && list.size() <= maxItems
+        && list.all(path, path is string && path.startsWith(basePath));
+    }
+
+    function optionalMediaValid(data, ownerId, postId, minItems, maxItems) {
+      return (!data.keys().hasAny(['media']) && minItems == 0)
+        || (data.keys().hasAny(['media']) && mediaListValid(data.media, ownerId, postId, minItems, maxItems));
+    }
+
+    function requiresMedia(data) {
+      return data.keys().hasAny(['media']);
+    }
+
+    function ensureModerationUnchanged() {
+      return !request.resource.data.keys().hasAny(['moderation']) || isModerator();
+    }
+
+    function ensureStatusUnchanged() {
+      return !request.resource.data.keys().hasAny(['status'])
+        || request.resource.data.status == resource.data.status
+        || isModerator();
+    }
+
+    function coreFieldsUnchanged(fields) {
+      return fields.all(field, 
+        !request.resource.data.keys().hasAny([field])
+        || request.resource.data[field] == resource.data[field]
+      );
+    }
+
+    function whereClauseMatches(index, field, value) {
+      return request.query.where.size() > index
+        && request.query.where[index].field.fieldPath == field
+        && request.query.where[index].op == '=='
+        && request.query.where[index].value == value;
+    }
+
+    function listQueryHasApprovedStatus() {
+      return whereClauseMatches(0, 'status', 'approved')
+        || whereClauseMatches(1, 'status', 'approved')
+        || whereClauseMatches(2, 'status', 'approved');
+    }
+
+    function listQueryIsOwnerScoped() {
+      return request.auth != null && (
+        whereClauseMatches(0, 'ownerId', request.auth.uid)
+        || whereClauseMatches(1, 'ownerId', request.auth.uid)
+        || whereClauseMatches(2, 'ownerId', request.auth.uid)
+        || whereClauseMatches(0, 'userId', request.auth.uid)
+        || whereClauseMatches(1, 'userId', request.auth.uid)
+        || whereClauseMatches(2, 'userId', request.auth.uid)
+      );
+    }
+
+    // ====================================================================
+    // POST TYPE VALIDATION - Content-specific rules
+    // ====================================================================
+
+    // ====================================================================
+    // POST TYPE VALIDATION - Content-specific rules
+    // ====================================================================
+    
+    function postPayloadValid(data, postId) {
+      let ownerId = data.ownerId;
+      let type = data.type;
+      return type is string
         && (
-          nextCount == currentCount + 1 ||
-          (currentCount > 0 && nextCount == currentCount - 1)
+          // SPILL: Text-focused post, 0-1 media, text required (1-2000 chars)
+          (type == 'spill'
+            && data.keys().hasAny(['text'])
+            && stringWithin(data.text, 1, 2000)
+            && optionalMediaValid(data, ownerId, postId, 0, 1))
+          
+          // CLAP: Short punchy text, 0-1 media, text required (1-140 chars)
+          || (type == 'clap'
+            && data.keys().hasAny(['text'])
+            && stringWithin(data.text, 1, 500)
+            && optionalMediaValid(data, ownerId, postId, 0, 1))
+          
+          // FRAME: Image-focused, ≥1 image required, text optional (≤300 chars)
+          || (type == 'frame'
+            && optionalStringWithin(data, 'text', 300)
+            && requiresMedia(data)
+            && mediaListValid(data.media, ownerId, postId, 1, 20))
+          
+          // CRINGECAST: Video post, exactly 1 video, text optional (≤300 chars)
+          || (type == 'cringecast'
+            && optionalStringWithin(data, 'text', 300)
+            && requiresMedia(data)
+            && mediaListValid(data.media, ownerId, postId, 1, 1))
+          
+          // MASH: Mixed media, 1-5 items (image+video), text required (1-200 chars)
+          || (type == 'mash'
+            && data.keys().hasAny(['text'])
+            && stringWithin(data.text, 1, 200)
+            && requiresMedia(data)
+            && mediaListValid(data.media, ownerId, postId, 1, 5))
         );
     }
 
-    function walletFieldImmutable(field) {
-      let afterHasField = request.resource.data.keys().hasAny([field]);
-      let beforeHasField = resource.data.keys().hasAny([field]);
+    // ====================================================================
+    // POST UPDATE VALIDATION
+    // ====================================================================
+    
+    function ownerPostUpdateAllowed(postId) {
+      let changed = request.resource.data.diff(resource.data).changedKeys();
+      let ownerId = resource.data.ownerId;
+      
+      return isOwner(ownerId)
+        // Only owner can modify: text, media, updatedAt
+        && changed.hasOnly(['text', 'media', 'updatedAt'])
+        // Core fields must remain unchanged
+        && coreFieldsUnchanged(['ownerId', 'type', 'createdAt', 'status'])
+        // Moderation field cannot be changed by owner
+        && ensureModerationUnchanged()
+        // Updated fields must be valid
+        && (!changed.hasAny(['text'])
+          || !request.resource.data.keys().hasAny(['text'])
+          || stringWithin(request.resource.data.text, 0, 2000))
+        && (!changed.hasAny(['media']) 
+          || mediaListValid(request.resource.data.media, ownerId, postId, 0, 50))
+        && (!changed.hasAny(['updatedAt']) 
+          || isValidTimestamp(request.resource.data.updatedAt))
+        // Full payload must still be valid
+        && postPayloadValid(request.resource.data, postId);
+    }
 
-      if (!afterHasField && !beforeHasField) {
-        return true;
+    function moderatorPostUpdateAllowed(postId) {
+      let category = resource.data.category;
+      
+      return (isSuperAdmin() || isModerator() || (category != null && canModerateCategory(category)))
+        // Core ownership/type fields cannot change even by moderator
+        && coreFieldsUnchanged(['ownerId', 'type'])
+        // Status must be valid
+        && validStatus(request.resource.data.status)
+        // Timestamps must be valid
+        && isValidTimestamp(request.resource.data.createdAt)
+        && (!request.resource.data.keys().hasAny(['updatedAt']) 
+          || isValidTimestamp(request.resource.data.updatedAt))
+        // Full payload must be valid
+        && postPayloadValid(request.resource.data, postId);
+    }
+
+    // ====================================================================
+    // COMMENT VALIDATION
+    // ====================================================================
+    
+    function commentPayloadValid(data) {
+      return data.ownerId is string
+        && data.ownerId == request.auth.uid
+        && stringWithin(data.text, 1, 2000)
+        && validStatus(data.status)
+        && data.status == 'pending'
+        && isValidTimestamp(data.createdAt)
+        && (!data.keys().hasAny(['updatedAt']) || isValidTimestamp(data.updatedAt))
+        && !data.keys().hasAny(['moderation']);
+    }
+
+    function ownerCommentUpdateAllowed() {
+      let changed = request.resource.data.diff(resource.data).changedKeys();
+      
+      return isOwner(resource.data.ownerId)
+        // Owner can only modify: text, updatedAt
+        && changed.hasOnly(['text', 'updatedAt'])
+        // Text must be valid
+        && stringWithin(request.resource.data.text, 1, 2000)
+        // Timestamp must be valid
+        && (!changed.hasAny(['updatedAt']) 
+          || isValidTimestamp(request.resource.data.updatedAt))
+        // Core fields unchanged
+        && coreFieldsUnchanged(['ownerId', 'createdAt', 'status'])
+        // Cannot touch moderation
+        && ensureModerationUnchanged();
+    }
+
+    function moderatorCommentUpdateAllowed() {
+      return (isModerator() || isSuperAdmin())
+        // Owner cannot change
+        && coreFieldsUnchanged(['ownerId', 'createdAt'])
+        // Text must be valid
+        && stringWithin(request.resource.data.text, 1, 2000)
+        // Status must be valid
+        && validStatus(request.resource.data.status)
+        // Timestamp must be valid
+        && (!request.resource.data.keys().hasAny(['updatedAt']) 
+          || isValidTimestamp(request.resource.data.updatedAt));
+    }
+
+    // ====================================================================
+    // REPORT VALIDATION
+    // ====================================================================
+    
+    function reportPayloadValid(data) {
+      let target = data.target;
+      let validReasons = ['nudity', 'harassment', 'spam', 'hate', 'violence', 'other'];
+      let validTargetTypes = ['post', 'comment', 'user'];
+      
+      return data.reporterId is string
+        && data.reporterId == request.auth.uid
+        && target is map
+        && target.keys().hasOnly(['type', 'id'])
+        && target.type is string
+        && validTargetTypes.hasAny([target.type])
+        && target.id is string
+        && target.id.size() > 0
+        && data.reason is string
+        && validReasons.hasAny([data.reason])
+        && (!data.keys().hasAny(['note']) 
+          || (data.note is string && data.note.size() <= 1000))
+        && data.status == 'open'
+        && isValidTimestamp(data.createdAt);
+    }
+
+    function reportUpdateAllowed() {
+      return isModerator()
+        // Core report data cannot change
+        && coreFieldsUnchanged(['reporterId', 'target', 'reason', 'createdAt'])
+        // Status must be valid (moderator can change to: open, investigating, resolved, dismissed)
+        && request.resource.data.status is string
+        && isValidTimestamp(resource.data.createdAt);
+    }
+
+    // ====================================================================
+    // USER VALIDATION
+    // ====================================================================
+    
+    function userProtectedFieldsUnchanged() {
+      let protectedFields = ['role', 'claims', 'isBanned', 'moderation'];
+      return protectedFields.all(field,
+        !resource.data.keys().hasAny([field])
+        || request.resource.data[field] == resource.data[field]
+      );
+    }
+
+    // ====================================================================
+    // COLLECTION RULES - POSTS (Collection: cringe_entries)
+    // ====================================================================
+    
+    match /cringe_entries/{postId} {
+      // READ: Approved posts are public, others only for owner/moderator
+      // LIST: Allow queries for approved posts (public feed)
+      // List sorgularında temel kimlik doğrulaması yeterlidir; doküman bazlı
+      // yetkilendirme allow get kontrolünde yapılır.
+      allow list: if isSignedIn();
+      allow get: if canReadModerated(resource.data.ownerId, resource.data.status);
+
+      // CREATE: Any signed-in user can create, must start as pending
+      allow create: if isSignedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && validStatus(request.resource.data.status)
+        && request.resource.data.status == 'pending'
+        && postPayloadValid(request.resource.data, postId)
+        && isValidTimestamp(request.resource.data.createdAt)
+        && (!request.resource.data.keys().hasAny(['updatedAt']) 
+          || isValidTimestamp(request.resource.data.updatedAt))
+        && !request.resource.data.keys().hasAny(['moderation']);
+
+      // UPDATE: Owner can edit safe fields, moderator can change status/moderation
+      allow update: if ensureModerationUnchanged()
+        && (ownerPostUpdateAllowed(postId) || moderatorPostUpdateAllowed(postId));
+
+      // DELETE: Owner or moderator can delete
+      allow delete: if isOwnerOrModerator(resource.data.ownerId);
+
+      // ====================================================================
+      // SUB-COLLECTION RULES - COMMENTS
+      // ====================================================================
+      
+      match /comments/{commentId} {
+        // READ: Same moderation rules as posts
+        allow read: if canReadModerated(resource.data.ownerId, resource.data.status);
+
+        // CREATE: Any signed-in user can comment
+        allow create: if isSignedIn()
+          && request.resource.data.ownerId == request.auth.uid
+          && commentPayloadValid(request.resource.data);
+
+        // UPDATE: Owner can edit text, moderator can change status/moderation
+        allow update: if ownerCommentUpdateAllowed() 
+          || moderatorCommentUpdateAllowed();
+
+        // DELETE: Owner or moderator can delete
+        allow delete: if isOwnerOrModerator(resource.data.ownerId);
       }
-
-      if (!afterHasField && beforeHasField) {
-        return false;
-      }
-
-      return request.resource.data[field] == resource.data[field];
     }
 
-    function walletFieldsUnchanged() {
-      return walletFieldImmutable('coins')
-        && walletFieldImmutable('ownedItems')
-        && walletFieldImmutable('equippedItems');
+    // ====================================================================
+    // COLLECTION RULES - REPORTS
+    // ====================================================================
+    
+    match /reports/{reportId} {
+      // READ: Only moderator or reporter can read
+      allow read: if isModerator() 
+        || (isSignedIn() && resource.data.reporterId == request.auth.uid);
+
+      // CREATE: Any signed-in user can create reports
+      allow create: if isSignedIn() && reportPayloadValid(request.resource.data);
+
+      // UPDATE: Only moderator can update (change status, add notes, etc.)
+      allow update: if reportUpdateAllowed();
+
+      // DELETE: Only moderator can delete
+      allow delete: if isModerator();
     }
 
-    function fieldUnchanged(field) {
-      return !request.resource.data.keys().hasAny([field])
-        || request.resource.data[field] == resource.data[field];
-    }
-
-    function contactFieldsUnchanged() {
-      return fieldUnchanged('email')
-        && fieldUnchanged('emailLower')
-        && fieldUnchanged('email_lower')
-        && fieldUnchanged('emailVerified')
-        && fieldUnchanged('phoneNumber')
-        && fieldUnchanged('phone_number')
-        && fieldUnchanged('phoneNumberVerified')
-        && fieldUnchanged('phone_number_verified');
-    }
-
-    // Kullanıcı profilleri
+    // ====================================================================
+    // COLLECTION RULES - USERS
+    // ====================================================================
+    
     match /users/{userId} {
-      allow read: if isSignedIn() && request.auth.uid == userId;
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if (isSignedIn()
-          && request.auth.uid == userId
-          && walletFieldsUnchanged()
-          && contactFieldsUnchanged())
-        || isFollowerCountAdjustment(userId);
-      allow delete: if false;
-    }
-
-    match /users/{userId}/followers/{followerId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn()
-        && request.auth.uid == followerId
-        && request.auth.uid != userId
-        && request.resource.data.followerId == followerId;
-      allow delete: if isSignedIn() && request.auth.uid == followerId;
-      allow update: if false;
-    }
-
-    match /users/{userId}/following/{followingId} {
-      allow read: if isSignedIn() && request.auth.uid == userId;
-      allow create: if isSignedIn()
-        && request.auth.uid == userId
-        && request.resource.data.userId == followingId
-        && followingId != userId;
-      allow delete: if isSignedIn()
-        && request.auth.uid == userId
-        && resource.data.userId == followingId;
-      allow update: if false;
-    }
-
-    // Entry koleksiyonu
-    match /cringe_entries/{entryId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
-    }
-
-    // Yarışmalar ve diğer herkese açık veriler
-    match /competitions/{document=**} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-
-    match /email_otps/{emailId} {
-      function otpDataIsValid(data) {
-        return data.keys().hasOnly([
-              'email',
-              'hash',
-              'expiresAt',
-              'createdAt',
-              'lastAttemptAt',
-              'attempts'
-            ]) &&
-          data.email is string &&
-          data.email.lower() == data.email &&
-          data.email == emailId &&
-          data.hash is string &&
-          data.expiresAt is timestamp &&
-          (!data.keys().hasAny(['attempts']) || (data.attempts is int && data.attempts >= 0)) &&
-          (!data.keys().hasAny(['lastAttemptAt']) ||
-            data.lastAttemptAt == null || data.lastAttemptAt is timestamp) &&
-          (!data.keys().hasAny(['createdAt']) ||
-            data.createdAt == null || data.createdAt is timestamp);
-      }
-
-      allow create: if otpDataIsValid(request.resource.data);
-
-      allow read: if resource.data.expiresAt is timestamp &&
-        request.time <= resource.data.expiresAt + duration.value(1, 'hours');
-
-      allow update: if otpDataIsValid(request.resource.data);
-
-      allow delete: if true;
-    }
-
-    match /leaderboard/{document=**} {
-      allow read: if isSignedIn();
-      allow write: if false;
-    }
-
-    match /trade_proposals/{proposalId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() &&
-        (request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId);
-    }
-
-    match /user_activity/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
-    }
-
-    match /auth_logs/{document=**} {
-      allow create: if isSignedIn() || request.resource.data.userId == null;
-      allow read, update, delete: if false;
-    }
-
-    match /settings/{document=**} {
-      allow read: if isSignedIn();
-      allow write: if false;
-    }
-
-    match /iap_products/{productId} {
+      // READ: Public profiles (you can restrict if needed)
       allow read: if true;
-      allow write: if false;
+
+      // CREATE: User can create their own profile
+      allow create: if isSignedIn() && request.auth.uid == userId;
+
+      // UPDATE: Super admin can update everything, user can update own profile (except protected fields), 
+      //         moderator can update everything
+      allow update: if isSuperAdmin()
+        || isModerator()
+        || (isSignedIn()
+          && request.auth.uid == userId
+          && userProtectedFieldsUnchanged());
+
+      // DELETE: Only super admin can delete users
+      allow delete: if isSuperAdmin();
     }
 
-    match /purchases/{purchaseId} {
-      allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
-      allow write: if false;
-    }
-
-    match /wallet_ledger/{eventId} {
-      allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
-      allow write: if false;
-    }
-
-    match /try_on_sessions/{sessionId} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow write: if false;
-    }
-
-    // Diğer tüm koleksiyonlar için varsayılan
-    match /{document=**} {
+    // ====================================================================
+    // COLLECTION RULES - CATEGORY ADMINS
+    // ====================================================================
+    
+    match /category_admins/{category} {
+      // READ: Any signed-in user can see who manages categories
       allow read: if isSignedIn();
-      allow write: if false;
+
+      // WRITE: Only super admin can assign/remove category admins
+      // Client CANNOT write - must use callable Functions
+      allow create, update, delete: if false;
+    }
+
+    // ====================================================================
+    // COLLECTION RULES - COMPETITIONS
+    // ====================================================================
+    
+    match /competitions/{competitionId} {
+      // READ: Public or owner/admin based on visibility
+      allow read: if true; // or add visibility check later
+      
+      // WRITE: Client CANNOT write - must use callable Functions
+      // Only super admin via Cloud Functions (Admin SDK bypasses rules)
+      allow create, update, delete: if false;
+    }
+
+    // ====================================================================
+    // COLLECTION RULES - ADMIN AUDIT LOG
+    // ====================================================================
+    
+    match /admin_audit/{logId} {
+      // READ: Only super admin can read audit logs
+      allow read: if isSuperAdmin();
+      
+      // WRITE: Client CANNOT write - only Functions
+      allow create, update, delete: if false;
+    }
+
+    // ====================================================================
+    // DEFAULT RULE - Deny everything else
+    // ====================================================================
+    
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

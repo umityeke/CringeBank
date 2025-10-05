@@ -20,7 +20,9 @@ class IapProduct {
   final String? iosSku;
 
   factory IapProduct.fromMap(Map<String, dynamic> map, {String? id}) {
-    final resolvedId = (id ?? map['id'] ?? map['productId'] ?? '').toString().trim();
+    final resolvedId = (id ?? map['id'] ?? map['productId'] ?? '')
+        .toString()
+        .trim();
     final platforms = map['platforms'];
     String? androidSku;
     String? iosSku;

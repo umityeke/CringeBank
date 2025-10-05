@@ -68,10 +68,10 @@ class StoreService {
     Map<String, dynamic> updates,
   ) async {
     if (updates.isEmpty) return;
-    await _firestore.collection('users').doc(userId).set(
-          updates,
-          SetOptions(merge: true),
-        );
+    await _firestore
+        .collection('users')
+        .doc(userId)
+        .set(updates, SetOptions(merge: true));
     await UserService.instance.loadUserData(userId);
   }
 
@@ -147,10 +147,7 @@ class StoreService {
 
     final callable = _functions.httpsCallable('storeStartTryOnSession');
     try {
-      final result = await callable.call({
-        'itemId': item.id,
-        'source': source,
-      });
+      final result = await callable.call({'itemId': item.id, 'source': source});
 
       final payload = result.data is Map
           ? Map<String, dynamic>.from(result.data as Map)
@@ -163,8 +160,9 @@ class StoreService {
         throw StateError('Try-on oturumu başlatılamadı.');
       }
 
-      final TryOnSession session =
-          TryOnSession.fromCallablePayload(sessionPayload);
+      final TryOnSession session = TryOnSession.fromCallablePayload(
+        sessionPayload,
+      );
 
       final itemPayload = payload['item'] is Map
           ? Map<String, dynamic>.from(payload['item'] as Map)
@@ -190,10 +188,10 @@ class StoreService {
           : const <String, dynamic>{};
       _activeCooldownRemainingSec =
           (limitsPayload['cooldownRemainingSec'] as num?)?.toInt() ??
-              tryOnConfig.cooldownSec;
+          tryOnConfig.cooldownSec;
       _activeTriesRemainingToday =
           (limitsPayload['triesRemainingToday'] as num?)?.toInt() ??
-              tryOnConfig.maxDailyTries;
+          tryOnConfig.maxDailyTries;
       _reusedActiveTryOn = payload['reusedSession'] == true;
 
       _activeTryOnSession = session;
@@ -227,12 +225,13 @@ class StoreService {
     final futures = assets.images
         .where((path) => path.trim().isNotEmpty)
         .map((path) async {
-      try {
-        return await _storage.ref(path).getDownloadURL();
-      } catch (_) {
-        return null;
-      }
-    }).toList(growable: false);
+          try {
+            return await _storage.ref(path).getDownloadURL();
+          } catch (_) {
+            return null;
+          }
+        })
+        .toList(growable: false);
 
     final results = await Future.wait(futures);
     return results.whereType<String>().toList(growable: false);
@@ -294,9 +293,9 @@ class StoreService {
           updates['equippedStoreItems.background'] = item.id;
           break;
         case StoreItemEffectType.badge:
-          updates['equippedStoreItems.badges'] = FieldValue.arrayUnion(
-            [item.id],
-          );
+          updates['equippedStoreItems.badges'] = FieldValue.arrayUnion([
+            item.id,
+          ]);
           break;
         case StoreItemEffectType.none:
           break;
@@ -306,20 +305,18 @@ class StoreService {
     await _applyUpdates(userId, updates);
   }
 
-  Future<void> setFrame(String? itemId) => _setEquippedValue(
-        fieldPath: 'equippedStoreItems.frame',
-        value: itemId,
-      );
+  Future<void> setFrame(String? itemId) =>
+      _setEquippedValue(fieldPath: 'equippedStoreItems.frame', value: itemId);
 
   Future<void> setNameColor(String? itemId) => _setEquippedValue(
-        fieldPath: 'equippedStoreItems.nameColor',
-        value: itemId,
-      );
+    fieldPath: 'equippedStoreItems.nameColor',
+    value: itemId,
+  );
 
   Future<void> setBackground(String? itemId) => _setEquippedValue(
-        fieldPath: 'equippedStoreItems.background',
-        value: itemId,
-      );
+    fieldPath: 'equippedStoreItems.background',
+    value: itemId,
+  );
 
   Future<void> toggleBadge(String itemId, {required bool active}) async {
     final user = await _requireUser();

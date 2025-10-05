@@ -17,14 +17,12 @@ class FollowService {
   DocumentReference<Map<String, dynamic>> _followDoc(
     String srcUid,
     String dstUid,
-  ) =>
-      _firestore.collection('follows').doc('${srcUid}_$dstUid');
+  ) => _firestore.collection('follows').doc('${srcUid}_$dstUid');
 
   DocumentReference<Map<String, dynamic>> _blockDoc(
     String srcUid,
     String dstUid,
-  ) =>
-      _firestore.collection('blocks').doc('${srcUid}_$dstUid');
+  ) => _firestore.collection('blocks').doc('${srcUid}_$dstUid');
 
   String _requireCurrentUserId() {
     final uid = _auth.currentUser?.uid.trim();
@@ -96,7 +94,10 @@ class FollowService {
     bool incomingBlockReady = false;
 
     void emitIfReady() {
-      if (!(followReady && reverseReady && outgoingBlockReady && incomingBlockReady)) {
+      if (!(followReady &&
+          reverseReady &&
+          outgoingBlockReady &&
+          incomingBlockReady)) {
         return;
       }
 
@@ -126,39 +127,27 @@ class FollowService {
 
     final subscriptions =
         <StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>>[
-      _followDoc(viewerId, normalizedTarget).snapshots().listen(
-        (snapshot) {
-          followSnapshot = snapshot;
-          followReady = true;
-          emitIfReady();
-        },
-        onError: controller.addError,
-      ),
-      _followDoc(normalizedTarget, viewerId).snapshots().listen(
-        (snapshot) {
-          reverseSnapshot = snapshot;
-          reverseReady = true;
-          emitIfReady();
-        },
-        onError: controller.addError,
-      ),
-      _blockDoc(viewerId, normalizedTarget).snapshots().listen(
-        (snapshot) {
-          outgoingBlockSnapshot = snapshot;
-          outgoingBlockReady = true;
-          emitIfReady();
-        },
-        onError: controller.addError,
-      ),
-      _blockDoc(normalizedTarget, viewerId).snapshots().listen(
-        (snapshot) {
-          incomingBlockSnapshot = snapshot;
-          incomingBlockReady = true;
-          emitIfReady();
-        },
-        onError: controller.addError,
-      ),
-    ];
+          _followDoc(viewerId, normalizedTarget).snapshots().listen((snapshot) {
+            followSnapshot = snapshot;
+            followReady = true;
+            emitIfReady();
+          }, onError: controller.addError),
+          _followDoc(normalizedTarget, viewerId).snapshots().listen((snapshot) {
+            reverseSnapshot = snapshot;
+            reverseReady = true;
+            emitIfReady();
+          }, onError: controller.addError),
+          _blockDoc(viewerId, normalizedTarget).snapshots().listen((snapshot) {
+            outgoingBlockSnapshot = snapshot;
+            outgoingBlockReady = true;
+            emitIfReady();
+          }, onError: controller.addError),
+          _blockDoc(normalizedTarget, viewerId).snapshots().listen((snapshot) {
+            incomingBlockSnapshot = snapshot;
+            incomingBlockReady = true;
+            emitIfReady();
+          }, onError: controller.addError),
+        ];
 
     controller
       ..onCancel = () async {
@@ -245,14 +234,13 @@ class FollowService {
       throw StateError('Kendini takip edemezsin.');
     }
 
-    final desiredStatus =
-        target.isPrivate ? FollowEdgeStatus.pending : FollowEdgeStatus.active;
+    final desiredStatus = target.isPrivate
+        ? FollowEdgeStatus.pending
+        : FollowEdgeStatus.active;
 
     await _firestore.runTransaction((transaction) async {
-      final outgoingBlockRef =
-          _blockDoc(normalizedViewer, normalizedTarget);
-      final incomingBlockRef =
-          _blockDoc(normalizedTarget, normalizedViewer);
+      final outgoingBlockRef = _blockDoc(normalizedViewer, normalizedTarget);
+      final incomingBlockRef = _blockDoc(normalizedTarget, normalizedViewer);
 
       final incomingBlockSnap = await transaction.get(incomingBlockRef);
       if (incomingBlockSnap.exists) {
@@ -282,13 +270,12 @@ class FollowService {
       }
 
       final data = snapshot.data()!;
-      final currentStatus =
-          FollowEdgeStatusMapper.fromFirestore(data['status'] as String?);
+      final currentStatus = FollowEdgeStatusMapper.fromFirestore(
+        data['status'] as String?,
+      );
 
       if (currentStatus == desiredStatus) {
-        transaction.update(followRef, {
-          'updatedAt': now,
-        });
+        transaction.update(followRef, {'updatedAt': now});
         return;
       }
 
@@ -427,8 +414,9 @@ class FollowService {
     if (!snapshot.exists) return false;
     final data = snapshot.data();
     if (data == null) return false;
-    final status =
-        FollowEdgeStatusMapper.fromFirestore(data['status'] as String?);
+    final status = FollowEdgeStatusMapper.fromFirestore(
+      data['status'] as String?,
+    );
     return status.isActive;
   }
 }

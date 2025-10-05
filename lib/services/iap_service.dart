@@ -34,10 +34,13 @@ class IapService {
 
   final InAppPurchase _iap = InAppPurchase.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(region: 'europe-west1');
+  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
+    region: 'europe-west1',
+  );
 
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
-  final StreamController<IapPurchaseState> _stateController = StreamController<IapPurchaseState>.broadcast();
+  final StreamController<IapPurchaseState> _stateController =
+      StreamController<IapPurchaseState>.broadcast();
   final Map<String, ProductDetails> _productDetailsById = {};
   final Map<String, IapProduct> _iapProductsBySku = {};
   bool _initialized = false;
@@ -71,7 +74,8 @@ class IapService {
       _stateController.add(
         const IapPurchaseState(
           status: IapPurchaseStatus.failure,
-          message: 'Mağaza şu anda kullanılamıyor. Lütfen daha sonra tekrar dene.',
+          message:
+              'Mağaza şu anda kullanılamıyor. Lütfen daha sonra tekrar dene.',
         ),
       );
     }
@@ -90,16 +94,18 @@ class IapService {
         .get();
 
     final platform = _currentPlatform();
-  final products = snapshot.docs
+    final products = snapshot.docs
         .map((doc) => IapProduct.fromMap(doc.data(), id: doc.id))
-        .where((product) => _skuForPlatform(product, platform)?.isNotEmpty == true)
+        .where(
+          (product) => _skuForPlatform(product, platform)?.isNotEmpty == true,
+        )
         .toList(growable: false);
 
     if (products.isEmpty) {
       return const [];
     }
 
-  final skus = products
+    final skus = products
         .map((product) => _skuForPlatform(product, platform)!)
         .toSet();
 
@@ -110,17 +116,17 @@ class IapService {
 
     _productDetailsById
       ..clear()
-      ..addEntries(response.productDetails.map((details) => MapEntry(details.id, details)));
+      ..addEntries(
+        response.productDetails.map((details) => MapEntry(details.id, details)),
+      );
     _iapProductsBySku
       ..clear()
       ..addEntries(
-        products
-            .map((product) {
-              final sku = _skuForPlatform(product, platform);
-              if (sku == null) return null;
-              return MapEntry(sku, product);
-            })
-            .whereType<MapEntry<String, IapProduct>>(),
+        products.map((product) {
+          final sku = _skuForPlatform(product, platform);
+          if (sku == null) return null;
+          return MapEntry(sku, product);
+        }).whereType<MapEntry<String, IapProduct>>(),
       );
 
     final packages = <CoinPackage>[];
@@ -176,7 +182,8 @@ class IapService {
           _verifyAndCredit(purchase);
           break;
         case PurchaseStatus.error:
-          final message = purchase.error?.message ?? 'Satın alma tamamlanamadı.';
+          final message =
+              purchase.error?.message ?? 'Satın alma tamamlanamadı.';
           _stateController.add(
             IapPurchaseState(
               status: IapPurchaseStatus.failure,
@@ -220,7 +227,8 @@ class IapService {
         'platform': platform,
         'productId': _productIdForSku(purchase.productID) ?? purchase.productID,
         'storeSku': purchase.productID,
-        'tokenOrReceipt': purchase.verificationData.serverVerificationData.trim(),
+        'tokenOrReceipt': purchase.verificationData.serverVerificationData
+            .trim(),
         'userId': userId,
         'transactionId': purchase.purchaseID,
         if (productDetails != null) 'price': productDetails.rawPrice,
@@ -269,7 +277,9 @@ class IapService {
         return product.iosSku?.isNotEmpty == true ? product.iosSku : null;
       case 'android':
       default:
-        return product.androidSku?.isNotEmpty == true ? product.androidSku : null;
+        return product.androidSku?.isNotEmpty == true
+            ? product.androidSku
+            : null;
     }
   }
 

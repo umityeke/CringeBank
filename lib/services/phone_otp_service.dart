@@ -97,7 +97,9 @@ class PhoneOtpService {
       });
       return PhoneOtpVerificationResult.fromResponse(result.data);
     } on FirebaseFunctionsException catch (e, stack) {
-      debugPrint('Cloud Function confirmPhoneUpdate failed: ${e.message}\n$stack');
+      debugPrint(
+        'Cloud Function confirmPhoneUpdate failed: ${e.message}\n$stack',
+      );
       rethrow;
     } catch (e, stack) {
       debugPrint('Unexpected error calling confirmPhoneUpdate: $e\n$stack');

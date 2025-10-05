@@ -24,9 +24,7 @@ class CringeNotificationItem {
   final String? category;
   final bool isUnread;
 
-  CringeNotificationItem copyWith({
-    bool? isUnread,
-  }) {
+  CringeNotificationItem copyWith({bool? isUnread}) {
     return CringeNotificationItem(
       id: id,
       title: title,
@@ -41,10 +39,7 @@ class CringeNotificationItem {
 }
 
 class ModernNotificationsScreen extends StatefulWidget {
-  const ModernNotificationsScreen({
-    super.key,
-    required this.notifications,
-  });
+  const ModernNotificationsScreen({super.key, required this.notifications});
 
   final List<CringeNotificationItem> notifications;
 
@@ -109,7 +104,7 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
       setState(() {
         _isInitialized = false;
         _errorMessage =
-            'Bildirim servisi başlatılamadı. Lütfen izinleri kontrol et.';
+            'Bildirim servisi başlatılamadı. Ltfen izinleri kontrol et.';
       });
     }
   }
@@ -120,8 +115,7 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
     super.dispose();
   }
 
-  int get _unreadCount =>
-      _notifications.where((item) => item.isUnread).length;
+  int get _unreadCount => _notifications.where((item) => item.isUnread).length;
 
   void _toggleRead(int index) {
     setState(() {
@@ -143,16 +137,12 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
       await CringeNotificationService.sendTestNotification();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Test bildirimi gönderildi! 🎉'),
-        ),
+        const SnackBar(content: Text('Test bildirimi gnderildi! ?ŸŽ‰')),
       );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Test bildirimi gönderilemedi: $error'),
-        ),
+        SnackBar(content: Text('Test bildirimi gnderilemedi: $error')),
       );
     }
   }
@@ -174,7 +164,7 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
         backgroundColor: AppTheme.backgroundColor,
         body: AnimatedBubbleBackground(
           bubbleCount: 24,
-          bubbleColor: Colors.white.withOpacity(0.08),
+          bubbleColor: Colors.white.withValues(alpha: 0.08),
           child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -186,8 +176,7 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
                     child: _buildHeader(),
                   ),
                   const SizedBox(height: 18),
-                  if (_errorMessage != null)
-                    _buildErrorBanner(_errorMessage!),
+                  if (_errorMessage != null) _buildErrorBanner(_errorMessage!),
                   Expanded(
                     child: FadeTransition(
                       opacity: _listOpacity,
@@ -215,7 +204,7 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
         _buildGlassIconButton(
           icon: Icons.arrow_back_rounded,
           onTap: _closeScreen,
-          tooltip: 'Geri dön',
+          tooltip: 'Geri dn',
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -232,11 +221,11 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
               ),
               const SizedBox(height: 4),
               Text(
-        _unreadCount > 0
-          ? '$_unreadCount yeni bildirim'
-          : 'Tüm bildirimleri görüntüledin',
+                _unreadCount > 0
+                    ? '$_unreadCount yeni bildirim'
+                    : 'Tm bildirimleri grntledin',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -266,7 +255,7 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
           onToggleRead: () => _toggleRead(index),
         );
       },
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemCount: _notifications.length,
     );
   }
@@ -276,7 +265,7 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
       children: [
         Expanded(
           child: _buildGlassButton(
-            label: 'Test bildirimi gönder',
+            label: 'Test bildirimi gnder',
             icon: Icons.play_arrow_rounded,
             onTap: _sendTestNotification,
             isEnabled: _isInitialized,
@@ -289,9 +278,7 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
             icon: Icons.tune_rounded,
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Bildirim ayarları yakında!'),
-                ),
+                const SnackBar(content: Text('Bildirim ayarları yakında!')),
               );
             },
             isEnabled: true,
@@ -333,7 +320,7 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
           Text(
             'Yeni bir cringe olduğunda seni ilk biz haberdar edeceğiz.',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
               fontSize: 14,
             ),
             textAlign: TextAlign.center,
@@ -349,18 +336,13 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
-  color: AppTheme.statusError.withOpacity(0.18),
+        color: AppTheme.statusError.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.statusError.withOpacity(0.4),
-        ),
+        border: Border.all(color: AppTheme.statusError.withValues(alpha: 0.4)),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.error_outline,
-            color: AppTheme.statusError,
-          ),
+          const Icon(Icons.error_outline, color: AppTheme.statusError),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -374,9 +356,7 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
           ),
           TextButton(
             onPressed: _initializeNotifications,
-            style: TextButton.styleFrom(
-              foregroundColor: AppTheme.statusError,
-            ),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.statusError),
             child: const Text('Tekrar dene'),
           ),
         ],
@@ -401,10 +381,8 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
             height: 52,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
-              color: Colors.white.withOpacity(0.08),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.14),
-              ),
+              color: Colors.white.withValues(alpha: 0.08),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -442,13 +420,11 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
           height: 46,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            color: Colors.white.withOpacity(0.12),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.2),
-            ),
+            color: Colors.white.withValues(alpha: 0.12),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.23),
+                color: Colors.black.withValues(alpha: 0.23),
                 blurRadius: 12,
                 offset: const Offset(0, 5),
               ),
@@ -467,10 +443,7 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
 }
 
 class _NotificationCard extends StatelessWidget {
-  const _NotificationCard({
-    required this.item,
-    required this.onToggleRead,
-  });
+  const _NotificationCard({required this.item, required this.onToggleRead});
 
   final CringeNotificationItem item;
   final VoidCallback onToggleRead;
@@ -482,13 +455,11 @@ class _NotificationCard extends StatelessWidget {
       curve: Curves.easeInOut,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
-        color: AppTheme.cardColor.withOpacity(
-          item.isUnread ? 0.75 : 0.5,
-        ),
+        color: AppTheme.cardColor.withValues(alpha: item.isUnread ? 0.75 : 0.5),
         border: Border.all(
           color: item.isUnread
-              ? item.accentColor.withOpacity(0.6)
-              : Colors.white.withOpacity(0.1),
+              ? item.accentColor.withValues(alpha: 0.6)
+              : Colors.white.withValues(alpha: 0.1),
           width: 1.2,
         ),
         boxShadow: AppTheme.glowShadow(
@@ -506,8 +477,8 @@ class _NotificationCard extends StatelessWidget {
               shape: BoxShape.circle,
               gradient: LinearGradient(
                 colors: [
-                  item.accentColor.withOpacity(0.85),
-                  item.accentColor.withOpacity(0.45),
+                  item.accentColor.withValues(alpha: 0.85),
+                  item.accentColor.withValues(alpha: 0.45),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -536,7 +507,7 @@ class _NotificationCard extends StatelessWidget {
                     Text(
                       item.timestampLabel,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.6),
+                        color: Colors.white.withValues(alpha: 0.6),
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -547,7 +518,7 @@ class _NotificationCard extends StatelessWidget {
                 Text(
                   item.message,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.78),
+                    color: Colors.white.withValues(alpha: 0.78),
                     fontSize: 14,
                     height: 1.5,
                   ),
@@ -555,13 +526,15 @@ class _NotificationCard extends StatelessWidget {
                 if (item.category != null) ...[
                   const SizedBox(height: 12),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(14),
-                      color: item.accentColor.withOpacity(0.2),
+                      color: item.accentColor.withValues(alpha: 0.2),
                       border: Border.all(
-                        color: item.accentColor.withOpacity(0.18),
+                        color: item.accentColor.withValues(alpha: 0.18),
                       ),
                     ),
                     child: Text(

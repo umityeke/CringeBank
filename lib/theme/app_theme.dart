@@ -51,7 +51,7 @@ class AppTheme {
   // Shadows
   static List<BoxShadow> cardShadow = [
     BoxShadow(
-  color: const Color(0xFF0D0420).withOpacity(0.6),
+      color: const Color(0xFF0D0420).withValues(alpha: 0.6),
       blurRadius: 18,
       spreadRadius: -8,
       offset: const Offset(0, 18),
@@ -59,17 +59,19 @@ class AppTheme {
   ];
 
   static List<BoxShadow> glowShadow(Color color) => [
-        BoxShadow(
-          color: color.withOpacity(0.45),
-          blurRadius: 16,
-          spreadRadius: 1,
-          offset: const Offset(0, 6),
-        ),
-      ];
+    BoxShadow(
+      color: color.withValues(alpha: 0.45),
+      blurRadius: 16,
+      spreadRadius: 1,
+      offset: const Offset(0, 6),
+    ),
+  ];
 
   // Border Radius
   static const BorderRadius cardRadius = BorderRadius.all(Radius.circular(24));
-  static const BorderRadius buttonRadius = BorderRadius.all(Radius.circular(18));
+  static const BorderRadius buttonRadius = BorderRadius.all(
+    Radius.circular(18),
+  );
   static const BorderRadius inputRadius = BorderRadius.all(Radius.circular(18));
 
   // Spacing
@@ -245,15 +247,11 @@ class AppTheme {
         fillColor: glassSurface,
         border: OutlineInputBorder(
           borderRadius: inputRadius,
-          borderSide: BorderSide(
-            color: dividerColor.withOpacity(0.5),
-          ),
+          borderSide: BorderSide(color: dividerColor.withValues(alpha: 0.5)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: inputRadius,
-          borderSide: BorderSide(
-            color: dividerColor.withOpacity(0.4),
-          ),
+          borderSide: BorderSide(color: dividerColor.withValues(alpha: 0.4)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: inputRadius,
@@ -263,10 +261,7 @@ class AppTheme {
           horizontal: spacingL,
           vertical: spacingM,
         ),
-        hintStyle: GoogleFonts.inter(
-          color: textMuted,
-          fontSize: 14,
-        ),
+        hintStyle: GoogleFonts.inter(color: textMuted, fontSize: 14),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: surfaceColor,
@@ -281,16 +276,13 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         backgroundColor: cardColor,
         actionTextColor: secondaryColor,
-        contentTextStyle: GoogleFonts.inter(
-          color: textPrimary,
-          fontSize: 14,
-        ),
+        contentTextStyle: GoogleFonts.inter(color: textPrimary, fontSize: 14),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: buttonRadius),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: glassSurface,
-  selectedColor: secondaryColor.withOpacity(0.22),
+        selectedColor: secondaryColor.withValues(alpha: 0.22),
         labelStyle: GoogleFonts.inter(
           fontWeight: FontWeight.w600,
           fontSize: 13,
@@ -303,10 +295,10 @@ class AppTheme {
   }
 
   static LinearGradient get linearGradientPrimary => const LinearGradient(
-        colors: [Color(0xFF8A2BE2), Color(0xFF2EE6D6)],
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
-      );
+    colors: [Color(0xFF8A2BE2), Color(0xFF2EE6D6)],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
 }
 
 // Custom Text Styles

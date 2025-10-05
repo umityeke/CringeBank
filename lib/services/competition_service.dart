@@ -28,12 +28,7 @@ enum CompetitionJoinResult {
   full,
 }
 
-enum CompetitionLeaveResult {
-  success,
-  notParticipant,
-  notFound,
-  unauthorized,
-}
+enum CompetitionLeaveResult { success, notParticipant, notFound, unauthorized }
 
 class CompetitionCommentWinner {
   const CompetitionCommentWinner({
@@ -248,7 +243,10 @@ class Competition {
         .whereType<CringeEntry>()
         .toList();
 
-  final entryCommentSum = entries.fold<int>(0, (sum, entry) => sum + entry.yorumSayisi);
+    final entryCommentSum = entries.fold<int>(
+      0,
+      (total, entry) => total + entry.yorumSayisi,
+    );
 
     final votesData = (data['votes'] as Map<String, dynamic>?) ?? {};
     final votes = votesData.map(
@@ -272,13 +270,13 @@ class Competition {
       targetKrepLevel: (data['targetKrepLevel'] as num?)?.toDouble(),
       sponsor: data['sponsor'] as String?,
       createdByUserId: data['createdByUserId'] as String?,
-      participantUserIds: ((data['participantUserIds'] ?? data['participants'])
-              as List?)
+      participantUserIds:
+          ((data['participantUserIds'] ?? data['participants']) as List?)
               ?.map((value) => value.toString())
               .toList() ??
           const [],
-    totalCommentCount:
-      (data['totalCommentCount'] as num?)?.toInt() ?? entryCommentSum,
+      totalCommentCount:
+          (data['totalCommentCount'] as num?)?.toInt() ?? entryCommentSum,
     );
   }
 
@@ -341,15 +339,34 @@ class CompetitionService {
   _firestoreSubscription;
   static bool _isInitialized = false;
   static final Map<String, _CompetitionCommentWinnerCacheEntry>
-    _commentWinnerCache = <String, _CompetitionCommentWinnerCacheEntry>{};
+  _commentWinnerCache = <String, _CompetitionCommentWinnerCacheEntry>{};
   static const Duration _commentWinnerCacheTTL = Duration(minutes: 3);
+  static const bool _allowClientWrites = false;
+
+  static bool get _canClientWrite => _allowClientWrites;
+
+  static Future<void> _updateCompetitionDocument(
+    String competitionId,
+    Map<String, dynamic> data,
+  ) async {
+    if (!_canClientWrite) {
+      return;
+    }
+
+    try {
+      await _firestore.collection('competitions').doc(competitionId).update(data);
+    } catch (e) {
+      // ignore: avoid_print
+      print('CompetitionService Firestore update error: $e');
+    }
+  }
 
   // Competition stream
   static Stream<List<Competition>> get competitionsStream =>
       _competitionsController.stream;
 
   static List<Competition> get currentCompetitions =>
-    List.unmodifiable(_competitions);
+      List.unmodifiable(_competitions);
 
   // Initialize competition service
   static Future<void> initialize() async {
@@ -372,7 +389,9 @@ class CompetitionService {
       _competitionsController.add(List.unmodifiable(_competitions));
     } else {
       await _generateInitialCompetitions();
-      await _persistCompetitionsToFirestore(_competitions);
+      if (_canClientWrite) {
+        await _persistCompetitionsToFirestore(_competitions);
+      }
     }
 
     _listenToFirestoreUpdates();
@@ -527,8 +546,10 @@ class CompetitionService {
     final updatedCompetition = competition.copyWith(
       entries: mergedEntries,
       votes: updatedVotes,
-      totalCommentCount:
-          mergedEntries.fold<int>(0, (sum, entry) => sum + entry.yorumSayisi),
+      totalCommentCount: mergedEntries.fold<int>(
+        0,
+        (total, entry) => total + entry.yorumSayisi,
+      ),
     );
 
     final index = _competitions.indexWhere((c) => c.id == competitionId);
@@ -627,7 +648,7 @@ class CompetitionService {
       if (cacheEntry != null) {
         final isFresh =
             DateTime.now().difference(cacheEntry.fetchedAt) <=
-                _commentWinnerCacheTTL;
+            _commentWinnerCacheTTL;
         if (isFresh) {
           return cacheEntry.winner;
         }
@@ -635,8 +656,10 @@ class CompetitionService {
     }
 
     final winner = await _calculateCommentWinner(competition);
-    _commentWinnerCache[competition.id] =
-        _CompetitionCommentWinnerCacheEntry(winner, DateTime.now());
+    _commentWinnerCache[competition.id] = _CompetitionCommentWinnerCacheEntry(
+      winner,
+      DateTime.now(),
+    );
     return winner;
   }
 
@@ -810,8 +833,10 @@ class CompetitionService {
         return false;
       }
 
-      if (_hasActiveParticipation(entry.userId,
-          exceptCompetitionId: competitionId)) {
+      if (_hasActiveParticipation(
+        entry.userId,
+        exceptCompetitionId: competitionId,
+      )) {
         return false;
       }
 
@@ -827,8 +852,7 @@ class CompetitionService {
       _competitions[competitionIndex] = competition.copyWith(
         entries: updatedEntries,
         participantUserIds: updatedParticipants,
-        totalCommentCount:
-            competition.totalCommentCount + entry.yorumSayisi,
+        totalCommentCount: competition.totalCommentCount + entry.yorumSayisi,
       );
       _competitionsController.add(List.unmodifiable(_competitions));
       await _persistCompetitionsToFirestore(_competitions);
@@ -869,7 +893,8 @@ class CompetitionService {
       }
 
       final createdBy =
-          competition.createdByUserId ?? firebase_auth.FirebaseAuth.instance.currentUser?.uid;
+          competition.createdByUserId ??
+          firebase_auth.FirebaseAuth.instance.currentUser?.uid;
       if (createdBy != null && _hasOngoingCompetition(createdBy)) {
         return false;
       }
@@ -933,7 +958,8 @@ class CompetitionService {
   }
 
   static Future<CompetitionJoinResult> joinCompetition(
-      String competitionId) async {
+    String competitionId,
+  ) async {
     final user = firebase_auth.FirebaseAuth.instance.currentUser;
     if (user == null) {
       return CompetitionJoinResult.unauthorized;
@@ -974,7 +1000,8 @@ class CompetitionService {
   }
 
   static Future<CompetitionLeaveResult> leaveCompetition(
-      String competitionId) async {
+    String competitionId,
+  ) async {
     final user = firebase_auth.FirebaseAuth.instance.currentUser;
     if (user == null) {
       return CompetitionLeaveResult.unauthorized;
@@ -991,13 +1018,15 @@ class CompetitionService {
       return CompetitionLeaveResult.notParticipant;
     }
 
-    final updatedParticipants =
-        competition.participantUserIds.where((id) => id != user.uid).toList();
-    final updatedEntries =
-        competition.entries.where((entry) => entry.userId != user.uid).toList();
+    final updatedParticipants = competition.participantUserIds
+        .where((id) => id != user.uid)
+        .toList();
+    final updatedEntries = competition.entries
+        .where((entry) => entry.userId != user.uid)
+        .toList();
     final removedCommentTotal = competition.entries
         .where((entry) => entry.userId == user.uid)
-        .fold<int>(0, (sum, entry) => sum + entry.yorumSayisi);
+        .fold<int>(0, (total, entry) => total + entry.yorumSayisi);
     final updatedTotalCommentCount = max(
       0,
       competition.totalCommentCount - removedCommentTotal,
@@ -1051,15 +1080,10 @@ class CompetitionService {
       );
       hasChanges = true;
 
-      try {
-        await _firestore.collection('competitions').doc(competition.id).update({
-          'entries': updatedEntries.map((entry) => entry.toJson()).toList(),
-          'votes': updatedVotes,
-        });
-      } catch (e) {
-        // ignore: avoid_print
-        print('CompetitionService entry ID sync error: $e');
-      }
+      await _updateCompetitionDocument(competition.id, {
+        'entries': updatedEntries.map((entry) => entry.toJson()).toList(),
+        'votes': updatedVotes,
+      });
     }
 
     if (hasChanges) {
@@ -1110,15 +1134,10 @@ class CompetitionService {
       );
       updated = true;
 
-      try {
-        await _firestore.collection('competitions').doc(competition.id).update({
-          'entries': updatedEntries.map((e) => e.toJson()).toList(),
-          'totalCommentCount': updatedTotalCommentCount,
-        });
-      } catch (e) {
-        // ignore: avoid_print
-        print('CompetitionService comment update error: $e');
-      }
+      await _updateCompetitionDocument(competition.id, {
+        'entries': updatedEntries.map((e) => e.toJson()).toList(),
+        'totalCommentCount': updatedTotalCommentCount,
+      });
     }
 
     if (updated) {
@@ -1159,14 +1178,9 @@ class CompetitionService {
       _competitions[i] = competition.copyWith(entries: updatedEntries);
       updated = true;
 
-      try {
-        await _firestore.collection('competitions').doc(competition.id).update({
-          'entries': updatedEntries.map((e) => e.toJson()).toList(),
-        });
-      } catch (e) {
-        // ignore: avoid_print
-        print('CompetitionService like update error: $e');
-      }
+      await _updateCompetitionDocument(competition.id, {
+        'entries': updatedEntries.map((e) => e.toJson()).toList(),
+      });
     }
 
     if (updated) {
@@ -1186,8 +1200,10 @@ class CompetitionService {
     });
   }
 
-  static bool _hasActiveParticipation(String userId,
-      {String? exceptCompetitionId}) {
+  static bool _hasActiveParticipation(
+    String userId, {
+    String? exceptCompetitionId,
+  }) {
     final now = DateTime.now();
     return _competitions.any((competition) {
       if (competition.id == exceptCompetitionId) return false;
@@ -1230,6 +1246,10 @@ class CompetitionService {
   static Future<void> _persistCompetitionsToFirestore(
     List<Competition> competitions,
   ) async {
+    if (!_canClientWrite) {
+      return;
+    }
+
     try {
       final collection = _firestore.collection('competitions');
       final batch = _firestore.batch();

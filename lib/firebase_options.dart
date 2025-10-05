@@ -83,5 +83,4 @@ class DefaultFirebaseOptions {
     authDomain: 'cringe-bank.firebaseapp.com',
     storageBucket: 'cringe-bank.firebasestorage.app',
   );
-
 }

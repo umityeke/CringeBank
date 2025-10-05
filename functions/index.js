@@ -1643,3 +1643,19 @@ exports.tryOnSessionExpirySweep = functions
 
     return null;
   });
+
+// ============================================================================
+// ADMIN OPERATIONS - Import secure admin functions
+// ============================================================================
+const adminOps = require('./adminOps');
+exports.assignCategoryAdmin = adminOps.assignCategoryAdmin;
+exports.removeCategoryAdmin = adminOps.removeCategoryAdmin;
+exports.toggleCategoryAdminStatus = adminOps.toggleCategoryAdminStatus;
+exports.createCompetition = adminOps.createCompetition;
+exports.updateCompetition = adminOps.updateCompetition;
+exports.deleteCompetition = adminOps.deleteCompetition;
+
+// One-time setup function (delete after use)
+const setupAdmin = require('./setupAdmin');
+exports.grantSuperAdminOnce = setupAdmin.grantSuperAdminOnce;
+

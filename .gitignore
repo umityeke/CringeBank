@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Windows Firebase artifacts
+/windows/firebase_sdk/
+/windows/tools/
+/windows/firebase_app_id_file.json
+/functions/.env

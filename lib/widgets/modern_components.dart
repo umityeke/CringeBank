@@ -1,5 +1,9 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+
 import '../theme/app_theme.dart';
 
 /// Modern Avatar Component with status indicator
@@ -37,36 +41,7 @@ class ModernAvatar extends StatelessWidget {
         ),
         child: Stack(
           children: [
-              ClipOval(
-                child: (imageUrl != null && imageUrl!.isNotEmpty)
-                    ? CachedNetworkImage(
-                        imageUrl: imageUrl!,
-                        fit: BoxFit.cover,
-                        width: size,
-                        height: size,
-                        placeholder: (_, __) => _AvatarInitialsPlaceholder(
-                          initials: initials,
-                          backgroundColor:
-                              AppTheme.primaryColor.withOpacity(0.08),
-                          textColor: AppTheme.primaryColor,
-                          fontSize: size / 2.5,
-                        ),
-                        errorWidget: (_, __, ___) => _AvatarInitialsPlaceholder(
-                          initials: initials,
-                          backgroundColor:
-                              AppTheme.primaryColor.withOpacity(0.08),
-                          textColor: AppTheme.primaryColor,
-                          fontSize: size / 2.5,
-                        ),
-                      )
-                    : _AvatarInitialsPlaceholder(
-                        initials: initials,
-                        backgroundColor:
-                            AppTheme.primaryColor.withOpacity(0.08),
-                        textColor: AppTheme.primaryColor,
-                        fontSize: size / 2.5,
-                      ),
-              ),
+            ClipOval(child: _buildAvatarContent()),
             if (isOnline)
               Positioned(
                 bottom: 0,
@@ -85,6 +60,86 @@ class ModernAvatar extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildAvatarContent() {
+    final trimmed = (imageUrl ?? '').trim();
+
+    if (trimmed.isEmpty) {
+      return _AvatarInitialsPlaceholder(
+        initials: initials,
+        backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.08),
+        textColor: AppTheme.primaryColor,
+        fontSize: size / 2.5,
+      );
+    }
+
+    if (trimmed.startsWith('http')) {
+      return CachedNetworkImage(
+        imageUrl: trimmed,
+        fit: BoxFit.cover,
+        width: size,
+        height: size,
+        placeholder: (context, url) => _AvatarInitialsPlaceholder(
+          initials: initials,
+          backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.08),
+          textColor: AppTheme.primaryColor,
+          fontSize: size / 2.5,
+        ),
+        errorWidget: (context, url, error) => _AvatarInitialsPlaceholder(
+          initials: initials,
+          backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.08),
+          textColor: AppTheme.primaryColor,
+          fontSize: size / 2.5,
+        ),
+      );
+    }
+
+    if (trimmed.startsWith('data:image')) {
+      final bytes = _decodeDataUri(trimmed);
+      if (bytes != null) {
+        return Image.memory(
+          bytes,
+          fit: BoxFit.cover,
+          width: size,
+          height: size,
+        );
+      }
+    }
+
+    if (trimmed.length <= 3) {
+      return _AvatarInitialsPlaceholder(
+        initials: trimmed,
+        backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.08),
+        textColor: AppTheme.primaryColor,
+        fontSize: size / 2.4,
+      );
+    }
+
+    return _AvatarInitialsPlaceholder(
+      initials: initials,
+      backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.08),
+      textColor: AppTheme.primaryColor,
+      fontSize: size / 2.5,
+    );
+  }
+}
+
+Uint8List? _decodeDataUri(String dataUri) {
+  final commaIndex = dataUri.indexOf(',');
+  if (commaIndex == -1) {
+    return null;
+  }
+
+  final base64Segment = dataUri.substring(commaIndex + 1);
+  if (base64Segment.isEmpty) {
+    return null;
+  }
+
+  try {
+    return base64Decode(base64Segment);
+  } catch (_) {
+    return null;
   }
 }
 
@@ -117,7 +172,6 @@ class _AvatarInitialsPlaceholder extends StatelessWidget {
     );
   }
 }
-
 
 /// Modern Button with loading state
 class ModernButton extends StatelessWidget {
@@ -410,7 +464,7 @@ class ModernBadge extends StatelessWidget {
         vertical: isSmall ? AppTheme.spacingXS : AppTheme.spacingXS,
       ),
       decoration: BoxDecoration(
-  color: backgroundColor ?? AppTheme.primaryColor.withOpacity(0.1),
+        color: backgroundColor ?? AppTheme.primaryColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(isSmall ? 8 : 12),
       ),
       child: Text(

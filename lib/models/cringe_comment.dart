@@ -39,17 +39,22 @@ class CringeComment {
     }
 
     final rawParentId = (data['parentCommentId'] as String?)?.trim();
-    final parentId = rawParentId == null || rawParentId.isEmpty ? null : rawParentId;
-    final likedBy = (data['likedByUserIds'] as List<dynamic>? ?? const <dynamic>[])
-        .whereType<String>()
-        .toList(growable: false);
+    final parentId = rawParentId == null || rawParentId.isEmpty
+        ? null
+        : rawParentId;
+    final likedBy =
+        (data['likedByUserIds'] as List<dynamic>? ?? const <dynamic>[])
+            .whereType<String>()
+            .toList(growable: false);
 
     return CringeComment(
       id: documentId,
       entryId: entryId,
       userId: (data['userId'] ?? '').toString(),
-      authorName: (data['authorName'] ?? data['username'] ?? 'Anonim').toString(),
-      authorHandle: (data['authorHandle'] ?? data['userHandle'] ?? '@anonim').toString(),
+      authorName: (data['authorName'] ?? data['username'] ?? 'Anonim')
+          .toString(),
+      authorHandle: (data['authorHandle'] ?? data['userHandle'] ?? '@anonim')
+          .toString(),
       authorAvatarUrl: data['authorAvatarUrl'] as String?,
       content: (data['content'] ?? '').toString(),
       createdAt: parseCreatedAt(data['createdAt']),

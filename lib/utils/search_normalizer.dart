@@ -45,24 +45,23 @@ class SearchNormalizer {
     'Ö': 'o',
     'ç': 'c',
     'Ç': 'c',
-    'â': 'a',
-    'Â': 'a',
-    'î': 'i',
-    'Î': 'i',
-    'û': 'u',
-    'Û': 'u',
     'á': 'a',
     'Á': 'a',
+    'í': 'i',
+    'Í': 'i',
+    'ú': 'u',
+    'Ú': 'u',
     'à': 'a',
     'À': 'a',
+    'â': 'a',
+    'Â': 'a',
     'ä': 'a',
     'Ä': 'a',
     'å': 'a',
-    'Å': 'a',
-    'é': 'e',
-    'É': 'e',
     'è': 'e',
     'È': 'e',
+    'é': 'e',
+    'É': 'e',
     'ê': 'e',
     'Ê': 'e',
     'ë': 'e',
@@ -77,8 +76,8 @@ class SearchNormalizer {
     'Õ': 'o',
     'ù': 'u',
     'Ù': 'u',
-    'ú': 'u',
-    'Ú': 'u',
+    'û': 'u',
+    'Û': 'u',
     'ý': 'y',
     'Ý': 'y',
     'ÿ': 'y',
@@ -118,11 +117,7 @@ class SearchNormalizer {
 
   static NormalizedText buildNormalization(String input) {
     if (input.isEmpty) {
-      return const NormalizedText(
-        original: '',
-        normalizedTr: '',
-        ascii: '',
-      );
+      return const NormalizedText(original: '', normalizedTr: '', ascii: '');
     }
 
     final trimmed = input.trim();
@@ -152,7 +147,7 @@ class SearchNormalizer {
   }) {
     final keywords = <String>{};
 
-  final normalizedFullName = buildNormalization(fullName).ascii;
+    final normalizedFullName = buildNormalization(fullName).ascii;
     if (normalizedFullName.isNotEmpty) {
       keywords.add(normalizedFullName);
       final nameTokens = normalizedFullName.split(' ');
@@ -164,7 +159,7 @@ class SearchNormalizer {
       }
     }
 
-  var normalizedUsername = buildNormalization(username).ascii;
+    var normalizedUsername = buildNormalization(username).ascii;
     normalizedUsername = normalizedUsername.replaceAll(RegExp(r'[@\s]+'), '');
     if (normalizedUsername.isNotEmpty) {
       keywords.add(normalizedUsername);
@@ -172,8 +167,9 @@ class SearchNormalizer {
     }
 
     final emailLocalPart = email.split('@').first;
-  final normalizedEmail = buildNormalization(emailLocalPart).ascii
-        .replaceAll(RegExp(r'[@\s]+'), '');
+    final normalizedEmail = buildNormalization(
+      emailLocalPart,
+    ).ascii.replaceAll(RegExp(r'[@\s]+'), '');
     if (normalizedEmail.isNotEmpty) {
       keywords.add(normalizedEmail);
     }

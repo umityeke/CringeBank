@@ -163,8 +163,10 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
             horizontal: AppTheme.spacingL,
             vertical: AppTheme.spacingS,
           ),
-          itemBuilder: (context, index) => _buildCommentTile(flattenedComments[index]),
-          separatorBuilder: (_, __) => const SizedBox(height: AppTheme.spacingM),
+          itemBuilder: (context, index) =>
+              _buildCommentTile(flattenedComments[index]),
+          separatorBuilder: (context, _) =>
+              const SizedBox(height: AppTheme.spacingM),
           itemCount: flattenedComments.length,
         );
       },
@@ -173,7 +175,9 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
 
   Widget _buildCommentTile(_CommentListItem item) {
     final comment = item.comment;
-    final indent = item.depth == 0 ? 0.0 : AppTheme.spacingM + item.depth * 18.0;
+    final indent = item.depth == 0
+        ? 0.0
+        : AppTheme.spacingM + item.depth * 18.0;
 
     return Padding(
       padding: EdgeInsets.only(left: indent),
@@ -191,74 +195,77 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      comment.authorName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        comment.authorName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  const SizedBox(width: AppTheme.spacingXS),
-                  Text(
-                    _formatTimestamp(comment.createdAt),
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Text(
-                comment.authorHandle,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: AppTheme.spacingXS),
-              Text(
-                comment.content,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: AppTheme.spacingXS),
-              Row(
-                children: [
-                  _buildLikeButton(comment),
-                  const SizedBox(width: AppTheme.spacingS),
-                  TextButton(
-                    onPressed: () => _handleReplyTap(comment),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.white.withValues(alpha: 0.6),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppTheme.spacingXS,
-                        vertical: 4,
+                    const SizedBox(width: AppTheme.spacingXS),
+                    Text(
+                      _formatTimestamp(comment.createdAt),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 11,
                       ),
-                      minimumSize: const Size(0, 0),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    child: const Text(
-                      'Yanıtla',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  comment.authorHandle,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 12,
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: AppTheme.spacingXS),
+                Text(
+                  comment.content,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacingXS),
+                Row(
+                  children: [
+                    _buildLikeButton(comment),
+                    const SizedBox(width: AppTheme.spacingS),
+                    TextButton(
+                      onPressed: () => _handleReplyTap(comment),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white.withValues(alpha: 0.6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppTheme.spacingXS,
+                          vertical: 4,
+                        ),
+                        minimumSize: const Size(0, 0),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Yanıtla',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
-    ),
+        ],
+      ),
     );
   }
 
@@ -334,11 +341,16 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
   }
 
   Widget _buildLikeButton(CringeComment comment) {
-    final isLiked = _currentUserId != null &&
+    final isLiked =
+        _currentUserId != null &&
         comment.likedByUserIds.contains(_currentUserId);
     final isProcessing = _likingCommentIds.contains(comment.id);
-    final icon = isLiked ? Icons.favorite_rounded : Icons.favorite_outline_rounded;
-    final color = isLiked ? AppTheme.cringeOrange : Colors.white.withValues(alpha: 0.7);
+    final icon = isLiked
+        ? Icons.favorite_rounded
+        : Icons.favorite_outline_rounded;
+    final color = isLiked
+        ? AppTheme.cringeOrange
+        : Colors.white.withValues(alpha: 0.7);
 
     return InkWell(
       onTap: isProcessing ? null : () => _handleToggleLike(comment),
@@ -517,7 +529,9 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: AppTheme.cringeOrange),
+                      borderSide: const BorderSide(
+                        color: AppTheme.cringeOrange,
+                      ),
                     ),
                   ),
                 ),
@@ -643,8 +657,5 @@ class _CommentListItem {
   final CringeComment comment;
   final int depth;
 
-  const _CommentListItem({
-    required this.comment,
-    required this.depth,
-  });
+  const _CommentListItem({required this.comment, required this.depth});
 }

@@ -31,7 +31,7 @@ class _AnimatedBubbleBackgroundState extends State<AnimatedBubbleBackground>
       duration: const Duration(seconds: 10),
       vsync: this,
     );
-    
+
     _initializeBubbles();
     _controller.repeat();
   }
@@ -43,7 +43,8 @@ class _AnimatedBubbleBackgroundState extends State<AnimatedBubbleBackground>
         y: _random.nextDouble(),
         size: 8 + _random.nextDouble() * 15, // 8-23 pixel (çok daha küçük)
         speed: 0.2 + _random.nextDouble() * 0.5,
-        opacity: 0.3 + _random.nextDouble() * 0.3, // 0.3-0.6 (biraz daha az görünür)
+        opacity:
+            0.3 + _random.nextDouble() * 0.3, // 0.3-0.6 (biraz daha az görünür)
       );
     });
   }
@@ -100,25 +101,22 @@ class BubblePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     for (var bubble in bubbles) {
       final paint = Paint()
-        ..color = bubbleColor.withOpacity(bubble.opacity)
+        ..color = bubbleColor.withValues(alpha: bubble.opacity)
         ..style = PaintingStyle.fill;
 
       // Y pozisyonunu animasyon ile güncelle (yukarı doğru hareket)
       double currentY = (bubble.y - animation * bubble.speed) % 1.2;
       if (currentY < -0.2) currentY = currentY + 1.2;
 
-      final center = Offset(
-        bubble.x * size.width,
-        currentY * size.height,
-      );
+      final center = Offset(bubble.x * size.width, currentY * size.height);
 
       // Glow efekti
       final glowPaint = Paint()
-        ..color = bubbleColor.withOpacity(bubble.opacity * 0.1)
+        ..color = bubbleColor.withValues(alpha: bubble.opacity * 0.1)
         ..style = PaintingStyle.fill;
 
       canvas.drawCircle(center, bubble.size * 1.3, glowPaint);
-      
+
       // Ana baloncuk
       canvas.drawCircle(center, bubble.size, paint);
     }

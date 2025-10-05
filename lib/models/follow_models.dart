@@ -1,11 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Possible follow edge statuses stored in Firestore.
-enum FollowEdgeStatus {
-  pending,
-  active,
-  removed,
-}
+enum FollowEdgeStatus { pending, active, removed }
 
 extension FollowEdgeStatusMapper on FollowEdgeStatus {
   String get asFirestoreValue {
@@ -57,10 +53,7 @@ class FollowEdge {
   bool get isPending => status.isPending;
   bool get isActive => status.isActive;
 
-  FollowEdge copyWith({
-    FollowEdgeStatus? status,
-    DateTime? updatedAt,
-  }) {
+  FollowEdge copyWith({FollowEdgeStatus? status, DateTime? updatedAt}) {
     return FollowEdge(
       id: id,
       srcUid: srcUid,
@@ -158,7 +151,8 @@ class FollowRelationship {
   bool get canCancelRequest => state == FollowRelationshipState.outgoingRequest;
   bool get canAcceptRequest => state == FollowRelationshipState.incomingRequest;
   bool get canUnfollow => state == FollowRelationshipState.following;
-  bool get isBlocked => state == FollowRelationshipState.blockedByMe ||
+  bool get isBlocked =>
+      state == FollowRelationshipState.blockedByMe ||
       state == FollowRelationshipState.blockedByThem ||
       state == FollowRelationshipState.blockedMutual;
 

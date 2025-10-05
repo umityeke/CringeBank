@@ -121,10 +121,7 @@ class _TryOnPreviewSheetState extends State<TryOnPreviewSheet> {
             color: Colors.white.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(14),
           ),
-          child: const Icon(
-            Icons.visibility_outlined,
-            color: Colors.white,
-          ),
+          child: const Icon(Icons.visibility_outlined, color: Colors.white),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -214,61 +211,65 @@ class _TryOnPreviewSheetState extends State<TryOnPreviewSheet> {
   Widget _buildInfoChips() {
     final chips = <Widget>[];
 
-    chips.add(_infoChip(
-      icon: Icons.bolt_rounded,
-      label: widget.previewAssets.watermark
-          ? 'Filigranlı önizleme'
-          : 'Filigransız önizleme',
-    ));
+    chips.add(
+      _infoChip(
+        icon: Icons.bolt_rounded,
+        label: widget.previewAssets.watermark
+            ? 'Filigranlı önizleme'
+            : 'Filigransız önizleme',
+      ),
+    );
 
-    chips.add(_infoChip(
-      icon: Icons.timer_outlined,
-      label: 'Süre ${widget.config.durationSec} sn',
-    ));
+    chips.add(
+      _infoChip(
+        icon: Icons.timer_outlined,
+        label: 'Süre ${widget.config.durationSec} sn',
+      ),
+    );
 
-    chips.add(_infoChip(
-      icon: Icons.repeat_on_rounded,
-      label: 'Günlük ${widget.config.maxDailyTries} deneme',
-    ));
+    chips.add(
+      _infoChip(
+        icon: Icons.repeat_on_rounded,
+        label: 'Günlük ${widget.config.maxDailyTries} deneme',
+      ),
+    );
 
     if (widget.triesRemaining > 0) {
-      chips.add(_infoChip(
-        icon: Icons.check_circle_outline,
-        label: 'Kalan deneme: ${widget.triesRemaining}',
-      ));
+      chips.add(
+        _infoChip(
+          icon: Icons.check_circle_outline,
+          label: 'Kalan deneme: ${widget.triesRemaining}',
+        ),
+      );
     } else {
-      chips.add(_infoChip(
-        icon: Icons.hourglass_empty,
-        label: 'Günlük limit doldu',
-      ));
+      chips.add(
+        _infoChip(icon: Icons.hourglass_empty, label: 'Günlük limit doldu'),
+      );
     }
 
     if (widget.reusedSession) {
-      chips.add(_infoChip(
-        icon: Icons.history_toggle_off,
-        label: 'Aktif deneme yeniden açıldı',
-      ));
+      chips.add(
+        _infoChip(
+          icon: Icons.history_toggle_off,
+          label: 'Aktif deneme yeniden açıldı',
+        ),
+      );
     }
 
     if (widget.cooldownRemaining > 0) {
-      chips.add(_infoChip(
-        icon: Icons.autorenew,
-        label:
-            'Sonraki deneme ${_formatDuration(Duration(seconds: widget.cooldownRemaining))}',
-      ));
+      chips.add(
+        _infoChip(
+          icon: Icons.autorenew,
+          label:
+              'Sonraki deneme ${_formatDuration(Duration(seconds: widget.cooldownRemaining))}',
+        ),
+      );
     }
 
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: chips,
-    );
+    return Wrap(spacing: 8, runSpacing: 8, children: chips);
   }
 
-  Widget _infoChip({
-    required IconData icon,
-    required String label,
-  }) {
+  Widget _infoChip({required IconData icon, required String label}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -303,10 +304,9 @@ class _TryOnPreviewSheetState extends State<TryOnPreviewSheet> {
           child: FilledButton(
             onPressed: widget.onPurchase,
             style: FilledButton.styleFrom(
-              backgroundColor:
-                  widget.item.artwork.colors.isNotEmpty
-                      ? widget.item.artwork.colors.last
-                      : const Color(0xFF7C4DFF),
+              backgroundColor: widget.item.artwork.colors.isNotEmpty
+                  ? widget.item.artwork.colors.last
+                  : const Color(0xFF7C4DFF),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(

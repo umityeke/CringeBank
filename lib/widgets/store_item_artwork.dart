@@ -59,17 +59,11 @@ class StoreItemArtworkCard extends StatelessWidget {
                     sigmaX: artwork.blurSigma,
                     sigmaY: artwork.blurSigma,
                   ),
-                  child: Container(
-                    color: Colors.white.withValues(alpha: 0.06),
-                  ),
+                  child: Container(color: Colors.white.withValues(alpha: 0.06)),
                 ),
               ),
               _buildHighlightRing(),
-              Icon(
-                artwork.icon,
-                color: Colors.white,
-                size: size * 0.44,
-              ),
+              Icon(artwork.icon, color: Colors.white, size: size * 0.44),
               Positioned(
                 bottom: 10,
                 left: 12,
@@ -131,9 +125,7 @@ class StoreItemArtworkCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.25),
-          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
         ),
       ),
     );
@@ -153,7 +145,7 @@ class _EquippedPill extends StatelessWidget {
         vertical: size * 0.08,
       ),
       decoration: BoxDecoration(
-  color: Colors.black.withValues(alpha: 0.48),
+        color: Colors.black.withValues(alpha: 0.48),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white70, width: 1.2),
       ),
@@ -181,10 +173,7 @@ class _OwnedDot extends StatelessWidget {
         color: Colors.white,
         shape: BoxShape.circle,
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: 6,
-          ),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 6),
         ],
       ),
     );

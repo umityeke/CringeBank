@@ -9,10 +9,7 @@ import '../services/user_service.dart';
 import '../theme/app_theme.dart';
 
 class CompetitionQuickEntrySheet extends StatefulWidget {
-  const CompetitionQuickEntrySheet({
-    super.key,
-    required this.competition,
-  });
+  const CompetitionQuickEntrySheet({super.key, required this.competition});
 
   final Competition competition;
 
@@ -76,7 +73,8 @@ class _CompetitionQuickEntrySheetState
                         height: 1.5,
                       ),
                       decoration: InputDecoration(
-                        hintText: 'Anını burada paylaş... (minimum 10 karakter)',
+                        hintText:
+                            'Anını burada paylaş... (minimum 10 karakter)',
                         hintStyle: TextStyle(
                           color: Colors.white.withValues(alpha: 0.4),
                         ),
@@ -91,8 +89,9 @@ class _CompetitionQuickEntrySheetState
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(20),
-                          borderSide:
-                              const BorderSide(color: AppTheme.cringeOrange),
+                          borderSide: const BorderSide(
+                            color: AppTheme.cringeOrange,
+                          ),
                         ),
                       ),
                     ),
@@ -107,8 +106,7 @@ class _CompetitionQuickEntrySheetState
                   children: [
                     Switch.adaptive(
                       value: _stayAnonymous,
-                      thumbColor:
-                          WidgetStatePropertyAll(AppTheme.cringeOrange),
+                      thumbColor: WidgetStatePropertyAll(AppTheme.cringeOrange),
                       trackColor: WidgetStatePropertyAll(
                         AppTheme.cringeOrange.withValues(alpha: 0.35),
                       ),
@@ -153,7 +151,9 @@ class _CompetitionQuickEntrySheetState
                               )
                             : const Icon(Icons.send_rounded, size: 18),
                         label: Text(
-                          _isSubmitting ? 'Gönderiliyor...' : 'Yarışmaya Gönder',
+                          _isSubmitting
+                              ? 'Gönderiliyor...'
+                              : 'Yarışmaya Gönder',
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -243,7 +243,7 @@ class _CompetitionQuickEntrySheetState
         throw StateError('Kullanıcı bilgileri bulunamadı.');
       }
 
-  final resolvedUser = user;
+      final resolvedUser = user;
 
       final competition = CompetitionService.currentCompetitions.firstWhere(
         (c) => c.id == widget.competition.id,
@@ -254,8 +254,9 @@ class _CompetitionQuickEntrySheetState
         throw StateError('Önce yarışmaya katılmalısın.');
       }
 
-      final hasSubmitted = competition.entries
-          .any((entry) => entry.userId == resolvedUser.id);
+      final hasSubmitted = competition.entries.any(
+        (entry) => entry.userId == resolvedUser.id,
+      );
       if (hasSubmitted) {
         throw StateError('Bu yarışmaya zaten bir anı gönderdin.');
       }
@@ -267,9 +268,12 @@ class _CompetitionQuickEntrySheetState
 
       final authorAvatarUrl = _stayAnonymous
           ? null
-          : (resolvedUser.avatar.trim().isNotEmpty ? resolvedUser.avatar.trim() : firebaseUser.photoURL);
+          : (resolvedUser.avatar.trim().isNotEmpty
+                ? resolvedUser.avatar.trim()
+                : firebaseUser.photoURL);
 
-      final category = competition.specificCategory ?? CringeCategory.sosyalRezillik;
+      final category =
+          competition.specificCategory ?? CringeCategory.sosyalRezillik;
       final severity = _estimateSeverity(rawText);
       final derivedTitle = _deriveTitle(rawText);
 
@@ -330,7 +334,10 @@ class _CompetitionQuickEntrySheetState
   }
 
   String _deriveTitle(String text) {
-    final sanitized = text.replaceAll('\n', ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+    final sanitized = text
+        .replaceAll('\n', ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
     if (sanitized.isEmpty) {
       return 'Yarışma Anısı';
     }
@@ -343,7 +350,8 @@ class _CompetitionQuickEntrySheetState
     final lengthScore = (text.length / 200).clamp(0, 5).toDouble();
     final exclamationBonus = RegExp(r'!').allMatches(text).length.clamp(0, 3);
     final questionBonus = RegExp(r'\?').allMatches(text).length.clamp(0, 2);
-    final base = 4.0 + lengthScore + exclamationBonus * 0.3 + questionBonus * 0.2;
+    final base =
+        4.0 + lengthScore + exclamationBonus * 0.3 + questionBonus * 0.2;
     return base.clamp(3, 10);
   }
 }

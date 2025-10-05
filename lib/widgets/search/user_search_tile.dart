@@ -29,14 +29,14 @@ class UserSearchTile extends StatelessWidget {
         padding: const EdgeInsets.all(AppTheme.spacingM),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.15)),
-          color: Colors.white.withOpacity(0.04),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+          color: Colors.white.withValues(alpha: 0.04),
         ),
         child: Row(
           children: [
             ModernAvatar(
-        imageUrl: user.avatarUrl,
-        initials: _buildInitials(),
+              imageUrl: user.avatarUrl,
+              initials: _buildInitials(),
               size: 48,
               isOnline: user.isActive,
             ),
@@ -52,7 +52,8 @@ class UserSearchTile extends StatelessWidget {
                           user.displayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
                               ),
@@ -60,7 +61,9 @@ class UserSearchTile extends StatelessWidget {
                       ),
                       if (isVerified)
                         Padding(
-                          padding: const EdgeInsets.only(left: AppTheme.spacingXS),
+                          padding: const EdgeInsets.only(
+                            left: AppTheme.spacingXS,
+                          ),
                           child: Icon(
                             Icons.verified,
                             color: AppTheme.accentBlue,
@@ -69,7 +72,9 @@ class UserSearchTile extends StatelessWidget {
                         ),
                       if (isPremium)
                         Padding(
-                          padding: const EdgeInsets.only(left: AppTheme.spacingXS),
+                          padding: const EdgeInsets.only(
+                            left: AppTheme.spacingXS,
+                          ),
                           child: Icon(
                             Icons.star_rounded,
                             color: AppTheme.accentPink,
@@ -82,8 +87,8 @@ class UserSearchTile extends StatelessWidget {
                   Text(
                     '@${user.username}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withOpacity(0.7),
-                        ),
+                      color: Colors.white.withValues(alpha: 0.7),
+                    ),
                   ),
                   if (user.bio.isNotEmpty) ...[
                     const SizedBox(height: AppTheme.spacingXS),
@@ -92,9 +97,9 @@ class UserSearchTile extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withOpacity(0.6),
-                            height: 1.3,
-                          ),
+                        color: Colors.white.withValues(alpha: 0.6),
+                        height: 1.3,
+                      ),
                     ),
                   ],
                   const SizedBox(height: AppTheme.spacingS),
@@ -135,17 +140,17 @@ class UserSearchTile extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        color: Colors.white.withOpacity(0.08),
+        color: Colors.white.withValues(alpha: 0.08),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.white.withOpacity(0.9)),
+          Icon(icon, size: 14, color: Colors.white.withValues(alpha: 0.9)),
           const SizedBox(width: 6),
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.85),
+              color: Colors.white.withValues(alpha: 0.85),
               fontWeight: FontWeight.w500,
               fontSize: 12,
             ),
@@ -172,10 +177,7 @@ class UserSearchTile extends StatelessWidget {
         ),
         child: const Text(
           'Profili Gör',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
       ),
     );

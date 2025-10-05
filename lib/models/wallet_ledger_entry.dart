@@ -48,7 +48,9 @@ class WalletLedgerEntry {
   final String? idempotencyKey;
 
   factory WalletLedgerEntry.fromMap(Map<String, dynamic> map, {String? id}) {
-    final resolvedId = (id ?? map['id'] ?? map['eventId'] ?? '').toString().trim();
+    final resolvedId = (id ?? map['id'] ?? map['eventId'] ?? '')
+        .toString()
+        .trim();
     return WalletLedgerEntry(
       id: resolvedId,
       userId: map['userId']?.toString() ?? '',

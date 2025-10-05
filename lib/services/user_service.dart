@@ -19,6 +19,7 @@ class UserService {
 
   static const String _lastUserIdKey = 'cb_last_user_id';
   static const String _lastUserEmailKey = 'cb_last_user_email';
+  static const bool _firestoreLoggingEnabled = false;
 
   final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -161,6 +162,9 @@ class UserService {
 
   // Update user activity
   Future<void> _updateUserActivity(String userId) async {
+    if (!_firestoreLoggingEnabled) {
+      return;
+    }
     try {
       await _firestore.collection('user_activity').doc(userId).set({
         'lastActive': FieldValue.serverTimestamp(),
@@ -176,6 +180,9 @@ class UserService {
 
   // Log authentication activity
   Future<void> _logAuthActivity(firebase_auth.User? user, String action) async {
+    if (!_firestoreLoggingEnabled) {
+      return;
+    }
     try {
       final deviceFingerprint = await _getDeviceFingerprint();
       await _firestore.collection('auth_logs').add({
@@ -314,9 +321,11 @@ class UserService {
             .collection('users')
             .doc(firebaseUser.uid)
             .snapshots()
-            .timeout(const Duration(seconds: 15)) // Enterprise timeout
             .listen(
-              (doc) => _handleEnterpriseUserSnapshot(doc, controller),
+              (doc) {
+                reconnectAttempts = 0;
+                _handleEnterpriseUserSnapshot(doc, controller);
+              },
               onError: (error) => _handleEnterpriseStreamError(
                 error,
                 controller,
@@ -473,6 +482,9 @@ class UserService {
 
   // Log user data updates
   void _logUserDataUpdate(String userId, User user) async {
+    if (!_firestoreLoggingEnabled) {
+      return;
+    }
     try {
       await _firestore.collection('user_data_logs').add({
         'userId': userId,
@@ -488,6 +500,9 @@ class UserService {
 
   // Log stream errors
   void _logStreamError(dynamic error) async {
+    if (!_firestoreLoggingEnabled) {
+      return;
+    }
     try {
       await _firestore.collection('stream_error_logs').add({
         'service': 'UserService',
@@ -917,10 +932,9 @@ class UserService {
           {'followersCount': FieldValue.increment(1)},
         );
 
-        transaction.update(
-          _firestore.collection('users').doc(currentUserId),
-          {'followingCount': FieldValue.increment(1)},
-        );
+        transaction.update(_firestore.collection('users').doc(currentUserId), {
+          'followingCount': FieldValue.increment(1),
+        });
 
         return true;
       });
@@ -999,10 +1013,9 @@ class UserService {
           {'followersCount': FieldValue.increment(-1)},
         );
 
-        transaction.update(
-          _firestore.collection('users').doc(currentUserId),
-          {'followingCount': FieldValue.increment(-1)},
-        );
+        transaction.update(_firestore.collection('users').doc(currentUserId), {
+          'followingCount': FieldValue.increment(-1),
+        });
 
         return true;
       });
@@ -1014,10 +1027,9 @@ class UserService {
 
         final currentCached = _currentUser;
         if (currentCached != null && currentCached.id.trim() == currentUserId) {
-          final updatedFollowingCount =
-              currentCached.followingCount > 0
-                  ? currentCached.followingCount - 1
-                  : 0;
+          final updatedFollowingCount = currentCached.followingCount > 0
+              ? currentCached.followingCount - 1
+              : 0;
           final updatedCurrent = currentCached.copyWith(
             followingCount: updatedFollowingCount,
           );
@@ -1027,10 +1039,9 @@ class UserService {
 
         final cachedTarget = _userCache[normalizedTargetId];
         if (cachedTarget != null) {
-          final updatedFollowersCount =
-              cachedTarget.followersCount > 0
-                  ? cachedTarget.followersCount - 1
-                  : 0;
+          final updatedFollowersCount = cachedTarget.followersCount > 0
+              ? cachedTarget.followersCount - 1
+              : 0;
           final updatedTarget = cachedTarget.copyWith(
             followersCount: updatedFollowersCount,
           );
@@ -1041,7 +1052,9 @@ class UserService {
       return result;
     } catch (e) {
       print('❌ unfollowUser error for $targetUserId: $e');
-      throw StateError('Takibi bırakma işlemi başarısız oldu. Lütfen tekrar dene.');
+      throw StateError(
+        'Takibi bırakma işlemi başarısız oldu. Lütfen tekrar dene.',
+      );
     }
   }
 
@@ -1368,5 +1381,50 @@ class UserService {
     }
 
     return _cachedDeviceFingerprint!;
+  }
+
+  // === MODERATOR FUNCTIONS (Security Contract) ===
+
+  /// Check if current user is a moderator
+  /// Security Contract: Moderators have custom claim 'moderator: true'
+  Future<bool> isModerator() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return false;
+    }
+
+    try {
+      final idTokenResult = await user.getIdTokenResult();
+      final isMod = idTokenResult.claims?['moderator'] == true;
+      print('🛡️ MODERATOR CHECK: ${user.uid} - $isMod');
+      return isMod;
+    } catch (e) {
+      print('❌ MODERATOR CHECK ERROR: $e');
+      return false;
+    }
+  }
+
+  /// Get moderator status synchronously (cached in token)
+  /// Note: Requires user to have refreshed their token recently
+  bool get isModeratorSync {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    
+    // This is less reliable as token might be stale
+    // Prefer using isModerator() future method
+    return false; // Default to false for sync check
+  }
+
+  /// Force token refresh to get latest custom claims
+  Future<void> refreshModeratorStatus() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await user.getIdToken(true); // Force refresh
+      print('🔄 TOKEN REFRESHED: Custom claims updated');
+    } catch (e) {
+      print('❌ TOKEN REFRESH ERROR: $e');
+    }
   }
 }

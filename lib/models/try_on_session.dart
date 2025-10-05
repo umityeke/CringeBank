@@ -30,13 +30,16 @@ class TryOnSession {
   Duration get remaining =>
       isExpired ? Duration.zero : expiresAt.difference(DateTime.now());
 
-  factory TryOnSession.fromSnapshot(DocumentSnapshot<Map<String, dynamic>> doc) {
+  factory TryOnSession.fromSnapshot(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     return TryOnSession.fromMap(doc.id, doc.data() ?? const {});
   }
 
   factory TryOnSession.fromMap(String id, JsonMap data) {
     final started = _parseTimestamp(data['startedAt']) ?? DateTime.now();
-    final expires = _parseTimestamp(data['expiresAt']) ??
+    final expires =
+        _parseTimestamp(data['expiresAt']) ??
         started.add(const Duration(seconds: 30));
 
     return TryOnSession(
@@ -54,13 +57,19 @@ class TryOnSession {
     final startedMillis = _readMillis(data['startedAtMillis']);
     final expiresMillis = _readMillis(data['expiresAtMillis']);
     final started = startedMillis != null
-        ? DateTime.fromMillisecondsSinceEpoch(startedMillis, isUtc: true).toLocal()
+        ? DateTime.fromMillisecondsSinceEpoch(
+            startedMillis,
+            isUtc: true,
+          ).toLocal()
         : DateTime.now();
-    final fallbackExpires = started.add(Duration(
-      seconds: (data['durationSec'] as num?)?.toInt() ?? 30,
-    ));
+    final fallbackExpires = started.add(
+      Duration(seconds: (data['durationSec'] as num?)?.toInt() ?? 30),
+    );
     final expires = expiresMillis != null
-        ? DateTime.fromMillisecondsSinceEpoch(expiresMillis, isUtc: true).toLocal()
+        ? DateTime.fromMillisecondsSinceEpoch(
+            expiresMillis,
+            isUtc: true,
+          ).toLocal()
         : fallbackExpires;
 
     return TryOnSession(

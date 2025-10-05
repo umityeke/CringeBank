@@ -1,4 +1,4 @@
-package com.example.cringe_bankasi
+package com.cringebank.app
 
 import io.flutter.embedding.android.FlutterActivity
 

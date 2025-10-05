@@ -1,22 +1,9 @@
 import 'package:flutter/material.dart';
 
 /// Ürünlerin profil üzerindeki etkisini belirleyen türler.
-enum StoreItemEffectType {
-  none,
-  frame,
-  badge,
-  nameColor,
-  profileBackground,
-}
+enum StoreItemEffectType { none, frame, badge, nameColor, profileBackground }
 
-enum StoreItemType {
-  subscription,
-  frame,
-  profileEffect,
-  badge,
-  tool,
-  bundle,
-}
+enum StoreItemType { subscription, frame, profileEffect, badge, tool, bundle }
 
 class StoreItemEffect {
   final StoreItemEffectType type;
@@ -101,10 +88,7 @@ class StoreItemFullAssets {
   final List<String> images;
   final String? video;
 
-  const StoreItemFullAssets({
-    this.images = const [],
-    this.video,
-  });
+  const StoreItemFullAssets({this.images = const [], this.video});
 
   factory StoreItemFullAssets.fromMap(Map<String, dynamic>? map) {
     if (map == null) {
@@ -118,10 +102,7 @@ class StoreItemFullAssets {
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'images': images,
-      if (video != null) 'video': video,
-    };
+    return {'images': images, if (video != null) 'video': video};
   }
 }
 
@@ -192,15 +173,13 @@ class StoreItem {
     this.tryOnConfig = const StoreItemTryOnConfig(),
   });
 
-  StoreItemPreviewAssets get effectivePreviewAssets => previewAssets ??
-      StoreItemPreviewAssets(
-        images: ['store_items/$id/preview/main.png'],
-      );
+  StoreItemPreviewAssets get effectivePreviewAssets =>
+      previewAssets ??
+      StoreItemPreviewAssets(images: ['store_items/$id/preview/main.png']);
 
-  StoreItemFullAssets get effectiveFullAssets => fullAssets ??
-      StoreItemFullAssets(
-        images: ['store_items/$id/full/main.png'],
-      );
+  StoreItemFullAssets get effectiveFullAssets =>
+      fullAssets ??
+      StoreItemFullAssets(images: ['store_items/$id/full/main.png']);
 
   static StoreItemType _typeFromString(String? value) {
     if (value == null) return StoreItemType.frame;
@@ -217,19 +196,26 @@ class StoreItem {
       priceLabel: map['priceLabel'] ?? '',
       categoryId: map['categoryId'] ?? 'uncategorized',
       type: _typeFromString(map['type'] as String?),
-      effect: StoreCatalog.effectFromMap(map['effect'] as Map<String, dynamic>?),
-      artwork: StoreCatalog.artworkFromMap(map['artwork'] as Map<String, dynamic>?),
+      effect: StoreCatalog.effectFromMap(
+        map['effect'] as Map<String, dynamic>?,
+      ),
+      artwork: StoreCatalog.artworkFromMap(
+        map['artwork'] as Map<String, dynamic>?,
+      ),
       description: map['description'] as String?,
       tag: map['tag'] as String?,
       note: map['note'] as String?,
       highlighted: map['highlighted'] ?? false,
       features: List<String>.from(map['features'] ?? const []),
-      previewAssets:
-          StoreItemPreviewAssets.fromMap(map['preview'] as Map<String, dynamic>?),
-      fullAssets:
-          StoreItemFullAssets.fromMap(map['full'] as Map<String, dynamic>?),
-      tryOnConfig:
-          StoreItemTryOnConfig.fromMap(map['tryOn'] as Map<String, dynamic>?),
+      previewAssets: StoreItemPreviewAssets.fromMap(
+        map['preview'] as Map<String, dynamic>?,
+      ),
+      fullAssets: StoreItemFullAssets.fromMap(
+        map['full'] as Map<String, dynamic>?,
+      ),
+      tryOnConfig: StoreItemTryOnConfig.fromMap(
+        map['tryOn'] as Map<String, dynamic>?,
+      ),
     );
   }
 
@@ -275,10 +261,7 @@ class StorePackage {
   final StoreItem item;
   final Color color;
 
-  const StorePackage({
-    required this.item,
-    required this.color,
-  });
+  const StorePackage({required this.item, required this.color});
 }
 
 class StoreCatalog {
@@ -488,10 +471,7 @@ class StoreCatalog {
       tag: 'Profil',
       effect: StoreItemEffect(
         type: StoreItemEffectType.profileBackground,
-        backgroundGlow: [
-          const Color(0xFF311B92),
-          const Color(0xFFFD5678),
-        ],
+        backgroundGlow: [const Color(0xFF311B92), const Color(0xFFFD5678)],
       ),
       artwork: const StoreItemArtwork(
         colors: [Color(0xFF311B92), Color(0xFFE91E63)],
@@ -643,11 +623,7 @@ class StoreCatalog {
         colors: [Color(0xFF8E24AA), Color(0xFFBA68C8)],
         icon: Icons.start_rounded,
       ),
-      features: const [
-        '✓ Mor Tik (1 ay)',
-        '✓ 5 Çerçeve',
-        '✓ Temel Rozetler',
-      ],
+      features: const ['✓ Mor Tik (1 ay)', '✓ 5 Çerçeve', '✓ Temel Rozetler'],
       highlighted: true,
     ),
     StoreItem(
@@ -656,7 +632,8 @@ class StoreCatalog {
       priceLabel: '99.99₺',
       categoryId: 'packages',
       type: StoreItemType.bundle,
-      description: 'Mor Plus (2 ay), tüm çerçeveler, tüm filtreler, premium rozetler',
+      description:
+          'Mor Plus (2 ay), tüm çerçeveler, tüm filtreler, premium rozetler',
       effect: StoreItemEffect.none,
       artwork: const StoreItemArtwork(
         colors: [Color(0xFF00ACC1), Color(0xFF4DD0E1)],
@@ -763,9 +740,9 @@ class StoreCatalog {
         return StoreItemEffect(
           type: effectType,
           badgeIcon: Icons.emoji_events_outlined,
-          badgeColor: _colorFromAny(map['badgeColor']) ?? const Color(0xFFFFD54F),
-          badgeTextColor:
-              _colorFromAny(map['badgeTextColor']) ?? Colors.white,
+          badgeColor:
+              _colorFromAny(map['badgeColor']) ?? const Color(0xFFFFD54F),
+          badgeTextColor: _colorFromAny(map['badgeTextColor']) ?? Colors.white,
           badgeLabel: map['badgeLabel'] as String?,
         );
       case StoreItemEffectType.nameColor:
@@ -784,9 +761,7 @@ class StoreCatalog {
   }
 
   static Map<String, dynamic> effectToMap(StoreItemEffect effect) {
-    final map = <String, dynamic>{
-      'type': effect.type.name,
-    };
+    final map = <String, dynamic>{'type': effect.type.name};
 
     switch (effect.type) {
       case StoreItemEffectType.frame:
@@ -833,7 +808,7 @@ class StoreCatalog {
 
   static Map<String, dynamic> artworkToMap(StoreItemArtwork artwork) {
     return {
-  'colors': artwork.colors.map((color) => color.toARGB32()).toList(),
+      'colors': artwork.colors.map((color) => color.toARGB32()).toList(),
       'icon': artwork.icon.codePoint,
       'begin': [artwork.begin.x, artwork.begin.y],
       'end': [artwork.end.x, artwork.end.y],

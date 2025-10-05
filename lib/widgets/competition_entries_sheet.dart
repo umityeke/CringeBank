@@ -6,6 +6,7 @@ import '../services/cringe_entry_service.dart';
 import '../theme/app_theme.dart';
 import 'entry_comments_sheet.dart';
 import 'modern_cringe_card.dart';
+import '../utils/entry_actions.dart';
 
 class CompetitionEntriesSheet extends StatefulWidget {
   const CompetitionEntriesSheet({
@@ -18,12 +19,14 @@ class CompetitionEntriesSheet extends StatefulWidget {
   final ValueChanged<List<CringeEntry>>? onEntriesChanged;
 
   @override
-  State<CompetitionEntriesSheet> createState() => _CompetitionEntriesSheetState();
+  State<CompetitionEntriesSheet> createState() =>
+      _CompetitionEntriesSheetState();
 }
 
 class _CompetitionEntriesSheetState extends State<CompetitionEntriesSheet> {
   late List<CringeEntry> _entries;
   final Set<String> _locallyLikedEntryIds = <String>{};
+  final Set<String> _deletingEntryIds = <String>{};
 
   @override
   void initState() {
@@ -33,7 +36,10 @@ class _CompetitionEntriesSheetState extends State<CompetitionEntriesSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final totalComments = _entries.fold<int>(0, (sum, entry) => sum + entry.yorumSayisi);
+    final totalComments = _entries.fold<int>(
+      0,
+      (sum, entry) => sum + entry.yorumSayisi,
+    );
 
     return Container(
       decoration: const BoxDecoration(
@@ -61,13 +67,26 @@ class _CompetitionEntriesSheetState extends State<CompetitionEntriesSheet> {
                       physics: const BouncingScrollPhysics(),
                       itemBuilder: (context, index) {
                         final entry = _entries[index];
+                        final canManageEntry = EntryActionHelper.canManageEntry(
+                          entry,
+                        );
                         return ModernCringeCard(
                           entry: entry,
                           onLike: () => _handleLike(entry),
                           onComment: () => _openComments(entry),
+                          onEdit: canManageEntry
+                              ? () => _handleEditEntry(entry)
+                              : null,
+                          onDelete: canManageEntry
+                              ? () => _handleDeleteEntry(entry)
+                              : null,
+                          isDeleteInProgress: _deletingEntryIds.contains(
+                            entry.id,
+                          ),
                         );
                       },
-                      separatorBuilder: (_, __) => const SizedBox(height: AppTheme.spacingL),
+                      separatorBuilder: (context, _) =>
+                          const SizedBox(height: AppTheme.spacingL),
                       itemCount: _entries.length,
                     ),
             ),
@@ -150,7 +169,11 @@ class _CompetitionEntriesSheetState extends State<CompetitionEntriesSheet> {
                 shape: BoxShape.circle,
                 color: Colors.white.withValues(alpha: 0.08),
               ),
-              child: const Icon(Icons.forum_outlined, color: Colors.white70, size: 36),
+              child: const Icon(
+                Icons.forum_outlined,
+                color: Colors.white70,
+                size: 36,
+              ),
             ),
             const SizedBox(height: AppTheme.spacingM),
             Text(
@@ -166,6 +189,45 @@ class _CompetitionEntriesSheetState extends State<CompetitionEntriesSheet> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleEditEntry(CringeEntry entry) async {
+    final edited = await EntryActionHelper.editEntry(context, entry);
+    if (!mounted) return;
+    if (edited) {
+      setState(() {});
+      _notifyEntriesChanged();
+    }
+  }
+
+  Future<void> _handleDeleteEntry(CringeEntry entry) async {
+    if (_deletingEntryIds.contains(entry.id)) {
+      return;
+    }
+
+    setState(() => _deletingEntryIds.add(entry.id));
+
+    final deleted = await EntryActionHelper.confirmAndDeleteEntry(
+      context,
+      entry,
+    );
+
+    if (!mounted) {
+      _deletingEntryIds.remove(entry.id);
+      return;
+    }
+
+    setState(() {
+      _deletingEntryIds.remove(entry.id);
+      if (deleted) {
+        _entries = _entries.where((item) => item.id != entry.id).toList();
+        _locallyLikedEntryIds.remove(entry.id);
+      }
+    });
+
+    if (deleted) {
+      _notifyEntriesChanged();
+    }
   }
 
   Future<void> _handleLike(CringeEntry entry) async {

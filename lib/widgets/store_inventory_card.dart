@@ -22,9 +22,9 @@ class StoreInventoryCard extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-  color: Colors.white.withValues(alpha: 0.03),
+        color: Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(24),
-  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,7 +65,7 @@ class StoreInventoryCard extends StatelessWidget {
                     isEquipped: true,
                   );
                 },
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
                 itemCount: equippedItems.length,
               ),
             ),
@@ -126,16 +126,13 @@ class _SectionLabel extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _SectionLabel({
-    required this.icon,
-    required this.label,
-  });
+  const _SectionLabel({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-  Icon(icon, size: 18, color: Colors.white.withValues(alpha: 0.65)),
+        Icon(icon, size: 18, color: Colors.white.withValues(alpha: 0.65)),
         const SizedBox(width: 8),
         Text(
           label,

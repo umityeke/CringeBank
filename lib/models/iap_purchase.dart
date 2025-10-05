@@ -18,7 +18,10 @@ extension IapPurchaseStatusX on IapPurchaseStatus {
     }
   }
 
-  bool get isFinal => this == IapPurchaseStatus.success || this == IapPurchaseStatus.failed || this == IapPurchaseStatus.refunded;
+  bool get isFinal =>
+      this == IapPurchaseStatus.success ||
+      this == IapPurchaseStatus.failed ||
+      this == IapPurchaseStatus.refunded;
 }
 
 IapPurchaseStatus iapPurchaseStatusFromFirestore(String? raw) {
@@ -65,16 +68,23 @@ class IapPurchaseRecord {
   final DateTime? updatedAt;
 
   factory IapPurchaseRecord.fromMap(Map<String, dynamic> map, {String? id}) {
-    final resolvedId = (id ?? map['id'] ?? map['purchaseId'] ?? '').toString().trim();
+    final resolvedId = (id ?? map['id'] ?? map['purchaseId'] ?? '')
+        .toString()
+        .trim();
     return IapPurchaseRecord(
       id: resolvedId,
       userId: map['userId']?.toString() ?? '',
       productId: map['productId']?.toString() ?? '',
       storeSku: map['storeSku']?.toString() ?? '',
       platform: _platformFrom(map['platform']),
-      transactionId: (map['storeTransactionId'] ?? map['purchaseToken'] ?? map['transactionId'] ?? '').toString(),
+      transactionId:
+          (map['storeTransactionId'] ??
+                  map['purchaseToken'] ??
+                  map['transactionId'] ??
+                  '')
+              .toString(),
       status: iapPurchaseStatusFromFirestore(map['status']?.toString()),
-  amountCoins: _asInt(map['amountCoins'] ?? map['coinsAmount']) ?? 0,
+      amountCoins: _asInt(map['amountCoins'] ?? map['coinsAmount']) ?? 0,
       price: _asDouble(map['price']),
       currency: map['currency']?.toString(),
       createdAt: _asDate(map['createdAt']),
@@ -93,8 +103,8 @@ class IapPurchaseRecord {
       'amountCoins': amountCoins,
       if (price != null) 'price': price,
       if (currency != null) 'currency': currency,
-  if (createdAt != null) 'createdAt': Timestamp.fromDate(createdAt!),
-  if (updatedAt != null) 'updatedAt': Timestamp.fromDate(updatedAt!),
+      if (createdAt != null) 'createdAt': Timestamp.fromDate(createdAt!),
+      if (updatedAt != null) 'updatedAt': Timestamp.fromDate(updatedAt!),
     };
   }
 }

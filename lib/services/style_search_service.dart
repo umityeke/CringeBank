@@ -121,33 +121,37 @@ class StyleSearchService {
     final futures = <Future<void>>[];
 
     final postsWatch = Stopwatch()..start();
-    futures.add(Future(() async {
-      postResult = await CringeSearchService.search(
-        query: hasMeaningfulQuery ? query : '',
-        filter: filter,
-        sortBy: sortBy,
-        limit: postsLimit,
-      );
-      timings['posts'] = postsWatch.elapsed;
-    }));
+    futures.add(
+      Future(() async {
+        postResult = await CringeSearchService.search(
+          query: hasMeaningfulQuery ? query : '',
+          filter: filter,
+          sortBy: sortBy,
+          limit: postsLimit,
+        );
+        timings['posts'] = postsWatch.elapsed;
+      }),
+    );
 
     final accountsWatch = Stopwatch()..start();
-    futures.add(Future(() async {
-      if (hasMeaningfulQuery) {
-        accountResult = await CringeSearchService.searchUsers(
-          query: query,
-          limit: limitPerSection,
-        );
-      } else {
-        accountResult = const UserSearchResult(
-          users: [],
-          totalCount: 0,
-          searchDuration: Duration.zero,
-          matchedTokens: [],
-        );
-      }
-      timings['accounts'] = accountsWatch.elapsed;
-    }));
+    futures.add(
+      Future(() async {
+        if (hasMeaningfulQuery) {
+          accountResult = await CringeSearchService.searchUsers(
+            query: query,
+            limit: limitPerSection,
+          );
+        } else {
+          accountResult = const UserSearchResult(
+            users: [],
+            totalCount: 0,
+            searchDuration: Duration.zero,
+            matchedTokens: [],
+          );
+        }
+        timings['accounts'] = accountsWatch.elapsed;
+      }),
+    );
 
     await Future.wait(futures);
 
@@ -237,10 +241,13 @@ class StyleSearchService {
         final key = normalizedTag.ascii;
         final current = stats[key] ?? _HashtagStats(tag: rawTag);
         current.count++;
-        current.isTrending = current.isTrending ||
-            trending.any((tag) =>
-                SearchNormalizer.buildNormalization(tag).ascii ==
-                normalizedTag.ascii);
+        current.isTrending =
+            current.isTrending ||
+            trending.any(
+              (tag) =>
+                  SearchNormalizer.buildNormalization(tag).ascii ==
+                  normalizedTag.ascii,
+            );
 
         if (asciiQuery.isNotEmpty &&
             normalizedTag.ascii.startsWith(asciiQuery)) {
@@ -276,17 +283,18 @@ class StyleSearchService {
         score: score,
         isTrending: value.isTrending,
       );
-    }).toList()
-      ..sort((a, b) => b.score.compareTo(a.score));
+    }).toList()..sort((a, b) => b.score.compareTo(a.score));
 
     final items = hashtags
         .take(limitPerSection)
-        .map((candidate) => StyleSearchHashtag(
-              tag: candidate.tag,
-              postCount: candidate.count,
-              trendScore: candidate.score,
-              isTrending: candidate.isTrending,
-            ))
+        .map(
+          (candidate) => StyleSearchHashtag(
+            tag: candidate.tag,
+            postCount: candidate.count,
+            trendScore: candidate.score,
+            isTrending: candidate.isTrending,
+          ),
+        )
         .toList(growable: false);
 
     watch.stop();
@@ -317,38 +325,40 @@ class StyleSearchService {
 
     final asciiQuery = normalized.ascii;
 
-    for (var i = 0;
-        i < min(3, accounts.items.length);
-        i++) {
+    for (var i = 0; i < min(3, accounts.items.length); i++) {
       final user = accounts.items[i];
       final score = _scoreAccount(user, asciiQuery, rank: i);
-      results.add(StyleSearchTopResult(
-        type: StyleSearchEntityType.account,
-        item: user,
-        score: score,
-      ));
+      results.add(
+        StyleSearchTopResult(
+          type: StyleSearchEntityType.account,
+          item: user,
+          score: score,
+        ),
+      );
     }
 
-    for (var i = 0;
-        i < min(3, hashtags.items.length);
-        i++) {
+    for (var i = 0; i < min(3, hashtags.items.length); i++) {
       final hashtag = hashtags.items[i];
       final score = _scoreHashtag(hashtag, asciiQuery, rank: i);
-      results.add(StyleSearchTopResult(
-        type: StyleSearchEntityType.hashtag,
-        item: hashtag,
-        score: score,
-      ));
+      results.add(
+        StyleSearchTopResult(
+          type: StyleSearchEntityType.hashtag,
+          item: hashtag,
+          score: score,
+        ),
+      );
     }
 
     for (var i = 0; i < min(3, posts.items.length); i++) {
       final post = posts.items[i];
       final score = _scorePost(post, rank: i);
-      results.add(StyleSearchTopResult(
-        type: StyleSearchEntityType.post,
-        item: post,
-        score: score,
-      ));
+      results.add(
+        StyleSearchTopResult(
+          type: StyleSearchEntityType.post,
+          item: post,
+          score: score,
+        ),
+      );
     }
 
     results.sort((a, b) => b.score.compareTo(a.score));
@@ -387,7 +397,8 @@ class StyleSearchService {
     final verifiedBoost = user.isVerified ? 0.2 : 0.0;
     final premiumBoost = user.isPremium ? 0.05 : 0.0;
     final base = 1.0 - min(rank, 5) * 0.1;
-    final nameMatch = asciiQuery.isNotEmpty &&
+    final nameMatch =
+        asciiQuery.isNotEmpty &&
             (user.username.toLowerCase().contains(asciiQuery) ||
                 user.fullName.toLowerCase().contains(asciiQuery))
         ? 0.25
@@ -396,24 +407,26 @@ class StyleSearchService {
         .clamp(0, 2.5);
   }
 
-  static double _scoreHashtag(StyleSearchHashtag hashtag, String asciiQuery,
-      {int rank = 0}) {
+  static double _scoreHashtag(
+    StyleSearchHashtag hashtag,
+    String asciiQuery, {
+    int rank = 0,
+  }) {
     final base = 0.9 - min(rank, 5) * 0.08;
     final popularity = log(hashtag.postCount + 1) / 8;
     final trendingBoost = hashtag.isTrending ? 0.25 : 0.0;
-    final matchBoost = asciiQuery.isNotEmpty &&
+    final matchBoost =
+        asciiQuery.isNotEmpty &&
             hashtag.tag.toLowerCase().startsWith(asciiQuery)
         ? 0.2
         : 0.0;
-    return (base + popularity + trendingBoost + matchBoost)
-        .clamp(0, 2.0);
+    return (base + popularity + trendingBoost + matchBoost).clamp(0, 2.0);
   }
 
   static double _scorePost(CringeEntry entry, {int rank = 0}) {
     final base = 0.8 - min(rank, 5) * 0.1;
     final popularity = log(entry.begeniSayisi + entry.yorumSayisi + 1) / 8;
-    final recencyMinutes =
-        DateTime.now().difference(entry.createdAt).inMinutes;
+    final recencyMinutes = DateTime.now().difference(entry.createdAt).inMinutes;
     final recencyBoost = recencyMinutes <= 0
         ? 0.3
         : max(0.0, 0.3 - log(recencyMinutes + 1) / 10);

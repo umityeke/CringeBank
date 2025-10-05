@@ -1,5 +1,64 @@
 import 'package:flutter/material.dart';
 
+// Content Moderation Status
+enum ModerationStatus {
+  pending('pending', 'Moderasyon Bekliyor', Colors.orange),
+  approved('approved', 'Onaylandı', Colors.green),
+  rejected('rejected', 'Reddedildi', Colors.red),
+  blocked('blocked', 'Engellendi', Colors.grey);
+
+  const ModerationStatus(this.value, this.label, this.color);
+  final String value;
+  final String label;
+  final Color color;
+
+  static ModerationStatus fromString(String? value) {
+    return ModerationStatus.values.firstWhere(
+      (status) => status.value == value,
+      orElse: () => ModerationStatus.pending,
+    );
+  }
+}
+
+// Post Type (5 types from security contract)
+enum PostType {
+  spill('spill', 'Spill', 'Metin odaklı paylaşım', Icons.article, 1, 2000, 0, 1),
+  clap('clap', 'Clap', 'Kısa vurucu metin', Icons.flash_on, 1, 140, 0, 1),
+  frame('frame', 'Frame', 'Görsel paylaşım', Icons.image, 0, 1000, 1, 20),
+  cringecast('cringecast', 'CringeCast', 'Video paylaşım', Icons.video_library, 0, 1000, 1, 1),
+  mash('mash', 'Mash', 'Karışık medya', Icons.collections, 0, 2000, 1, 5);
+
+  const PostType(
+    this.value,
+    this.label,
+    this.description,
+    this.icon,
+    this.minTextLength,
+    this.maxTextLength,
+    this.minMedia,
+    this.maxMedia,
+  );
+
+  final String value;
+  final String label;
+  final String description;
+  final IconData icon;
+  final int minTextLength;
+  final int maxTextLength;
+  final int minMedia;
+  final int maxMedia;
+
+  bool get requiresText => minTextLength > 0;
+  bool get requiresMedia => minMedia > 0;
+
+  static PostType fromString(String? value) {
+    return PostType.values.firstWhere(
+      (type) => type.value == value,
+      orElse: () => PostType.spill,
+    );
+  }
+}
+
 enum CringeCategory {
   fizikselRezillik(
     'Fiziksel Rezillik',
@@ -81,7 +140,7 @@ enum CringeCategory {
 
 class CringeEntry {
   final String id;
-  final String userId;
+  final String userId; // ownerId in Firestore rules
   final String baslik;
   final String aciklama;
   final CringeCategory kategori;
@@ -96,11 +155,18 @@ class CringeEntry {
   final double? borsaDegeri; // Premium kullanıcılar için borsa değeri
 
   // Twitter-style eklenen alanlar
-  final List<String> imageUrls; // Çoklu resim desteği
+  final List<String> imageUrls; // Çoklu resim desteği (media paths)
   final int retweetSayisi;
   final String authorName; // Görünür isim
   final String authorHandle; // @username
   final String? authorAvatarUrl; // Profil resmi URL'i
+
+  // === SECURITY CONTRACT FIELDS ===
+  final PostType type; // spill, clap, frame, cringecast, mash
+  final ModerationStatus status; // pending, approved, rejected, blocked
+  final DateTime? updatedAt; // Son güncelleme zamanı
+  final Map<String, dynamic>? moderation; // Moderasyon notları (only mods can write)
+  final List<String> media; // Storage paths: user_uploads/{ownerId}/{postId}/filename
 
   const CringeEntry({
     required this.id,
@@ -122,6 +188,12 @@ class CringeEntry {
     this.videoUrl,
     this.borsaDegeri,
     this.authorAvatarUrl,
+    // Security contract fields
+    this.type = PostType.spill,
+    this.status = ModerationStatus.pending,
+    this.updatedAt,
+    this.moderation,
+    this.media = const [],
   });
 
   static int _parseInt(dynamic value) {
@@ -221,27 +293,37 @@ class CringeEntry {
   factory CringeEntry.fromJson(Map<String, dynamic> json) {
     return CringeEntry(
       id: json['id'],
-      userId: json['userId'],
+      userId: json['userId'] ?? json['ownerId'], // Support both field names
       authorName: json['authorName'] ?? 'Anonim',
       authorHandle: json['authorHandle'] ?? '@anonim',
-      baslik: json['baslik'],
-      aciklama: json['aciklama'],
+      baslik: json['baslik'] ?? json['text'] ?? '',
+      aciklama: json['aciklama'] ?? json['text'] ?? '',
       kategori: CringeCategory.values.firstWhere(
         (cat) => cat.name == json['kategori'],
         orElse: () => CringeCategory.fizikselRezillik,
       ),
-      krepSeviyesi: (json['krepSeviyesi'] as num).toDouble(),
-      createdAt: DateTime.parse(json['createdAt']),
+      krepSeviyesi: (json['krepSeviyesi'] as num?)?.toDouble() ?? 0.0,
+      createdAt: json['createdAt'] is int
+          ? DateTime.fromMillisecondsSinceEpoch(json['createdAt'])
+          : DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
       etiketler: List<String>.from(json['etiketler'] ?? []),
       isAnonim: json['isAnonim'] ?? false,
       begeniSayisi: _parseInt(json['begeniSayisi']),
       yorumSayisi: _parseInt(json['yorumSayisi']),
       retweetSayisi: _parseInt(json['retweetSayisi']),
-      imageUrls: List<String>.from(json['imageUrls'] ?? []),
+      imageUrls: List<String>.from(json['imageUrls'] ?? json['media'] ?? []),
       audioUrl: json['audioUrl'],
       videoUrl: json['videoUrl'],
       borsaDegeri: json['borsaDegeri']?.toDouble(),
       authorAvatarUrl: json['authorAvatarUrl'],
+      // Security contract fields
+      type: PostType.fromString(json['type']),
+      status: ModerationStatus.fromString(json['status']),
+      updatedAt: json['updatedAt'] is int
+          ? DateTime.fromMillisecondsSinceEpoch(json['updatedAt'])
+          : (json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null),
+      moderation: json['moderation'] as Map<String, dynamic>?,
+      media: List<String>.from(json['media'] ?? json['imageUrls'] ?? []),
     );
   }
 
@@ -254,13 +336,15 @@ class CringeEntry {
     return {
       'id': id,
       'userId': userId,
+      'ownerId': userId, // Firestore rules expect 'ownerId'
       'authorName': authorName,
       'authorHandle': authorHandle,
       'baslik': baslik,
       'aciklama': aciklama,
+      'text': baslik.isNotEmpty ? baslik : aciklama, // For rules validation
       'kategori': kategori.name,
       'krepSeviyesi': krepSeviyesi,
-      'createdAt': createdAt.toIso8601String(),
+      'createdAt': createdAt.millisecondsSinceEpoch, // int for Firestore rules
       'etiketler': etiketler,
       'isAnonim': isAnonim,
       'begeniSayisi': begeniSayisi,
@@ -271,6 +355,12 @@ class CringeEntry {
       'videoUrl': videoUrl,
       'borsaDegeri': borsaDegeri,
       'authorAvatarUrl': authorAvatarUrl,
+      // Security contract fields
+      'type': type.value,
+      'status': status.value,
+      'updatedAt': updatedAt?.millisecondsSinceEpoch,
+      'moderation': moderation,
+      'media': media,
     };
   }
 
@@ -294,6 +384,11 @@ class CringeEntry {
     String? videoUrl,
     double? borsaDegeri,
     String? authorAvatarUrl,
+    PostType? type,
+    ModerationStatus? status,
+    DateTime? updatedAt,
+    Map<String, dynamic>? moderation,
+    List<String>? media,
   }) {
     return CringeEntry(
       id: id ?? this.id,
@@ -315,53 +410,100 @@ class CringeEntry {
       videoUrl: videoUrl ?? this.videoUrl,
       borsaDegeri: borsaDegeri ?? this.borsaDegeri,
       authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
+      type: type ?? this.type,
+      status: status ?? this.status,
+      updatedAt: updatedAt ?? this.updatedAt,
+      moderation: moderation ?? this.moderation,
+      media: media ?? this.media,
     );
   }
 
   // Firestore için factory constructor
   factory CringeEntry.fromFirestore(Map<String, dynamic> data) {
+    // Parse createdAt - could be Firestore Timestamp or int milliseconds
+    DateTime parsedCreatedAt;
+    if (data['createdAt'] != null) {
+      final createdAtValue = data['createdAt'];
+      if (createdAtValue is int) {
+        parsedCreatedAt = DateTime.fromMillisecondsSinceEpoch(createdAtValue);
+      } else if (createdAtValue.toString().contains('-')) {
+        parsedCreatedAt = DateTime.parse(createdAtValue.toString());
+      } else {
+        // Assume Firestore Timestamp
+        parsedCreatedAt = (createdAtValue as dynamic).toDate();
+      }
+    } else {
+      parsedCreatedAt = DateTime.now();
+    }
+
+    // Parse updatedAt similarly
+    DateTime? parsedUpdatedAt;
+    if (data['updatedAt'] != null) {
+      final updatedAtValue = data['updatedAt'];
+      if (updatedAtValue is int) {
+        parsedUpdatedAt = DateTime.fromMillisecondsSinceEpoch(updatedAtValue);
+      } else if (updatedAtValue.toString().contains('-')) {
+        parsedUpdatedAt = DateTime.parse(updatedAtValue.toString());
+      } else {
+        parsedUpdatedAt = (updatedAtValue as dynamic).toDate();
+      }
+    }
+
     return CringeEntry(
       id: data['id'] ?? '',
-      userId: data['userId'] ?? '',
+      userId: data['ownerId'] ?? data['userId'] ?? '', // Firestore rules use 'ownerId'
       authorName: data['authorName'] ?? data['username'] ?? 'Anonim',
       authorHandle: data['authorHandle'] ?? '@${data['username'] ?? 'anonim'}',
       baslik: data['baslik'] ?? data['title'] ?? '',
       aciklama: data['aciklama'] ?? data['description'] ?? '',
-      kategori: data['kategori'] != null 
-          ? CringeCategory.values[data['kategori'] % CringeCategory.values.length]
+      kategori: data['kategori'] != null
+          ? CringeCategory.values[data['kategori'] %
+                CringeCategory.values.length]
           : CringeCategory.values.firstWhere(
               (cat) => cat.name == data['category'],
               orElse: () => CringeCategory.fizikselRezillik,
             ),
       krepSeviyesi: (data['krepSeviyesi'] ?? data['krepValue'] ?? 0).toDouble(),
-      createdAt: data['createdAt'] != null 
-          ? (data['createdAt'] as dynamic).toDate()
-          : DateTime.now(),
+      createdAt: parsedCreatedAt,
       begeniSayisi: _parseInt(data['begeniSayisi'] ?? data['likes']),
       yorumSayisi: _parseInt(data['yorumSayisi'] ?? data['comments']),
       retweetSayisi: _parseInt(data['retweetSayisi'] ?? data['retweets']),
       imageUrls: List<String>.from(data['imageUrls'] ?? []),
       authorAvatarUrl: data['authorAvatarUrl'],
       isAnonim: data['isAnonim'] ?? false,
+      // Security contract fields
+      type: data['type'] != null ? PostType.fromString(data['type']) : PostType.spill,
+      status: data['status'] != null ? ModerationStatus.fromString(data['status']) : ModerationStatus.pending,
+      updatedAt: parsedUpdatedAt,
+      moderation: data['moderation'] != null ? Map<String, dynamic>.from(data['moderation']) : null,
+      media: data['media'] != null ? List<String>.from(data['media']) : [],
     );
   }
 
   // Firestore için Map'e çevir
   Map<String, dynamic> toFirestore() {
     return {
-      'userId': userId,
+      'ownerId': userId, // Firestore rules expect 'ownerId'
+      'userId': userId, // Keep for backward compatibility
       'username': authorHandle.replaceAll('@', ''),
       'authorName': authorName,
       'title': baslik,
       'description': aciklama,
+      'text': baslik.isNotEmpty ? baslik : aciklama, // For rules validation
       'category': kategori.name,
       'krepValue': krepSeviyesi,
-      'createdAt': createdAt,
+      'createdAt': createdAt.millisecondsSinceEpoch, // int for Firestore rules
       'likes': begeniSayisi,
       'comments': yorumSayisi,
       'retweets': retweetSayisi,
       'imageUrls': imageUrls,
       'authorAvatarUrl': authorAvatarUrl,
+      // Security contract fields
+      'type': type.value,
+      'status': status.value,
+      'updatedAt': updatedAt?.millisecondsSinceEpoch,
+      'moderation': moderation,
+      'media': media,
     };
   }
 

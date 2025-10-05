@@ -29,19 +29,23 @@ class ConnectivityService {
       final initialResults = await _connectivity.checkConnectivity();
       _handleConnectivityResults(initialResults);
     } catch (error) {
-      debugPrint('⚠️ Connectivity check failed: $error');
+      debugPrint('âš ï¸ Connectivity check failed: $error');
     }
 
     _subscription = _connectivity.onConnectivityChanged.listen(
       _handleConnectivityResults,
-      onError: (error) => debugPrint('⚠️ Connectivity stream error: $error'),
+      onError: (error) =>
+          debugPrint('âš ï¸ Connectivity stream error: $error'),
     );
   }
 
   void _handleConnectivityResults(List<ConnectivityResult> results) {
-    final hasConnection = results.any((result) => result != ConnectivityResult.none);
-    final nextStatus =
-        hasConnection ? ConnectivityStatus.online : ConnectivityStatus.offline;
+    final hasConnection = results.any(
+      (result) => result != ConnectivityResult.none,
+    );
+    final nextStatus = hasConnection
+        ? ConnectivityStatus.online
+        : ConnectivityStatus.offline;
 
     if (statusNotifier.value != nextStatus) {
       statusNotifier.value = nextStatus;

@@ -1,0 +1,113 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // ====================================================================
+    // HELPER FUNCTIONS - Authentication & Authorization
+    // ====================================================================
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isModerator() {
+      return isSignedIn() && request.auth.token.moderator == true;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isOwnerOrModerator(uid) {
+      return isOwner(uid) || isModerator();
+    }
+
+    // ====================================================================
+    // HELPER FUNCTIONS - Validation
+    // ====================================================================
+    
+    function validStatus(status) {
+      return status == 'pending'
+        || status == 'approved'
+        || status == 'rejected'
+        || status == 'blocked';
+    }
+
+    function requestStatus() {
+      return request.resource.metadata.status;
+    }
+
+    function resourceStatus() {
+      return resource.metadata.status;
+    }
+
+    function metadataPostIdMatches(postId) {
+      return request.resource.metadata.postId == postId;
+    }
+
+    function contentTypeAllowed() {
+      return request.resource.contentType.matches('image/.+')
+        || request.resource.contentType.matches('video/.+');
+    }
+
+    function sizeAllowed() {
+      // Max file size: 25 MB
+      return request.resource.size <= 25 * 1024 * 1024;
+    }
+
+    function requiredMetadataPresent() {
+      return request.resource.metadata.keys().hasAll(['postId', 'status']);
+    }
+
+    function canReadBasedOnStatus(uid) {
+      return resourceStatus() == 'approved'
+        || ((resourceStatus() == 'pending' || resourceStatus() == 'rejected')
+          && isOwnerOrModerator(uid))
+        || (resourceStatus() == 'blocked' && isModerator());
+    }
+
+    // ====================================================================
+    // STORAGE RULES - USER UPLOADS
+    // Path: user_uploads/{uid}/{postId}/{fileName}
+    // ====================================================================
+    
+    match /user_uploads/{uid}/{postId}/{fileName} {
+      // READ: Public if approved, owner/moderator for pending/rejected,
+      //       only moderator for blocked
+      allow read: if resource.exists() && canReadBasedOnStatus(uid);
+
+      // CREATE: Only owner can upload to their own folder
+      //         Must set metadata: postId, status (pending)
+      //         File type: image/* or video/*
+      //         Max size: 25 MB
+      allow create: if isOwner(uid)
+        && requiredMetadataPresent()
+        && metadataPostIdMatches(postId)
+        && request.resource.metadata.status is string
+        && requestStatus() == 'pending'
+        && contentTypeAllowed()
+        && sizeAllowed();
+
+      // UPDATE: Owner can update metadata (pending only)
+      //         Moderator can update to any status
+      //         Metadata structure must remain consistent
+      allow update: if ((isOwner(uid) && requestStatus() == 'pending') || isModerator())
+        && requiredMetadataPresent()
+        && metadataPostIdMatches(postId)
+        && request.resource.metadata.status is string
+        && validStatus(requestStatus())
+        && contentTypeAllowed()
+        && sizeAllowed();
+
+      // DELETE: Owner can delete their own files, moderator can delete any
+      allow delete: if isOwnerOrModerator(uid);
+    }
+
+    // ====================================================================
+    // DEFAULT RULE - Deny everything else
+    // ====================================================================
+    
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

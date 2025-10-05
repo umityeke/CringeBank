@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../data/store_catalog.dart';
@@ -12,6 +13,9 @@ import '../services/store_service.dart';
 import '../services/user_service.dart';
 import '../widgets/animated_bubble_background.dart';
 import '../widgets/modern_cringe_card.dart';
+import '../utils/entry_actions.dart';
+import '../utils/safe_haptics.dart';
+import 'cringe_entry_detail_screen.dart';
 import 'cringe_store_screen.dart';
 import 'modern_login_screen.dart';
 import 'profile_edit_screen.dart';
@@ -52,10 +56,7 @@ class _BadgeChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(
-              color: textColor,
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -70,6 +71,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
   bool _isFollowStateLoading = false;
   bool _isFollowActionInProgress = false;
   String? _activeProfileUserId;
+  final Set<String> _deletingEntryIds = <String>{};
 
   String? get _requestedUserId => widget.userId ?? widget.initialUser?.id;
 
@@ -110,8 +112,8 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
   }
 
   bool _canEditProfile(User user) {
-  final firebaseUser = UserService.instance.firebaseUser;
-  final firebaseUserId = firebaseUser?.uid.trim();
+    final firebaseUser = UserService.instance.firebaseUser;
+    final firebaseUserId = firebaseUser?.uid.trim();
     if (firebaseUserId == null || firebaseUserId.isEmpty) {
       return false;
     }
@@ -120,7 +122,8 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
       if (user.id.trim().isNotEmpty) user.id.trim(),
       if (widget.userId != null && widget.userId!.trim().isNotEmpty)
         widget.userId!.trim(),
-      if (widget.initialUser != null && widget.initialUser!.id.trim().isNotEmpty)
+      if (widget.initialUser != null &&
+          widget.initialUser!.id.trim().isNotEmpty)
         widget.initialUser!.id.trim(),
     };
 
@@ -165,9 +168,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
 
       final firebaseUser = UserService.instance.firebaseUser;
       if (firebaseUser != null) {
-        print(
-          '_loadProfileUser - Loading Firebase user: ${firebaseUser.uid}',
-        );
+        print('_loadProfileUser - Loading Firebase user: ${firebaseUser.uid}');
         await UserService.instance.loadUserData(firebaseUser.uid);
         return UserService.instance.currentUser;
       }
@@ -275,11 +276,10 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
       if (_isFollowingTarget) {
         final result = await UserService.instance.unfollowUser(targetId);
         if (result) {
-          final updatedFollowers =
-              user.followersCount > 0 ? user.followersCount - 1 : 0;
-          final updatedUser = user.copyWith(
-            followersCount: updatedFollowers,
-          );
+          final updatedFollowers = user.followersCount > 0
+              ? user.followersCount - 1
+              : 0;
+          final updatedUser = user.copyWith(followersCount: updatedFollowers);
           if (!mounted) return;
           setState(() {
             _isFollowingTarget = false;
@@ -306,10 +306,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     } on StateError catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
       );
     } catch (e) {
       if (!mounted) return;
@@ -364,10 +361,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     );
   }
 
-  Widget _buildFollowActionArea(
-    User user, {
-    required bool isOwnProfile,
-  }) {
+  Widget _buildFollowActionArea(User user, {required bool isOwnProfile}) {
     if (isOwnProfile) {
       return const SizedBox.shrink();
     }
@@ -385,16 +379,18 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
           children: [
             Expanded(
               child: FilledButton.icon(
-                onPressed:
-                    isLoading ? null : () => _onFollowActionPressed(user),
+                onPressed: isLoading
+                    ? null
+                    : () => _onFollowActionPressed(user),
                 icon: isLoading
                     ? const SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       )
                     : Icon(followIcon),
@@ -403,8 +399,9 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 style: FilledButton.styleFrom(
-                  backgroundColor:
-                      isFollowing ? const Color(0xFF1E1E1E) : Colors.orange,
+                  backgroundColor: isFollowing
+                      ? const Color(0xFF1E1E1E)
+                      : Colors.orange,
                   foregroundColor: isFollowing ? Colors.white : Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
@@ -421,9 +418,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                 ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
-                  side: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.4),
-                  ),
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
               ),
@@ -476,7 +471,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
       return;
     }
 
-  final editableUser = currentUser;
+    final editableUser = currentUser;
     if (!mounted) return;
     final result = await Navigator.push(
       context,
@@ -552,9 +547,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.orange.withValues(alpha: 0.3),
-                ),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -621,9 +614,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.12),
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -646,10 +637,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                   SizedBox(height: 12),
                   Text(
                     'Aradığınız kullanıcı kaldırılmış veya mevcut değil.',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 15,
-                    ),
+                    style: TextStyle(color: Colors.white70, fontSize: 15),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -672,10 +660,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
               child: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      Color(0xFF121B2E),
-                      Color(0xFF090C14),
-                    ],
+                    colors: [Color(0xFF121B2E), Color(0xFF090C14)],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                   ),
@@ -724,7 +709,11 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                     ),
                     actions: [
                       Container(
-                        margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+                        margin: const EdgeInsets.only(
+                          right: 8,
+                          top: 8,
+                          bottom: 8,
+                        ),
                         child: ElevatedButton.icon(
                           icon: const Icon(
                             Icons.store_rounded,
@@ -769,10 +758,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildHeaderCard(
-                            user,
-                            isOwnProfile: isOwnProfile,
-                          ),
+                          _buildHeaderCard(user, isOwnProfile: isOwnProfile),
                           const SizedBox(height: 12),
                           _buildStatsGrid(user),
                           const SizedBox(height: 16),
@@ -794,19 +780,18 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     );
   }
 
-
-
   Widget _buildHeaderCard(User user, {required bool isOwnProfile}) {
     final theme = Theme.of(context);
-    final displayName =
-        user.fullName.isNotEmpty ? user.fullName : user.username;
+    final displayName = user.fullName.isNotEmpty
+        ? user.fullName
+        : user.username;
     final frameEffect = _storeService.resolveFrameEffect(user);
     final backgroundEffect = _storeService.resolveBackgroundEffect(user);
     final badgeEffects = _storeService.resolveBadgeEffects(user);
     final nameColor = _storeService.resolveNameColor(user);
     final backgroundGlow = backgroundEffect.backgroundGlow ?? const <Color>[];
-  final canEditProfile = _canEditProfile(user);
-  final showOwnerActions = isOwnProfile && canEditProfile;
+    final canEditProfile = _canEditProfile(user);
+    final showOwnerActions = isOwnProfile && canEditProfile;
 
     const baseGradient = LinearGradient(
       colors: [Color(0xFF1C1A24), Color(0xFF14111C)],
@@ -819,10 +804,11 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-      color: (backgroundGlow.isNotEmpty
-          ? backgroundGlow.first
-          : Colors.orange)
-        .withValues(alpha: 0.25),
+            color:
+                (backgroundGlow.isNotEmpty
+                        ? backgroundGlow.first
+                        : Colors.orange)
+                    .withValues(alpha: 0.25),
             blurRadius: 42,
             spreadRadius: 2,
             offset: const Offset(0, 28),
@@ -844,8 +830,9 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                   decoration: BoxDecoration(
                     gradient: RadialGradient(
                       colors: [
-            ...backgroundGlow
-              .map((color) => color.withValues(alpha: 0.35)),
+                        ...backgroundGlow.map(
+                          (color) => color.withValues(alpha: 0.35),
+                        ),
                         Colors.transparent,
                       ],
                       radius: 1.05,
@@ -894,8 +881,9 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                                 shadows: nameColor != null
                                     ? [
                                         Shadow(
-                      color:
-                        nameColor.withValues(alpha: 0.35),
+                                          color: nameColor.withValues(
+                                            alpha: 0.35,
+                                          ),
                                           blurRadius: 16,
                                         ),
                                       ]
@@ -974,10 +962,10 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                             style: FilledButton.styleFrom(
                               backgroundColor: const Color(0xFFFFB74D),
                               foregroundColor: Colors.black,
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 16),
-                              textStyle:
-                                  const TextStyle(fontWeight: FontWeight.w600),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              textStyle: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             onPressed: () => _navigateToEditProfile(user),
                           ),
@@ -992,10 +980,10 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                               side: BorderSide(
                                 color: Colors.white.withValues(alpha: 0.35),
                               ),
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 16),
-                              textStyle:
-                                  const TextStyle(fontWeight: FontWeight.w600),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              textStyle: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             onPressed: () {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -1013,12 +1001,8 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                         ),
                       ],
                     ),
-                  ]
-                  else if (!isOwnProfile) ...[
-                    _buildFollowActionArea(
-                      user,
-                      isOwnProfile: isOwnProfile,
-                    ),
+                  ] else if (!isOwnProfile) ...[
+                    _buildFollowActionArea(user, isOwnProfile: isOwnProfile),
                   ],
                 ],
               ),
@@ -1035,17 +1019,19 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     required StoreItemEffect backgroundEffect,
   }) {
     final avatarRadius = 46.0;
-    final bytes = _decodeAvatar(user.avatar);
+    final avatarValue = user.avatar.trim();
+    final bytes = _decodeAvatar(avatarValue);
 
-    final frameGradient = frameEffect.frameGradient ??
-        const LinearGradient(
-          colors: [Color(0xFFFFA726), Color(0xFFFF7043)],
-        );
-  final frameBorder =
-    frameEffect.frameBorderWidth.clamp(2.0, 12.0).toDouble();
+    final frameGradient =
+        frameEffect.frameGradient ??
+        const LinearGradient(colors: [Color(0xFFFFA726), Color(0xFFFF7043)]);
+    final frameBorder = frameEffect.frameBorderWidth
+        .clamp(2.0, 12.0)
+        .toDouble();
     final glowColors = backgroundEffect.backgroundGlow ?? const <Color>[];
-    final glowColor =
-        glowColors.isNotEmpty ? glowColors.first : const Color(0xFFFFA726);
+    final glowColor = glowColors.isNotEmpty
+        ? glowColors.first
+        : const Color(0xFFFFA726);
 
     return Stack(
       alignment: Alignment.center,
@@ -1058,9 +1044,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  ...glowColors.map(
-                    (color) => color.withValues(alpha: 0.35),
-                  ),
+                  ...glowColors.map((color) => color.withValues(alpha: 0.35)),
                   Colors.transparent,
                 ],
                 radius: 0.9,
@@ -1085,33 +1069,17 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
             margin: EdgeInsets.all(frameBorder),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.45),
-                  width: 2.4,
-                ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.45),
+                width: 2.4,
+              ),
             ),
             child: ClipOval(
-              child: bytes != null
-                  ? Image.memory(bytes, fit: BoxFit.cover)
-                  : Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF2C3350), Color(0xFF1F2538)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          _buildAvatarFallbackInitial(user),
-                          style: const TextStyle(
-                            fontSize: 28,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
+              child: _buildAvatarContent(
+                avatarValue: avatarValue,
+                bytes: bytes,
+                fallbackInitial: _buildAvatarFallbackInitial(user),
+              ),
             ),
           ),
         ),
@@ -1123,8 +1091,8 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     final source = user.fullName.trim().isNotEmpty
         ? user.fullName.trim()
         : user.username.trim().isNotEmpty
-            ? user.username.trim()
-            : user.email.trim();
+        ? user.username.trim()
+        : user.email.trim();
 
     if (source.isEmpty) {
       return '👤';
@@ -1136,6 +1104,58 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     }
 
     return String.fromCharCode(firstRune).toUpperCase();
+  }
+
+  Widget _buildAvatarContent({
+    required String avatarValue,
+    required Uint8List? bytes,
+    required String fallbackInitial,
+  }) {
+    if (avatarValue.startsWith('http')) {
+      return CachedNetworkImage(
+        imageUrl: avatarValue,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => _buildAvatarPlaceholder(fallbackInitial),
+        errorWidget: (context, url, error) =>
+            _buildAvatarPlaceholder(fallbackInitial),
+      );
+    }
+
+    if (bytes != null) {
+      return Image.memory(bytes, fit: BoxFit.cover);
+    }
+
+    if (avatarValue == '👤') {
+      return _buildAvatarPlaceholder(fallbackInitial);
+    }
+
+    if (avatarValue.isNotEmpty && avatarValue.length <= 3) {
+      return _buildAvatarPlaceholder(avatarValue);
+    }
+
+    return _buildAvatarPlaceholder(fallbackInitial);
+  }
+
+  Widget _buildAvatarPlaceholder(String label) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF2C3350), Color(0xFF1F2538)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 28,
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
   }
 
   Uint8List? _decodeAvatar(String rawAvatar) {
@@ -1161,7 +1181,80 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     }
   }
 
+  Future<void> _openEntryDetail(
+    CringeEntry entry, {
+    required bool canManageEntry,
+  }) async {
+    SafeHaptics.selection();
 
+    final result = await Navigator.of(context).push<CringeEntryDetailResult>(
+      MaterialPageRoute(
+        builder: (context) => CringeEntryDetailScreen(
+          entry: entry,
+          isOwnedByCurrentUser: canManageEntry,
+        ),
+      ),
+    );
+
+    if (!mounted || result == null) {
+      return;
+    }
+
+    if (result.wasDeleted) {
+      _showEntrySnack('Krep silindi.', backgroundColor: Colors.redAccent);
+    } else if (result.entry != null) {
+      _showEntrySnack('Krep güncellendi.', backgroundColor: Colors.green);
+    }
+  }
+
+  Future<void> _handleEditEntry(CringeEntry entry) async {
+    final edited = await EntryActionHelper.editEntry(context, entry);
+    if (!mounted) return;
+    if (edited) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _handleDeleteEntry(CringeEntry entry) async {
+    if (_deletingEntryIds.contains(entry.id)) {
+      return;
+    }
+
+    setState(() => _deletingEntryIds.add(entry.id));
+
+    final deleted = await EntryActionHelper.confirmAndDeleteEntry(
+      context,
+      entry,
+    );
+
+    if (!mounted) {
+      _deletingEntryIds.remove(entry.id);
+      return;
+    }
+
+    setState(() => _deletingEntryIds.remove(entry.id));
+
+    if (deleted) {
+      setState(() {});
+    }
+  }
+
+  void _showEntrySnack(
+    String message, {
+    Color backgroundColor = Colors.orange,
+  }) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
   Widget _buildStatsGrid(User user) {
     final stats = [
@@ -1201,8 +1294,9 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
             children: [
               CircleAvatar(
                 radius: 8,
-        backgroundColor:
-          (stat['color'] as Color).withValues(alpha: 0.18),
+                backgroundColor: (stat['color'] as Color).withValues(
+                  alpha: 0.18,
+                ),
                 child: Icon(
                   stat['icon'] as IconData,
                   color: stat['color'] as Color,
@@ -1234,12 +1328,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     );
   }
 
-
-
-  Widget _buildUserEntriesSection(
-    User user, {
-    required bool isOwnProfile,
-  }) {
+  Widget _buildUserEntriesSection(User user, {required bool isOwnProfile}) {
     final fallbackUserId = UserService.instance.firebaseUser?.uid ?? '';
     final userId = user.id.isNotEmpty ? user.id : fallbackUserId;
 
@@ -1256,9 +1345,16 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     }
 
     final effectiveUser = user.id == userId ? user : user.copyWith(id: userId);
+    
+    // Security Contract: Determine if viewing own profile
+    final currentUserId = UserService.instance.currentUser?.id;
+    final isOwnProfile = currentUserId != null && currentUserId == effectiveUser.id;
 
     return StreamBuilder<List<CringeEntry>>(
-      stream: CringeEntryService.instance.getUserEntriesStream(effectiveUser),
+      stream: CringeEntryService.instance.getUserEntriesStream(
+        effectiveUser,
+        isOwnProfile: isOwnProfile,
+      ),
       builder: (context, snapshot) {
         final isLoading =
             snapshot.connectionState == ConnectionState.waiting &&
@@ -1300,10 +1396,26 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: entries.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 14),
+            separatorBuilder: (context, _) => const SizedBox(height: 14),
             itemBuilder: (context, index) {
               final entry = entries[index];
-              return ModernCringeCard(entry: entry);
+              final currentUserId = UserService.instance.firebaseUser?.uid;
+              final canManageEntry =
+                  isOwnProfile ||
+                  (currentUserId != null && currentUserId == entry.userId);
+
+              return ModernCringeCard(
+                entry: entry,
+                onTap: () =>
+                    _openEntryDetail(entry, canManageEntry: canManageEntry),
+                onComment: () =>
+                    _openEntryDetail(entry, canManageEntry: canManageEntry),
+                onEdit: canManageEntry ? () => _handleEditEntry(entry) : null,
+                onDelete: canManageEntry
+                    ? () => _handleDeleteEntry(entry)
+                    : null,
+                isDeleteInProgress: _deletingEntryIds.contains(entry.id),
+              );
             },
           );
         }
@@ -1322,8 +1434,6 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
       },
     );
   }
-
-
 
   Widget _buildSimpleEntriesInfoMessage(
     String message, {

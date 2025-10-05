@@ -6,6 +6,7 @@ import 'services/user_service.dart';
 
 import 'screens/modern_login_screen.dart';
 import 'screens/main_navigation.dart';
+import 'screens/admin_test_page.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
@@ -41,6 +42,7 @@ class CringeBankApp extends StatelessWidget {
       routes: {
         '/main': (context) => const MainNavigation(),
         '/login': (context) => const ModernLoginScreen(),
+        '/admin-test': (context) => const AdminTestPage(),
       },
     );
   }

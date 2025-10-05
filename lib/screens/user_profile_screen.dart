@@ -9,6 +9,7 @@ import '../widgets/animated_bubble_background.dart';
 import '../widgets/entry_comments_sheet.dart';
 import '../widgets/modern_cringe_card.dart';
 import '../widgets/modern_components.dart';
+import '../utils/entry_actions.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final User user;
@@ -25,6 +26,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   bool _isLoadingUser = false;
   bool _isRefreshing = false;
   final Set<String> _locallyLikedEntryIds = <String>{};
+  final Set<String> _deletingEntryIds = <String>{};
 
   @override
   void initState() {
@@ -494,6 +496,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       );
     } else {
       for (final entry in entries) {
+        final canManageEntry = EntryActionHelper.canManageEntry(entry);
         children.add(
           Padding(
             padding: const EdgeInsets.only(bottom: AppTheme.spacingL),
@@ -503,6 +506,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               onLike: () => _likeEntry(entry),
               onComment: () => _commentOnEntry(entry),
               onShare: () => _shareEntry(entry),
+              onEdit: canManageEntry ? () => _handleEditEntry(entry) : null,
+              onDelete: canManageEntry ? () => _handleDeleteEntry(entry) : null,
+              isDeleteInProgress: _deletingEntryIds.contains(entry.id),
             ),
           ),
         );
@@ -568,6 +574,38 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   void _shareEntry(CringeEntry entry) {
     HapticFeedback.mediumImpact();
     // TODO: Implement share action
+  }
+
+  Future<void> _handleEditEntry(CringeEntry entry) async {
+    final edited = await EntryActionHelper.editEntry(context, entry);
+    if (!mounted) return;
+    if (edited) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _handleDeleteEntry(CringeEntry entry) async {
+    if (_deletingEntryIds.contains(entry.id)) {
+      return;
+    }
+
+    setState(() => _deletingEntryIds.add(entry.id));
+
+    final deleted = await EntryActionHelper.confirmAndDeleteEntry(
+      context,
+      entry,
+    );
+
+    if (!mounted) {
+      _deletingEntryIds.remove(entry.id);
+      return;
+    }
+
+    setState(() => _deletingEntryIds.remove(entry.id));
+
+    if (deleted) {
+      setState(() {});
+    }
   }
 
   String _buildInitials() {

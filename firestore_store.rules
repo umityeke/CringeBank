@@ -1,0 +1,112 @@
+// ========================================
+// CRINGESTORE FIRESTORE SECURITY RULES
+// Full Security - Escrow Protected Marketplace
+// ========================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ==================== HELPER FUNCTIONS ====================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    
+    // ==================== STORE PRODUCTS ====================
+    // Ürünler herkes okuyabilir, sadece satıcı ve admin yazabilir
+    
+    match /store_products/{productId} {
+      // Herkes aktif ürünleri görebilir
+      allow read: if resource.data.status == 'active';
+      
+      // P2P: Sadece ürün sahibi güncelleyebilir
+      // Vendor: Sadece admin oluşturabilir
+      allow create: if isAuthenticated() && (
+        // P2P seller creating their own product
+        (request.resource.data.sellerId == request.auth.uid &&
+         request.resource.data.vendorId == null &&
+         request.resource.data.sellerType == 'p2p') ||
+        // Admin creating vendor product
+        (isAdmin() && 
+         request.resource.data.vendorId != null &&
+         request.resource.data.sellerId == null &&
+         request.resource.data.sellerType == 'vendor')
+      );
+      
+      // Sadece ürün sahibi veya admin güncelleyebilir
+      allow update: if isAuthenticated() && (
+        isOwner(resource.data.sellerId) || isAdmin()
+      );
+      
+      // Sadece admin silebilir
+      allow delete: if isAdmin();
+    }
+    
+    // ==================== STORE ORDERS ====================
+    // Siparişler: Sadece alıcı, satıcı ve admin görebilir
+    
+    match /store_orders/{orderId} {
+      // Sadece ilgili taraflar görebilir
+      allow read: if isAuthenticated() && (
+        isOwner(resource.data.buyerId) ||
+        isOwner(resource.data.sellerId) ||
+        isAdmin()
+      );
+      
+      // Siparişler SADECE Cloud Functions tarafından oluşturulur
+      // Client'tan direkt sipariş oluşturma YOK!
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+    
+    // ==================== STORE WALLETS ====================
+    // Cüzdanlar: Sadece sahibi okuyabilir, SADECE Functions yazabilir
+    
+    match /store_wallets/{userId} {
+      // Sadece cüzdan sahibi kendi bakiyesini görebilir
+      allow read: if isOwner(userId);
+      
+      // Cüzdanlar SADECE Cloud Functions tarafından güncellenir
+      // Para transferleri client'tan ASLA yapılmaz!
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+    
+    // ==================== STORE ESCROWS ====================
+    // Escrow kilitleri: İlgili taraflar okuyabilir, SADECE Functions yazabilir
+    
+    match /store_escrows/{escrowId} {
+      // Sadece alıcı, satıcı ve admin görebilir
+      allow read: if isAuthenticated() && (
+        isOwner(resource.data.buyerId) ||
+        isOwner(resource.data.sellerId) ||
+        isAdmin()
+      );
+      
+      // Escrow işlemleri SADECE Cloud Functions tarafından yapılır
+      // Client'tan escrow manipülasyonu YOK!
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+    
+    // ==================== ADMIN COLLECTION ====================
+    
+    match /admins/{adminId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Sadece manuel olarak eklenebilir
+    }
+  }
+}

@@ -15,7 +15,8 @@ class ModernCompetitionsScreen extends StatefulWidget {
   const ModernCompetitionsScreen({super.key});
 
   @override
-  State<ModernCompetitionsScreen> createState() => _ModernCompetitionsScreenState();
+  State<ModernCompetitionsScreen> createState() =>
+      _ModernCompetitionsScreenState();
 }
 
 class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
@@ -51,22 +52,19 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
     _scaleAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.elasticOut,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
 
-    _opacityAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.3, 1.0, curve: Curves.easeInOut),
-    ));
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.3, 1.0, curve: Curves.easeInOut),
+      ),
+    );
     _syncCompetitions(CompetitionService.currentCompetitions);
 
-    _competitionsSubscription =
-        CompetitionService.competitionsStream.listen((competitions) {
+    _competitionsSubscription = CompetitionService.competitionsStream.listen((
+      competitions,
+    ) {
       if (!mounted) return;
       _syncCompetitions(competitions);
     });
@@ -117,7 +115,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                         dotHeight: 6,
                         dotWidth: 6,
                         spacing: 8,
-                        dotColor: Colors.white.withOpacity(0.2),
+                        dotColor: Colors.white.withValues(alpha: 0.2),
                         activeDotColor: Colors.orange,
                       ),
                       onDotClicked: (index) {
@@ -139,8 +137,6 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
       floatingActionButton: _buildFloatingActionButton(),
     );
   }
-
-
 
   Widget _buildHeader() {
     return AnimatedBuilder(
@@ -164,7 +160,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.orange.withOpacity(0.3),
+                          color: Colors.orange.withValues(alpha: 0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 5),
                         ),
@@ -193,7 +189,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                           'En krep anları yarışıyor!',
                           style: TextStyle(
                             fontSize: 14,
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                           ),
                         ),
                       ],
@@ -206,9 +202,9 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                     ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(20),
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         width: 1,
                       ),
                     ),
@@ -243,9 +239,9 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
@@ -285,10 +281,10 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(8),
-      color: isSelected 
-        ? Colors.orange.withOpacity(0.8)
-        : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            color: isSelected
+                ? Colors.orange.withValues(alpha: 0.8)
+                : Colors.transparent,
           ),
           child: Text(
             title,
@@ -329,7 +325,10 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
     );
   }
 
-  Widget _buildCompetitionCard(Competition competition, {VoidCallback? onDelete}) {
+  Widget _buildCompetitionCard(
+    Competition competition, {
+    VoidCallback? onDelete,
+  }) {
     final title = competition.title;
     final description = competition.description;
     final prize = competition.prizeKrepCoins > 0
@@ -344,32 +343,35 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
     final dateRangeLabel = _formatDateRange(startDate, endDate);
     final isOwnerView = onDelete != null;
     final userId = firebase_auth.FirebaseAuth.instance.currentUser?.uid;
-  final bool isParticipant =
-    userId != null && competition.participantUserIds.contains(userId);
-  final bool hasSubmittedEntry = userId != null &&
-    competition.entries.any((entry) => entry.userId == userId);
-  final int totalCommentCount = competition.totalCommentCount;
+    final bool isParticipant =
+        userId != null && competition.participantUserIds.contains(userId);
+    final bool hasSubmittedEntry =
+        userId != null &&
+        competition.entries.any((entry) => entry.userId == userId);
+    final int totalCommentCount = competition.totalCommentCount;
     final int totalEntryCount = competition.entries.length;
-    final bool isProcessing =
-        _pendingCompetitionActions.contains(competition.id);
+    final bool isProcessing = _pendingCompetitionActions.contains(
+      competition.id,
+    );
     final bool isJoinWindowOpen = _isJoinWindowOpen(competition);
     final bool hasOtherParticipation =
         _activeParticipationCompetitionId != null &&
-            _activeParticipationCompetitionId != competition.id;
+        _activeParticipationCompetitionId != competition.id;
     final bool isFull =
         competition.participantUserIds.length >= competition.maxEntries;
-  final bool canJoin = userId != null &&
-        isJoinWindowOpen &&
-        !isFull &&
-        !hasOtherParticipation;
-  final bool canSubmitEntry =
-    isParticipant && !hasSubmittedEntry && !isProcessing && isJoinWindowOpen;
+    final bool canJoin =
+        userId != null && isJoinWindowOpen && !isFull && !hasOtherParticipation;
+    final bool canSubmitEntry =
+        isParticipant &&
+        !hasSubmittedEntry &&
+        !isProcessing &&
+        isJoinWindowOpen;
 
     String buttonLabel;
     Color buttonColor;
     VoidCallback? buttonAction;
     String? helperMessage;
-  String? participantHelperMessage;
+    String? participantHelperMessage;
 
     if (isOwnerView) {
       buttonLabel = 'Yarışmayı Sil';
@@ -378,7 +380,9 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
     } else if (isParticipant) {
       buttonLabel = 'Yarışmadan Ayrıl';
       buttonColor = Colors.redAccent;
-      buttonAction = isProcessing ? null : () => _handleLeaveCompetition(competition);
+      buttonAction = isProcessing
+          ? null
+          : () => _handleLeaveCompetition(competition);
       if (hasSubmittedEntry) {
         participantHelperMessage =
             'Anını paylaştın, tekrar düzenlemek için yarışma bitimini bekle.';
@@ -387,8 +391,10 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
       }
     } else {
       buttonLabel = isProcessing ? 'Katılım İşleniyor…' : 'Yarışmaya Katıl';
-      buttonColor = canJoin ? accentColor : Colors.white.withOpacity(0.2);
-      buttonAction = isProcessing ? null : () => _handleJoinCompetition(competition);
+      buttonColor = canJoin ? accentColor : Colors.white.withValues(alpha: 0.2);
+      buttonAction = isProcessing
+          ? null
+          : () => _handleJoinCompetition(competition);
 
       if (!canJoin) {
         if (userId == null) {
@@ -414,19 +420,16 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
           )
         : Text(
             buttonLabel,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           );
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha: 0.1),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -446,13 +449,9 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                       height: 50,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: accentColor.withOpacity(0.2),
+                        color: accentColor.withValues(alpha: 0.2),
                       ),
-                      child: Icon(
-                        icon,
-                        color: accentColor,
-                        size: 24,
-                      ),
+                      child: Icon(icon, color: accentColor, size: 24),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -471,7 +470,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                             description,
                             style: TextStyle(
                               fontSize: 14,
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha: 0.7),
                             ),
                           ),
                         ],
@@ -484,7 +483,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    color: Colors.white.withOpacity(0.05),
+                    color: Colors.white.withValues(alpha: 0.05),
                   ),
                   child: Row(
                     children: [
@@ -496,7 +495,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                               'Ödül',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.white.withOpacity(0.7),
+                                color: Colors.white.withValues(alpha: 0.7),
                               ),
                             ),
                             Text(
@@ -518,7 +517,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                               'Katılımcı',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.white.withOpacity(0.7),
+                                color: Colors.white.withValues(alpha: 0.7),
                               ),
                             ),
                             Text(
@@ -540,7 +539,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                               'Kalan Süre',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.white.withOpacity(0.7),
+                                color: Colors.white.withValues(alpha: 0.7),
                               ),
                             ),
                             Text(
@@ -556,7 +555,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                                 dateRangeLabel,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.white.withOpacity(0.7),
+                                  color: Colors.white.withValues(alpha: 0.7),
                                 ),
                               ),
                           ],
@@ -598,7 +597,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                         side: BorderSide(
                           color: canSubmitEntry
                               ? accentColor
-                              : Colors.white.withOpacity(0.3),
+                              : Colors.white.withValues(alpha: 0.3),
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
@@ -614,9 +613,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                     ),
                   ),
                 Padding(
-                  padding: EdgeInsets.only(
-                    top: isParticipant ? 8.0 : 12.0,
-                  ),
+                  padding: EdgeInsets.only(top: isParticipant ? 8.0 : 12.0),
                   child: TextButton.icon(
                     onPressed: () => _showCompetitionEntries(competition),
                     style: TextButton.styleFrom(
@@ -638,7 +635,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                     child: Text(
                       participantHelperMessage,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.white.withValues(alpha: 0.7),
                         fontSize: 12,
                       ),
                     ),
@@ -649,7 +646,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                     child: Text(
                       helperMessage,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.white.withValues(alpha: 0.7),
                         fontSize: 12,
                       ),
                     ),
@@ -718,8 +715,11 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
               children: [
                 Row(
                   children: const [
-                    Icon(Icons.emoji_events_rounded,
-                        color: Colors.orangeAccent, size: 20),
+                    Icon(
+                      Icons.emoji_events_rounded,
+                      color: Colors.orangeAccent,
+                      size: 20,
+                    ),
                     SizedBox(width: 8),
                     Text(
                       'Yorum Kazananı',
@@ -844,22 +844,26 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
 
   Widget _buildLeaderboardItem(int index) {
     final names = [
-      'KrepMaster2024', 'UtancVerici', 'CringeKing', 'MegaShame',
-      'EpicFail', 'BlushMaster', 'AwkwardMoment', 'RedFaceEmoji',
-      'ShameSpiral', 'CringeLord'
+      'KrepMaster2024',
+      'UtancVerici',
+      'CringeKing',
+      'MegaShame',
+      'EpicFail',
+      'BlushMaster',
+      'AwkwardMoment',
+      'RedFaceEmoji',
+      'ShameSpiral',
+      'CringeLord',
     ];
-    
+
     final scores = [2847, 2156, 1923, 1756, 1634, 1521, 1398, 1287, 1156, 1034];
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         color: Colors.white.withOpacity(0.08),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.1),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -874,7 +878,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
               children: [
                 CircleAvatar(
                   radius: 24,
-                  backgroundColor: index < 3 
+                  backgroundColor: index < 3
                       ? [Colors.amber, Colors.grey, Colors.brown][index]
                       : Colors.orange.withOpacity(0.3),
                   child: Text(
@@ -898,7 +902,11 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                         color: Colors.white,
                       ),
                       child: Icon(
-                        [Icons.emoji_events, Icons.military_tech, Icons.star][index],
+                        [
+                          Icons.emoji_events,
+                          Icons.military_tech,
+                          Icons.star,
+                        ][index],
                         size: 14,
                         color: [Colors.amber, Colors.grey, Colors.brown][index],
                       ),
@@ -929,8 +937,11 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                     ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
-                      color: [Colors.amber, Colors.grey, Colors.brown][index]
-                          .withOpacity(0.2),
+                      color: [
+                        Colors.amber,
+                        Colors.grey,
+                        Colors.brown,
+                      ][index].withOpacity(0.2),
                     ),
                     child: Text(
                       ['👑', '🥈', '🥉'][index],
@@ -964,8 +975,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
                     final competition = _myCompetitions[index];
                     return _buildCompetitionCard(
                       competition,
-                      onDelete: () =>
-                          _confirmAndDeleteCompetition(competition),
+                      onDelete: () => _confirmAndDeleteCompetition(competition),
                     );
                   },
                 ),
@@ -1013,8 +1023,9 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
 
     final competition = result.toCompetition();
 
-    final creationSuccess =
-        await CompetitionService.createCompetition(competition);
+    final creationSuccess = await CompetitionService.createCompetition(
+      competition,
+    );
 
     if (!mounted) return;
 
@@ -1102,7 +1113,9 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
   }
 
   DateTime _calculateMaxEndDate(DateTime startDate) {
-    final cappedEnd = startDate.add(const Duration(days: _maxCompetitionDurationDays));
+    final cappedEnd = startDate.add(
+      const Duration(days: _maxCompetitionDurationDays),
+    );
     final globalLimit = DateTime.now().add(const Duration(days: 365));
     return cappedEnd.isBefore(globalLimit) ? cappedEnd : globalLimit;
   }
@@ -1285,7 +1298,8 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
     if (userId != null) {
       for (final competition in normalizedCompetitions) {
         if (!competition.participantUserIds.contains(userId)) continue;
-        final bool isActivePhase = now.isBefore(competition.endDate) &&
+        final bool isActivePhase =
+            now.isBefore(competition.endDate) &&
             (competition.status == CompetitionStatus.active ||
                 competition.status == CompetitionStatus.upcoming ||
                 competition.status == CompetitionStatus.voting ||
@@ -1298,16 +1312,20 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
     }
 
     setState(() {
-      _activeCompetitions = normalizedCompetitions
-          .where((competition) => now.isBefore(competition.endDate))
-          .toList()
-        ..sort((a, b) => a.startDate.compareTo(b.startDate));
-
-      _myCompetitions = userId == null
-          ? []
-          : normalizedCompetitions
-              .where((competition) => competition.createdByUserId == userId)
+      _activeCompetitions =
+          normalizedCompetitions
+              .where((competition) => now.isBefore(competition.endDate))
               .toList()
+            ..sort((a, b) => a.startDate.compareTo(b.startDate));
+
+      _myCompetitions =
+          userId == null
+                ? []
+                : normalizedCompetitions
+                      .where(
+                        (competition) => competition.createdByUserId == userId,
+                      )
+                      .toList()
             ..sort((a, b) => a.startDate.compareTo(b.startDate));
 
       _activeParticipationCompetitionId = activeParticipationId;
@@ -1345,27 +1363,33 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
     String competitionId,
     List<CringeEntry> updatedEntries,
   ) {
-    final totalComments =
-        updatedEntries.fold<int>(0, (sum, entry) => sum + entry.yorumSayisi);
-  setState(() {
-    _activeCompetitions = _activeCompetitions
-      .map((competition) => competition.id == competitionId
-        ? competition.copyWith(
-          entries: updatedEntries,
-          totalCommentCount: totalComments,
-        )
-        : competition)
-      .toList();
+    final totalComments = updatedEntries.fold<int>(
+      0,
+      (sum, entry) => sum + entry.yorumSayisi,
+    );
+    setState(() {
+      _activeCompetitions = _activeCompetitions
+          .map(
+            (competition) => competition.id == competitionId
+                ? competition.copyWith(
+                    entries: updatedEntries,
+                    totalCommentCount: totalComments,
+                  )
+                : competition,
+          )
+          .toList();
 
-    _myCompetitions = _myCompetitions
-      .map((competition) => competition.id == competitionId
-        ? competition.copyWith(
-          entries: updatedEntries,
-          totalCommentCount: totalComments,
-        )
-        : competition)
-      .toList();
-  });
+      _myCompetitions = _myCompetitions
+          .map(
+            (competition) => competition.id == competitionId
+                ? competition.copyWith(
+                    entries: updatedEntries,
+                    totalCommentCount: totalComments,
+                  )
+                : competition,
+          )
+          .toList();
+    });
   }
 
   Future<void> _openCompetitionEntry(
@@ -1374,15 +1398,18 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
   }) async {
     final user = firebase_auth.FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnackBar('Anı göndermek için giriş yapmalısın.',
-          backgroundColor: Colors.redAccent);
+      _showSnackBar(
+        'Anı göndermek için giriş yapmalısın.',
+        backgroundColor: Colors.redAccent,
+      );
       return;
     }
 
-    if (!forceOpen &&
-        !competition.participantUserIds.contains(user.uid)) {
-      _showSnackBar('Önce yarışmaya katılmalısın.',
-          backgroundColor: Colors.redAccent);
+    if (!forceOpen && !competition.participantUserIds.contains(user.uid)) {
+      _showSnackBar(
+        'Önce yarışmaya katılmalısın.',
+        backgroundColor: Colors.redAccent,
+      );
       return;
     }
 
@@ -1395,15 +1422,11 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => CompetitionQuickEntrySheet(
-        competition: competition,
-      ),
+      builder: (_) => CompetitionQuickEntrySheet(competition: competition),
     );
 
     if (result == true && mounted) {
-      _showSnackBar(
-        '"${competition.title}" yarışmasına anın gönderildi!',
-      );
+      _showSnackBar('"${competition.title}" yarışmasına anın gönderildi!');
     }
   }
 
@@ -1412,28 +1435,36 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
 
     final user = firebase_auth.FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnackBar('Katılmak için giriş yapmalısın.',
-          backgroundColor: Colors.redAccent);
+      _showSnackBar(
+        'Katılmak için giriş yapmalısın.',
+        backgroundColor: Colors.redAccent,
+      );
       return;
     }
 
     if (!competition.participantUserIds.contains(user.uid) &&
         _activeParticipationCompetitionId != null &&
         _activeParticipationCompetitionId != competition.id) {
-      _showSnackBar('Aynı anda yalnızca bir yarışmada yer alabilirsin.',
-          backgroundColor: Colors.redAccent);
+      _showSnackBar(
+        'Aynı anda yalnızca bir yarışmada yer alabilirsin.',
+        backgroundColor: Colors.redAccent,
+      );
       return;
     }
 
-    if (! _isJoinWindowOpen(competition)) {
-      _showSnackBar('Yarışma şu anda katılıma kapalı.',
-          backgroundColor: Colors.redAccent);
+    if (!_isJoinWindowOpen(competition)) {
+      _showSnackBar(
+        'Yarışma şu anda katılıma kapalı.',
+        backgroundColor: Colors.redAccent,
+      );
       return;
     }
 
     if (competition.participantUserIds.length >= competition.maxEntries) {
-      _showSnackBar('Yarışma kontenjanı doldu.',
-          backgroundColor: Colors.redAccent);
+      _showSnackBar(
+        'Yarışma kontenjanı doldu.',
+        backgroundColor: Colors.redAccent,
+      );
       return;
     }
 
@@ -1469,34 +1500,38 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
         }
 
         if (!competition.entries.any((entry) => entry.userId == user.uid)) {
-          await _openCompetitionEntry(
-            competition,
-            forceOpen: true,
-          );
+          await _openCompetitionEntry(competition, forceOpen: true);
         }
         break;
       case CompetitionJoinResult.limitReached:
-        _showSnackBar('Aynı anda yalnızca bir yarışmaya katılabilirsin.',
-            backgroundColor: Colors.redAccent);
+        _showSnackBar(
+          'Aynı anda yalnızca bir yarışmaya katılabilirsin.',
+          backgroundColor: Colors.redAccent,
+        );
         break;
       case CompetitionJoinResult.alreadyJoined:
         _showSnackBar('Bu yarışmaya zaten katıldın.');
         break;
       case CompetitionJoinResult.closed:
-        _showSnackBar('Yarışma şu anda katılıma kapalı.',
-            backgroundColor: Colors.redAccent);
+        _showSnackBar(
+          'Yarışma şu anda katılıma kapalı.',
+          backgroundColor: Colors.redAccent,
+        );
         break;
       case CompetitionJoinResult.full:
-        _showSnackBar('Yarışma kontenjanı doldu.',
-            backgroundColor: Colors.redAccent);
+        _showSnackBar(
+          'Yarışma kontenjanı doldu.',
+          backgroundColor: Colors.redAccent,
+        );
         break;
       case CompetitionJoinResult.unauthorized:
-        _showSnackBar('Katılmak için giriş yapmalısın.',
-            backgroundColor: Colors.redAccent);
+        _showSnackBar(
+          'Katılmak için giriş yapmalısın.',
+          backgroundColor: Colors.redAccent,
+        );
         break;
       case CompetitionJoinResult.notFound:
-        _showSnackBar('Yarışma bulunamadı.',
-            backgroundColor: Colors.redAccent);
+        _showSnackBar('Yarışma bulunamadı.', backgroundColor: Colors.redAccent);
         break;
     }
   }
@@ -1506,14 +1541,18 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
 
     final user = firebase_auth.FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnackBar('Çıkmak için giriş yapmalısın.',
-          backgroundColor: Colors.redAccent);
+      _showSnackBar(
+        'Çıkmak için giriş yapmalısın.',
+        backgroundColor: Colors.redAccent,
+      );
       return;
     }
 
     if (!competition.participantUserIds.contains(user.uid)) {
-      _showSnackBar('Bu yarışmaya kayıtlı değilsin.',
-          backgroundColor: Colors.redAccent);
+      _showSnackBar(
+        'Bu yarışmaya kayıtlı değilsin.',
+        backgroundColor: Colors.redAccent,
+      );
       return;
     }
 
@@ -1534,16 +1573,19 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
         _showSnackBar('"${competition.title}" yarışmasından ayrıldın.');
         break;
       case CompetitionLeaveResult.notParticipant:
-        _showSnackBar('Bu yarışmaya kayıtlı değilsin.',
-            backgroundColor: Colors.redAccent);
+        _showSnackBar(
+          'Bu yarışmaya kayıtlı değilsin.',
+          backgroundColor: Colors.redAccent,
+        );
         break;
       case CompetitionLeaveResult.unauthorized:
-        _showSnackBar('Çıkmak için giriş yapmalısın.',
-            backgroundColor: Colors.redAccent);
+        _showSnackBar(
+          'Çıkmak için giriş yapmalısın.',
+          backgroundColor: Colors.redAccent,
+        );
         break;
       case CompetitionLeaveResult.notFound:
-        _showSnackBar('Yarışma bulunamadı.',
-            backgroundColor: Colors.redAccent);
+        _showSnackBar('Yarışma bulunamadı.', backgroundColor: Colors.redAccent);
         break;
     }
   }
@@ -1560,15 +1602,13 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
   void _showSnackBar(String message, {Color backgroundColor = Colors.orange}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: backgroundColor,
-      ),
+      SnackBar(content: Text(message), backgroundColor: backgroundColor),
     );
   }
 
   Future<void> _confirmAndDeleteCompetition(Competition competition) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed =
+        await showDialog<bool>(
           context: context,
           builder: (dialogContext) {
             return AlertDialog(
@@ -1607,9 +1647,11 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(success
-            ? '"${competition.title}" yarışması silindi.'
-            : 'Yarışma silinemedi. Lütfen tekrar deneyin.'),
+        content: Text(
+          success
+              ? '"${competition.title}" yarışması silindi.'
+              : 'Yarışma silinemedi. Lütfen tekrar deneyin.',
+        ),
         backgroundColor: success ? Colors.orange : Colors.redAccent,
       ),
     );
@@ -1638,8 +1680,7 @@ class _CompetitionCreationSheet extends StatefulWidget {
       _CompetitionCreationSheetState();
 }
 
-class _CompetitionCreationSheetState
-    extends State<_CompetitionCreationSheet> {
+class _CompetitionCreationSheetState extends State<_CompetitionCreationSheet> {
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
   late final TextEditingController _prizeController;
@@ -1657,8 +1698,7 @@ class _CompetitionCreationSheetState
     _descriptionController = TextEditingController();
     _prizeController = TextEditingController(text: '1000');
     _selectedStartDate = DateTime.now();
-    _selectedEndDate =
-        _selectedStartDate.add(const Duration(days: 7));
+    _selectedEndDate = _selectedStartDate.add(const Duration(days: 7));
     _startDateController = TextEditingController(
       text: widget.formatDateLabel(_selectedStartDate),
     );
@@ -1685,10 +1725,7 @@ class _CompetitionCreationSheetState
         decoration: BoxDecoration(
           color: const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.08),
-            width: 1,
-          ),
+          border: Border.all(color: Colors.white.withOpacity(0.08), width: 1),
         ),
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -1744,7 +1781,8 @@ class _CompetitionCreationSheetState
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<CompetitionType>(
-                  value: _selectedType,
+                  key: ValueKey(_selectedType),
+                  initialValue: _selectedType,
                   decoration: widget.buildInputDecoration('Yarışma Türü'),
                   dropdownColor: const Color(0xFF1A1A1A),
                   iconEnabledColor: Colors.white,
@@ -1769,10 +1807,10 @@ class _CompetitionCreationSheetState
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _prizeController,
-                  decoration:
-                      widget.buildInputDecoration('Ödül (Krep Coin)'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: widget.buildInputDecoration('Ödül (Krep Coin)'),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Ödül gerekli';
@@ -1790,8 +1828,9 @@ class _CompetitionCreationSheetState
                       child: TextFormField(
                         controller: _startDateController,
                         readOnly: true,
-                        decoration:
-                            widget.buildInputDecoration('Başlangıç Tarihi'),
+                        decoration: widget.buildInputDecoration(
+                          'Başlangıç Tarihi',
+                        ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Başlangıç tarihi gerekli';
@@ -1812,19 +1851,22 @@ class _CompetitionCreationSheetState
                               _selectedStartDate = picked;
                               var ensuredEnd = _selectedEndDate;
                               if (!ensuredEnd.isAfter(_selectedStartDate)) {
-                                ensuredEnd =
-                                    _selectedStartDate.add(const Duration(days: 1));
+                                ensuredEnd = _selectedStartDate.add(
+                                  const Duration(days: 1),
+                                );
                               }
-                              final maxEnd =
-                                  widget.calculateMaxEndDate(_selectedStartDate);
+                              final maxEnd = widget.calculateMaxEndDate(
+                                _selectedStartDate,
+                              );
                               if (ensuredEnd.isAfter(maxEnd)) {
                                 ensuredEnd = maxEnd;
                               }
                               _selectedEndDate = ensuredEnd;
-                              _startDateController.text =
-                                  widget.formatDateLabel(_selectedStartDate);
-                              _endDateController.text =
-                                  widget.formatDateLabel(_selectedEndDate);
+                              _startDateController.text = widget
+                                  .formatDateLabel(_selectedStartDate);
+                              _endDateController.text = widget.formatDateLabel(
+                                _selectedEndDate,
+                              );
                             });
                           }
                         },
@@ -1835,8 +1877,7 @@ class _CompetitionCreationSheetState
                       child: TextFormField(
                         controller: _endDateController,
                         readOnly: true,
-                        decoration:
-                            widget.buildInputDecoration('Bitiş Tarihi'),
+                        decoration: widget.buildInputDecoration('Bitiş Tarihi'),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Bitiş tarihi gerekli';
@@ -1844,8 +1885,9 @@ class _CompetitionCreationSheetState
                           if (!_selectedEndDate.isAfter(_selectedStartDate)) {
                             return 'Bitiş tarihi başlangıçtan sonra olmalı';
                           }
-                          final allowedMax =
-                              widget.calculateMaxEndDate(_selectedStartDate);
+                          final allowedMax = widget.calculateMaxEndDate(
+                            _selectedStartDate,
+                          );
                           if (_selectedEndDate.isAfter(allowedMax)) {
                             return 'Yarışma süresi en fazla ${widget.maxDurationDays} gün olabilir';
                           }
@@ -1856,14 +1898,16 @@ class _CompetitionCreationSheetState
                             context: context,
                             initialDate: _selectedEndDate,
                             firstDate: _selectedStartDate,
-                            lastDate:
-                                widget.calculateMaxEndDate(_selectedStartDate),
+                            lastDate: widget.calculateMaxEndDate(
+                              _selectedStartDate,
+                            ),
                           );
                           if (picked != null) {
                             setState(() {
                               _selectedEndDate = picked;
-                              _endDateController.text =
-                                  widget.formatDateLabel(_selectedEndDate);
+                              _endDateController.text = widget.formatDateLabel(
+                                _selectedEndDate,
+                              );
                             });
                           }
                         },
@@ -1955,8 +1999,8 @@ class _CompetitionFormResult {
     final status = now.isBefore(normalizedStart)
         ? CompetitionStatus.upcoming
         : now.isAfter(endDate)
-            ? CompetitionStatus.ended
-            : CompetitionStatus.active;
+        ? CompetitionStatus.ended
+        : CompetitionStatus.active;
 
     return Competition(
       id: 'local_${DateTime.now().millisecondsSinceEpoch}',

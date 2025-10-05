@@ -1,9 +1,11 @@
 # CringeStore Deployment Guide
+
 ## Full Security Escrow Marketplace
 
 ### 🔐 Güvenlik Özellikleri
 
 #### 1. **Firestore Security Rules**
+
 - ✅ Cüzdanlar: SADECE Cloud Functions yazabilir
 - ✅ Siparişler: SADECE Cloud Functions oluşturabilir
 - ✅ Escrow: SADECE Cloud Functions manipüle edebilir
@@ -11,6 +13,7 @@
 - ✅ Client asla para transferi yapamaz
 
 #### 2. **Cloud Functions Escrow**
+
 - ✅ Transaction ile atomik işlemler
 - ✅ %5 komisyon otomatik hesaplanır
 - ✅ Bakiye kontrolü
@@ -18,6 +21,7 @@
 - ✅ Escrow lock/release/refund güvenli
 
 #### 3. **Client-Side Validations**
+
 - ✅ Firebase Authentication zorunlu
 - ✅ Tüm işlemler Cloud Functions üzerinden
 - ✅ Direct Firestore write YOK
@@ -72,6 +76,7 @@ firebase deploy --only functions
 Firebase Console'da manuel olarak oluştur:
 
 #### a) `store_products` Collection
+
 ```javascript
 // Örnek document
 {
@@ -91,6 +96,7 @@ Firebase Console'da manuel olarak oluştur:
 ```
 
 #### b) `store_wallets` Collection
+
 ```javascript
 // Her kullanıcı için
 {
@@ -102,6 +108,7 @@ Firebase Console'da manuel olarak oluştur:
 ```
 
 #### c) `admins` Collection (Opsiyonel)
+
 ```javascript
 // Admin user ID'leri
 {
@@ -122,6 +129,7 @@ firebase functions:config:set regions.default="europe-west1"
 ## 🧪 Test Senaryoları
 
 ### Test 1: Satın Alma (Escrow Lock)
+
 ```dart
 // Client tarafında
 final result = await CringeStoreService().lockEscrow('product123');
@@ -131,28 +139,33 @@ if (result['ok'] == true) {
 ```
 
 **Beklenen Sonuç:**
+
 - ✅ Escrow oluşturuldu
 - ✅ Alıcının bakiyesi düştü
 - ✅ Ürün rezerve oldu
 - ✅ Order pending durumda
 
 ### Test 2: Siparişi Tamamla (Escrow Release)
+
 ```dart
 final result = await CringeStoreService().releaseEscrow(orderId);
 ```
 
 **Beklenen Sonuç:**
+
 - ✅ Satıcının bakiyesi arttı (fiyat kadar)
 - ✅ Platform komisyon kazandı
 - ✅ Order completed oldu
 - ✅ Ürün sold oldu
 
 ### Test 3: İptal Et (Escrow Refund)
+
 ```dart
 final result = await CringeStoreService().refundEscrow(orderId);
 ```
 
 **Beklenen Sonuç:**
+
 - ✅ Alıcının parası iade edildi
 - ✅ Order canceled oldu
 - ✅ Ürün tekrar active oldu
@@ -161,13 +174,15 @@ final result = await CringeStoreService().refundEscrow(orderId);
 
 ## 🔍 Güvenlik Kontrolleri
 
-### ✅ Client Tarafında Asla Yapılamaz:
+### Client Tarafında Asla Yapılamaz
+
 - ❌ Cüzdan bakiyesi değiştirme
 - ❌ Direct order oluşturma
 - ❌ Escrow manipülasyonu
 - ❌ Başkasının ürününü güncelleme
 
-### ✅ Sadece Cloud Functions Yapabilir:
+### Sadece Cloud Functions Yapabilir
+
 - ✅ Para transferleri
 - ✅ Komisyon kesimi
 - ✅ Escrow işlemleri
@@ -602,7 +617,7 @@ firebase deploy --only firestore:rules,storage:rules
 
 Firebase Console → Firestore → Indexes:
 
-```
+```firestore
 Collection: store_products
 Fields: status (ASC), sellerType (ASC), createdAt (DESC)
 
@@ -643,6 +658,7 @@ function calculateCommission(amount) {
 ```
 
 **Örnek Hesaplamalar:**
+
 - Ürün: 100 Altın
 - Komisyon (%5): 5 Altın
 - Alıcıdan kesilen: 105 Altın
@@ -653,13 +669,15 @@ function calculateCommission(amount) {
 
 ## 🎯 Para Basma Stratejisi
 
-### Revenue Streams:
+### Revenue Streams
+
 1. **P2P Komisyonu**: Her P2P satıştan %5
 2. **Vendor Satışları**: Platform kendi ürünlerini satabilir (100% kâr)
 3. **Premium Listings**: Featured ürünler için ek ücret
 4. **Promotion**: Ürün boost sistemi
 
-### Platform Wallet:
+### Platform Wallet
+
 ```javascript
 // Platform cüzdanını kontrol et
 const platformWallet = await db.collection('store_wallets').doc('platform').get();
@@ -671,15 +689,19 @@ console.log('Platform Balance:', platformWallet.data().goldBalance);
 ## 🆘 Troubleshooting
 
 ### Hata: "Insufficient permissions"
+
 → Firestore rules deploy edilmemiş olabilir
 
 ### Hata: "Function not found"
+
 → Functions deploy edilmemiş veya region yanlış
 
 ### Hata: "Insufficient balance"
+
 → Test için wallet oluşturulup balance eklensin
 
 ### Hata: "Index required"
+
 → Firebase console'daki index linkini takip et
 
 ---
@@ -694,6 +716,6 @@ console.log('Platform Balance:', platformWallet.data().goldBalance);
 
 ---
 
-## 🎉 Hazır!
+## Hazır
 
 Sistem tamamen güvenli ve production-ready. Para basma zamanı! 💰💰💰

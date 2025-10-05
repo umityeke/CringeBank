@@ -2,18 +2,22 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
+import 'package:image/image.dart' as img;
 
 import '../models/user_model.dart';
+import '../services/avatar_upload_service.dart';
 import '../services/email_otp_service.dart';
 import '../services/phone_otp_service.dart';
 import '../services/user_service.dart';
 import '../widgets/animated_bubble_background.dart';
 
-const int _displayNameMinLength = 2;
+const int _displayNameminLength = 2;
 const int _displayNameMaxLength = 60;
 const int _bioMaxLength = 160;
 const int _genderOtherMaxLength = 30;
@@ -25,7 +29,11 @@ const List<String> _tabTitles = <String>[
   'Eğitim',
   'Gizlilik',
 ];
-const List<String> _visibilityOptions = <String>['public', 'followers', 'private'];
+const List<String> _visibilityOptions = <String>[
+  'public',
+  'followers',
+  'private',
+];
 const Map<String, String> _visibilityLabels = <String, String>{
   'public': 'Herkese açık',
   'followers': 'Sadece takipçiler',
@@ -51,7 +59,10 @@ const Map<String, String> _genderLabels = <String, String>{
 
 final HtmlEscape _htmlEscape = const HtmlEscape(HtmlEscapeMode.element);
 final RegExp _linkRegExp = RegExp(r'(https?:\/\/[^\s]+)', caseSensitive: false);
-final RegExp _emojiRegExp = RegExp(r'[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1FAFF}\u{2600}-\u{26FF}]', unicode: true);
+final RegExp _emojiRegExp = RegExp(
+  r'[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1FAFF}\u{2600}-\u{26FF}]',
+  unicode: true,
+);
 
 class ProfileEditScreen extends StatefulWidget {
   final User user;
@@ -67,6 +78,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
   late final TabController _tabController;
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
+  final AvatarUploadService _avatarUploadService = AvatarUploadService();
+
   late final TextEditingController _displayNameController;
   late final TextEditingController _bioController;
   late final TextEditingController _genderOtherController;
@@ -76,6 +89,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
 
   late User _user;
   late Map<String, dynamic> _initialSnapshot;
+
+  Uint8List? _avatarPreviewBytes;
+  Uint8List? _pendingAvatarBytes;
+  bool _avatarProcessing = false;
+  bool _avatarCleared = false;
+  int? _avatarOriginalSize;
+  int? _avatarCompressedSize;
+  int? _avatarQuality;
 
   String _gender = 'prefer_not';
   DateTime? _birthDate;
@@ -122,6 +143,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
     unawaited(initializeDateFormatting('tr_TR'));
     _dateFormat = DateFormat.yMMMMd('tr_TR');
 
+    _avatarPreviewBytes = _decodeAvatarBytes(_user.avatar);
+    _pendingAvatarBytes = null;
+    _avatarCleared = _isAvatarEmpty(_user.avatar);
+
     _initialSnapshot = _captureSnapshot();
   }
 
@@ -160,6 +185,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
       _allowMessagesFromNonFollowers =
           _user.preferences.allowMessagesFromNonFollowers;
 
+      _avatarPreviewBytes = _decodeAvatarBytes(_user.avatar);
+      _pendingAvatarBytes = null;
+      _avatarCleared = _isAvatarEmpty(_user.avatar);
+
       _initialSnapshot = _captureSnapshot();
       _markDirty();
     }
@@ -171,6 +200,86 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
     _genderOtherController.addListener(_onFormChanged);
   }
 
+  Uint8List? _decodeAvatarBytes(String avatar) {
+    if (!avatar.startsWith('data:image')) {
+      return null;
+    }
+
+    final int commaIndex = avatar.indexOf(',');
+    if (commaIndex == -1 || commaIndex >= avatar.length - 1) {
+      return null;
+    }
+
+    final String base64Segment = avatar.substring(commaIndex + 1).trim();
+    if (base64Segment.isEmpty) {
+      return null;
+    }
+
+    try {
+      return base64Decode(base64Segment);
+    } catch (error, stackTrace) {
+      debugPrint('Avatar decode failed: $error\n$stackTrace');
+      return null;
+    }
+  }
+
+  bool _isAvatarEmpty(String avatar) {
+    final trimmed = avatar.trim();
+    if (trimmed.isEmpty) return true;
+    if (trimmed == '👤') return true;
+    return false;
+  }
+
+  Future<_AvatarProcessingResult?> _prepareAvatarData(
+    Uint8List rawBytes,
+  ) async {
+    try {
+      final img.Image? decodedImage = img.decodeImage(rawBytes);
+      if (decodedImage == null) {
+        debugPrint('Avatar decode returned null image');
+        return null;
+      }
+
+      final img.Image normalized = img.bakeOrientation(decodedImage);
+      const int maxDimension = 256;
+      final img.Image resized = img.copyResize(
+        normalized,
+        width: normalized.width >= normalized.height ? maxDimension : null,
+        height: normalized.height > normalized.width ? maxDimension : null,
+        interpolation: img.Interpolation.average,
+      );
+
+      const List<int> qualitySteps = <int>[70, 60, 50, 40];
+      Uint8List? bestBytes;
+      int selectedQuality = qualitySteps.first;
+
+      for (final int quality in qualitySteps) {
+        final Uint8List candidate = Uint8List.fromList(
+          img.encodeJpg(resized, quality: quality),
+        );
+        bestBytes = candidate;
+        selectedQuality = quality;
+        if (candidate.lengthInBytes <= 60 * 1024) {
+          break;
+        }
+      }
+
+      if (bestBytes == null) {
+        return null;
+      }
+
+      return _AvatarProcessingResult(
+        bytes: bestBytes,
+        originalSize: rawBytes.length,
+        finalSize: bestBytes.length,
+        quality: selectedQuality,
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Avatar processing failed: $error\n$stackTrace');
+      return null;
+    }
+  }
+
   void _onFormChanged() {
     if (!_saving) {
       _markDirty();
@@ -179,6 +288,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
 
   Map<String, dynamic> _captureSnapshot() {
     return <String, dynamic>{
+      'avatarState': _avatarCleared
+          ? 'cleared'
+          : (_pendingAvatarBytes != null ? 'pending' : _user.avatar),
       'displayName': _collapseSpaces(_displayNameController.text),
       'bio': _bioController.text.trim(),
       'gender': _gender,
@@ -239,8 +351,23 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: _onWillPop,
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) {
+          return;
+        }
+
+        final navigator = Navigator.of(context);
+        final shouldPop = await _onWillPop();
+        if (!mounted) {
+          return;
+        }
+
+        if (shouldPop) {
+          navigator.pop();
+        }
+      },
       child: Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
@@ -255,8 +382,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
               const SizedBox(width: 12),
               if (_isDirty)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.orange.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(10),
@@ -293,13 +422,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
           ],
           bottom: TabBar(
             controller: _tabController,
-            tabs: _tabTitles
-                .map(
-                  (title) => Tab(
-                    text: title,
-                  ),
-                )
-                .toList(),
+            tabs: _tabTitles.map((title) => Tab(text: title)).toList(),
             indicatorColor: Colors.orange,
             labelColor: Colors.orange,
             unselectedLabelColor: Colors.white54,
@@ -352,6 +475,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _buildAvatarSection(),
+          const SizedBox(height: 32),
           _sectionHeader(
             title: 'Görünen İsim',
             subtitle:
@@ -468,6 +593,407 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
     );
   }
 
+  Widget _buildAvatarSection() {
+    final double previewSize = 112;
+    final bool hasPendingAvatar = _pendingAvatarBytes != null;
+    final bool hasStoredAvatar = !_isAvatarEmpty(_user.avatar);
+    final bool hasCustomAvatar =
+        hasPendingAvatar || (hasStoredAvatar && !_avatarCleared);
+    final bool canClearAvatar = !_avatarCleared && hasCustomAvatar;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader(
+          title: 'Profil Fotoğrafı',
+          subtitle:
+              'Kare bir görsel seç, gerekirse kırp. Uygulama otomatik olarak 256px’e düşürüp sıkıştırır.',
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: previewSize,
+                  height: previewSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFA726), Color(0xFFFF7043)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.orange.withValues(alpha: 0.35),
+                        blurRadius: 22,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: previewSize - 12,
+                  height: previewSize - 12,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      width: 2.2,
+                    ),
+                  ),
+                  child: ClipOval(child: _buildAvatarPreview(previewSize - 20)),
+                ),
+                Positioned(
+                  bottom: 4,
+                  right: 6,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt,
+                      size: 16,
+                      color: Colors.orange,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: _avatarProcessing
+                            ? null
+                            : () => _handleAvatarSelection(useCamera: false),
+                        icon: const Icon(Icons.photo_library_outlined),
+                        label: const Text('Galeriden Seç'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF8A50),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _avatarProcessing
+                            ? null
+                            : () => _handleAvatarSelection(useCamera: true),
+                        icon: const Icon(Icons.photo_camera_outlined),
+                        label: const Text('Kameradan Çek'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.orange,
+                          side: const BorderSide(color: Colors.orange),
+                        ),
+                      ),
+                      if (canClearAvatar)
+                        TextButton.icon(
+                          onPressed: _avatarProcessing
+                              ? null
+                              : _clearSelectedAvatar,
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Kaldır'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.redAccent,
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (_avatarProcessing)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 12),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'Fotoğraf sıkıştırılıyor...',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (!_avatarProcessing &&
+                      _avatarOriginalSize != null &&
+                      _avatarCompressedSize != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(
+                        'Sıkıştırma: '
+                        '${(_avatarOriginalSize! / 1024).toStringAsFixed(1)}KB → '
+                        '${(_avatarCompressedSize! / 1024).toStringAsFixed(1)}KB '
+                        '(kalite %${_avatarQuality ?? 0})',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  const Padding(
+                    padding: EdgeInsets.only(top: 12),
+                    child: Text(
+                      'Fotoğraf otomatik olarak en fazla 256px boyutuna küçültülür '
+                      've %40-70 kalite aralığında sıkıştırılır. Böylece profilin '
+                      'hızlı yüklenir ve veri tasarrufu sağlanır.',
+                      style: TextStyle(color: Colors.white60, fontSize: 13),
+                    ),
+                  ),
+                  if (hasCustomAvatar && !_avatarProcessing)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Yeni görünümünü kaydetmek için "Kaydet" butonuna basmayı unutma.',
+                        style: TextStyle(
+                          color: Colors.orange.shade200,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAvatarPreview(double size) {
+    if (_avatarProcessing) {
+      return Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            colors: [Color(0xFF2C3350), Color(0xFF1F2538)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: const SizedBox(
+          width: 26,
+          height: 26,
+          child: CircularProgressIndicator(strokeWidth: 3),
+        ),
+      );
+    }
+
+    if (_avatarPreviewBytes != null && !_avatarCleared) {
+      return Image.memory(
+        _avatarPreviewBytes!,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+      );
+    }
+
+    if (_avatarCleared) {
+      return _buildAvatarFallback(size);
+    }
+
+    final String trimmedAvatar = _user.avatar.trim();
+
+    if (trimmedAvatar.startsWith('http')) {
+      return Image.network(
+        trimmedAvatar,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) =>
+            _buildAvatarFallback(size),
+      );
+    }
+
+    if (trimmedAvatar.startsWith('data:image')) {
+      final Uint8List? decoded =
+          _avatarPreviewBytes ?? _decodeAvatarBytes(trimmedAvatar);
+      if (decoded != null) {
+        return Image.memory(
+          decoded,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+        );
+      }
+    }
+
+    return _buildAvatarFallback(size);
+  }
+
+  Widget _buildAvatarFallback(double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [Color(0xFF2C3350), Color(0xFF1F2538)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          _avatarInitial(),
+          style: const TextStyle(
+            fontSize: 32,
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleAvatarSelection({required bool useCamera}) async {
+    if (_avatarProcessing) {
+      return;
+    }
+
+    setState(() {
+      _avatarProcessing = true;
+      _avatarOriginalSize = null;
+      _avatarCompressedSize = null;
+      _avatarQuality = null;
+    });
+
+    final imageFile = useCamera
+        ? await _avatarUploadService.pickImageFromCamera()
+        : await _avatarUploadService.pickImageFromGallery();
+
+    if (!mounted) {
+      return;
+    }
+
+    if (imageFile == null) {
+      setState(() {
+        _avatarProcessing = false;
+      });
+      return;
+    }
+
+    CroppedFile? croppedFile;
+    try {
+      croppedFile = await _avatarUploadService.cropImage(
+        sourcePath: imageFile.path,
+        context: context,
+      );
+    } catch (_) {
+      // Errors already logged within the service
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    Uint8List? rawBytes;
+
+    if (croppedFile != null) {
+      rawBytes = await croppedFile.readAsBytes();
+    } else if (kIsWeb) {
+      rawBytes = await imageFile.readAsBytes();
+      if (mounted) {
+        _showSnack(
+          'Web sürümünde kırpma henüz desteklenmiyor, görsel kırpılmadan kullanılacak.',
+        );
+      }
+    } else {
+      setState(() {
+        _avatarProcessing = false;
+      });
+      _showSnack('Kırpma iptal edildi.');
+      return;
+    }
+
+    final Uint8List rawBytesNonNull = rawBytes;
+    final _AvatarProcessingResult? processed = await _prepareAvatarData(
+      rawBytesNonNull,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (processed == null) {
+      setState(() {
+        _avatarProcessing = false;
+      });
+      _showSnack(
+        'Fotoğraf işlenemedi. Farklı bir görsel seçmeyi dene.',
+        isError: true,
+      );
+      return;
+    }
+
+    setState(() {
+      _avatarPreviewBytes = processed.bytes;
+      _pendingAvatarBytes = processed.bytes;
+      _avatarOriginalSize = processed.originalSize;
+      _avatarCompressedSize = processed.finalSize;
+      _avatarQuality = processed.quality;
+      _avatarProcessing = false;
+      _avatarCleared = false;
+    });
+    _markDirty();
+  }
+
+  void _clearSelectedAvatar() {
+    if (_avatarProcessing) {
+      return;
+    }
+
+    setState(() {
+      _avatarPreviewBytes = null;
+      _pendingAvatarBytes = null;
+      _avatarCleared = true;
+      _avatarOriginalSize = null;
+      _avatarCompressedSize = null;
+      _avatarQuality = null;
+    });
+    _markDirty();
+  }
+
+  String _avatarInitial() {
+    final List<String> candidates = [
+      _displayNameController.text.trim(),
+      _user.fullName.trim(),
+      _user.username.trim(),
+      _user.email.trim(),
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate.isEmpty) continue;
+      final int codePoint = candidate.runes.isNotEmpty
+          ? candidate.runes.first
+          : candidate.codeUnitAt(0);
+      return String.fromCharCode(codePoint).toUpperCase();
+    }
+
+    return '👤';
+  }
+
   Widget _buildDemographicsTab() {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -477,7 +1003,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
         children: [
           _sectionHeader(
             title: 'Cinsiyet',
-            subtitle: 'İsteğe bağlı. Diğer seçilirse 30 karaktere kadar açıklayabilirsin.',
+            subtitle:
+                'İsteğe bağlı. Diğer seçilirse 30 karaktere kadar açıklayabilirsin.',
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -595,7 +1122,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: _educationLevel,
+            key: ValueKey(_educationLevel),
+            initialValue: _educationLevel,
             decoration: _inputDecoration(label: 'Seviye'),
             dropdownColor: const Color(0xFF1B1F2A),
             items: _educationLabels.entries
@@ -706,10 +1234,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
         const SizedBox(height: 6),
         Text(
           description,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.65),
-            fontSize: 13,
-          ),
+          style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 13),
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -764,11 +1289,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
       contentPadding: EdgeInsets.zero,
       value: value,
       onChanged: _saving ? null : onChanged,
-      title: Text(
-        title,
-        style: const TextStyle(color: Colors.white),
-      ),
-      activeColor: Colors.orange,
+      title: Text(title, style: const TextStyle(color: Colors.white)),
+      activeTrackColor: Colors.orange,
     );
   }
 
@@ -788,10 +1310,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
         children: [
           const Text(
             'Önizleme',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 6),
           Text(
@@ -807,13 +1326,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
               spacing: 8,
               runSpacing: 8,
               children: [
-                ...links.map((link) => Chip(
-                      label: Text(link),
-                      avatar: const Icon(Icons.link, size: 16),
-                    )),
-                ...emojis.map((emoji) => Chip(
-                      label: Text(emoji),
-                    )),
+                ...links.map(
+                  (link) => Chip(
+                    label: Text(link),
+                    avatar: const Icon(Icons.link, size: 16),
+                  ),
+                ),
+                ...emojis.map((emoji) => Chip(label: Text(emoji))),
               ],
             ),
           ],
@@ -822,10 +1341,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
     );
   }
 
-  Widget _sectionHeader({
-    required String title,
-    required String subtitle,
-  }) {
+  Widget _sectionHeader({required String title, required String subtitle}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -863,9 +1379,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
       errorText: errorText,
       filled: true,
       fillColor: Colors.white.withOpacity(0.06),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
@@ -952,8 +1466,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
 
   String? _validateDisplayName(String? value) {
     final String collapsed = _collapseSpaces(value ?? '');
-    if (collapsed.length < _displayNameMinLength) {
-      return 'En az $_displayNameMinLength karakter olmalı.';
+    if (collapsed.length < _displayNameminLength) {
+      return 'En az $_displayNameminLength karakter olmalı.';
     }
     if (collapsed.length > _displayNameMaxLength) {
       return 'En fazla $_displayNameMaxLength karakter.';
@@ -980,10 +1494,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
 
   Future<void> _pickBirthDate() async {
     final DateTime now = DateTime.now();
-    final DateTime initial = _birthDate ??
-        DateTime(now.year - _minAgeYears, now.month, now.day);
+    final DateTime initial =
+        _birthDate ?? DateTime(now.year - _minAgeYears, now.month, now.day);
     final DateTime firstDate = DateTime(now.year - 100, 1, 1);
-    final DateTime lastDate = DateTime(now.year - _minAgeYears, now.month, now.day);
+    final DateTime lastDate = DateTime(
+      now.year - _minAgeYears,
+      now.month,
+      now.day,
+    );
 
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -1032,10 +1550,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
     _normalizeDisplayNameInput();
 
     if (!(_formKey.currentState?.validate() ?? false)) {
-      _showSnack(
-        'Lütfen formdaki hataları düzelt.',
-        isError: true,
-      );
+      _showSnack('Lütfen formdaki hataları düzelt.', isError: true);
       return;
     }
 
@@ -1049,11 +1564,54 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
       _saving = true;
     });
 
-    final String collapsedDisplayName = _collapseSpaces(_displayNameController.text);
+    final String collapsedDisplayName = _collapseSpaces(
+      _displayNameController.text,
+    );
     final String sanitizedBio = _bioController.text.trim();
     final String genderOther = _gender == 'other'
         ? _genderOtherController.text.trim()
         : '';
+
+    String finalAvatar = _user.avatar;
+    String? avatarToDelete;
+
+    try {
+      if (_avatarCleared) {
+        finalAvatar = '👤';
+        if (_user.avatar.trim().startsWith('http')) {
+          avatarToDelete = _user.avatar.trim();
+        }
+      } else if (_pendingAvatarBytes != null) {
+        final String? uploadedUrl = await _avatarUploadService
+            .uploadAvatarBytes(userId: _user.id, bytes: _pendingAvatarBytes!);
+
+        if (uploadedUrl == null) {
+          _showSnack(
+            'Profil fotoğrafı yüklenemedi. Lütfen tekrar dene.',
+            isError: true,
+          );
+          setState(() {
+            _saving = false;
+          });
+          return;
+        }
+
+        finalAvatar = uploadedUrl;
+        if (_user.avatar.trim().startsWith('http')) {
+          avatarToDelete = _user.avatar.trim();
+        }
+      }
+    } catch (error, stack) {
+      debugPrint('Avatar yükleme hatası: $error\n$stack');
+      _showSnack(
+        'Profil fotoğrafı yüklenemedi. Lütfen tekrar dene.',
+        isError: true,
+      );
+      setState(() {
+        _saving = false;
+      });
+      return;
+    }
 
     final UserVisibilitySettings updatedVisibility = _user.visibility.copyWith(
       phoneNumber: _visibility['phoneNumber'] ?? 'private',
@@ -1067,6 +1625,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
     );
 
     final User updatedUser = _user.copyWith(
+      avatar: finalAvatar,
       displayName: collapsedDisplayName,
       bio: sanitizedBio,
       gender: _gender,
@@ -1078,7 +1637,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
     );
 
     try {
-      final bool success = await UserService.instance.updateProfile(updatedUser);
+      final bool success = await UserService.instance.updateProfile(
+        updatedUser,
+      );
       if (!success) {
         _showSnack(
           'Profil güncellemesi başarısız oldu. Lütfen tekrar dene.',
@@ -1089,12 +1650,45 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
 
       if (!mounted) return;
 
+      final Uint8List? pendingPreview = _pendingAvatarBytes;
+      final bool cleared = _isAvatarEmpty(updatedUser.avatar);
       setState(() {
         _user = updatedUser;
+        _pendingAvatarBytes = null;
+        _avatarCleared = cleared;
+        if (cleared) {
+          _avatarPreviewBytes = null;
+        } else if (updatedUser.avatar.startsWith('data:image')) {
+          _avatarPreviewBytes = _decodeAvatarBytes(updatedUser.avatar);
+        } else if (pendingPreview != null) {
+          _avatarPreviewBytes = pendingPreview;
+        }
+        _avatarOriginalSize = null;
+        _avatarCompressedSize = null;
+        _avatarQuality = null;
       });
 
+      if (avatarToDelete != null && avatarToDelete != finalAvatar) {
+        unawaited(_avatarUploadService.deleteOldAvatar(avatarToDelete));
+      }
+
       _resetDirtyTracking();
-      _showSnack('Profilin başarıyla güncellendi.');
+      _saving = false;
+      final navigator = Navigator.of(context);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        navigator.pushNamedAndRemoveUntil('/main', (route) => false);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final messenger = ScaffoldMessenger.maybeOf(navigator.context);
+          messenger?.showSnackBar(
+            const SnackBar(
+              content: Text('Profilin başarıyla güncellendi.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        });
+      });
+      navigator.pop<User>(updatedUser);
+      return;
     } on FirebaseFunctionsException catch (error, stack) {
       debugPrint('Profil güncelleme Firebase hatası: ${error.message}\n$stack');
       _showSnack(
@@ -1108,7 +1702,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
         isError: true,
       );
     } finally {
-      if (mounted) {
+      if (mounted && _saving) {
         setState(() {
           _saving = false;
         });
@@ -1313,8 +1907,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
   }
 
   Future<String?> _promptForEmailAddress() async {
-    final TextEditingController controller =
-        TextEditingController(text: _emailController.text.trim());
+    final TextEditingController controller = TextEditingController(
+      text: _emailController.text.trim(),
+    );
     String? errorText;
 
     final String? result = await showDialog<String>(
@@ -1435,7 +2030,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                     const SizedBox(height: 10),
                     SelectableText(
                       'Geliştirici kodu: $debugCode',
-                      style: const TextStyle(color: Colors.orange, fontSize: 12),
+                      style: const TextStyle(
+                        color: Colors.orange,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ],
@@ -1470,8 +2068,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
   }
 
   Future<String?> _promptForPhoneNumber() async {
-    final TextEditingController controller =
-        TextEditingController(text: _phoneController.text.trim());
+    final TextEditingController controller = TextEditingController(
+      text: _phoneController.text.trim(),
+    );
     String? errorText;
 
     final String? result = await showDialog<String>(
@@ -1497,7 +2096,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                       labelText: 'Telefon',
                       hintText: '+905XXXXXXXXX',
                       labelStyle: const TextStyle(color: Colors.white70),
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
+                      hintStyle: TextStyle(
+                        color: Colors.white.withOpacity(0.4),
+                      ),
                       errorText: errorText,
                       filled: true,
                       fillColor: Colors.white.withOpacity(0.08),
@@ -1595,7 +2196,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                     const SizedBox(height: 10),
                     SelectableText(
                       'Geliştirici kodu: $debugCode',
-                      style: const TextStyle(color: Colors.orange, fontSize: 12),
+                      style: const TextStyle(
+                        color: Colors.orange,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ],
@@ -1771,6 +2375,20 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
   String _normalizeVisibility(String value) {
     return _visibilityOptions.contains(value) ? value : 'private';
   }
+}
+
+class _AvatarProcessingResult {
+  final Uint8List bytes;
+  final int originalSize;
+  final int finalSize;
+  final int quality;
+
+  const _AvatarProcessingResult({
+    required this.bytes,
+    required this.originalSize,
+    required this.finalSize,
+    required this.quality,
+  });
 }
 
 class _StatusChip extends StatelessWidget {

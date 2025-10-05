@@ -17,10 +17,7 @@ class UserVisibilitySettings {
     );
   }
 
-  Map<String, dynamic> toMap() => {
-        'phoneNumber': phoneNumber,
-        'email': email,
-      };
+  Map<String, dynamic> toMap() => {'phoneNumber': phoneNumber, 'email': email};
 
   UserVisibilitySettings copyWith({String? phoneNumber, String? email}) {
     return UserVisibilitySettings(
@@ -63,10 +60,10 @@ class UserPreferences {
   }
 
   Map<String, dynamic> toMap() => {
-        'showActivityStatus': showActivityStatus,
-        'allowTagging': allowTagging,
-        'allowMessagesFromNonFollowers': allowMessagesFromNonFollowers,
-      };
+    'showActivityStatus': showActivityStatus,
+    'allowTagging': allowTagging,
+    'allowMessagesFromNonFollowers': allowMessagesFromNonFollowers,
+  };
 
   UserPreferences copyWith({
     bool? showActivityStatus,
@@ -74,12 +71,10 @@ class UserPreferences {
     bool? allowMessagesFromNonFollowers,
   }) {
     return UserPreferences(
-      showActivityStatus:
-          showActivityStatus ?? this.showActivityStatus,
+      showActivityStatus: showActivityStatus ?? this.showActivityStatus,
       allowTagging: allowTagging ?? this.allowTagging,
       allowMessagesFromNonFollowers:
-          allowMessagesFromNonFollowers ??
-              this.allowMessagesFromNonFollowers,
+          allowMessagesFromNonFollowers ?? this.allowMessagesFromNonFollowers,
     );
   }
 }
@@ -117,6 +112,9 @@ class User {
   final String educationLevel;
   final UserVisibilitySettings visibility;
   final UserPreferences preferences;
+  final bool isSuperAdmin;
+  final List<String> moderatedCategories;
+  final Map<String, List<String>> categoryPermissions;
 
   User({
     required this.id,
@@ -141,25 +139,27 @@ class User {
     this.isSuspended = false,
     this.ownedStoreItems = const [],
     this.equippedFrameItemId,
-  this.equippedBadgeItemIds = const [],
-  this.equippedNameColorItemId,
-  this.equippedBackgroundItemId,
-  String? phoneNumber,
+    this.equippedBadgeItemIds = const [],
+    this.equippedNameColorItemId,
+    this.equippedBackgroundItemId,
+    String? phoneNumber,
     String gender = 'prefer_not',
     String? genderOther,
     DateTime? birthDate,
     String educationLevel = 'higher',
     UserVisibilitySettings? visibility,
     UserPreferences? preferences,
-  })  : displayName =
-            _normalizeDisplayName(displayName, fullName, username),
-  phoneNumber = _stringOrNull(phoneNumber),
-  gender = _normalizeGender(gender),
-        genderOther = (genderOther ?? '').trim(),
-        birthDate = _normalizeBirthDate(birthDate),
-        educationLevel = _normalizeEducationLevel(educationLevel),
-        visibility = visibility ?? const UserVisibilitySettings(),
-        preferences = preferences ?? const UserPreferences();
+    this.isSuperAdmin = false,
+    this.moderatedCategories = const [],
+    this.categoryPermissions = const {},
+  }) : displayName = _normalizeDisplayName(displayName, fullName, username),
+       phoneNumber = _stringOrNull(phoneNumber),
+       gender = _normalizeGender(gender),
+       genderOther = (genderOther ?? '').trim(),
+       birthDate = _normalizeBirthDate(birthDate),
+       educationLevel = _normalizeEducationLevel(educationLevel),
+       visibility = visibility ?? const UserVisibilitySettings(),
+       preferences = preferences ?? const UserPreferences();
 
   // Seviye hesaplama
   String get seviyeAdi {
@@ -201,8 +201,9 @@ class User {
       id: json['id'] ?? '',
       username: json['username'] ?? '',
       email: json['email'] ?? '',
-  fullName: json['fullName'] ?? json['displayName'] ?? '',
-  displayName: json['displayName'] ?? json['fullName'] ?? json['username'] ?? '',
+      fullName: json['fullName'] ?? json['displayName'] ?? '',
+      displayName:
+          json['displayName'] ?? json['fullName'] ?? json['username'] ?? '',
       avatar: json['avatar'] ?? '👤',
       bio: json['bio'] ?? '',
       krepScore: json['krepScore'] ?? 0,
@@ -210,73 +211,80 @@ class User {
       followersCount: json['followersCount'] ?? 0,
       followingCount: json['followingCount'] ?? 0,
       entriesCount: json['entriesCount'] ?? 0,
-    coins: json['coins'] ?? json['coinBalance'] ?? 0,
-      joinDate: json['joinDate'] != null 
-          ? DateTime.parse(json['joinDate']) 
+      coins: json['coins'] ?? json['coinBalance'] ?? 0,
+      joinDate: json['joinDate'] != null
+          ? DateTime.parse(json['joinDate'])
           : DateTime.now(),
-      lastActive: json['lastActive'] != null 
+      lastActive: json['lastActive'] != null
           ? DateTime.parse(json['lastActive'])
           : DateTime.now(),
       rozetler: List<String>.from(json['rozetler'] ?? []),
       isPremium: json['isPremium'] ?? false,
       isVerified: json['isVerified'] ?? false,
-  isPrivate: json['isPrivate'] ?? json['is_private'] ?? false,
-  isSuspended: json['isSuspended'] ?? json['is_suspended'] ?? false,
+      isPrivate: json['isPrivate'] ?? json['is_private'] ?? false,
+      isSuspended: json['isSuspended'] ?? json['is_suspended'] ?? false,
       ownedStoreItems: _mergeLists(
         List<String>.from(json['ownedStoreItems'] ?? const []),
         List<String>.from(json['ownedItems'] ?? const []),
       ),
-    equippedFrameItemId:
-      _stringOrNull(json['equippedStoreItems']?['frame']),
-    equippedBadgeItemIds: _safeStringList(
-    json['equippedStoreItems']?['badges'],
-    ),
-    equippedNameColorItemId:
-      _stringOrNull(json['equippedStoreItems']?['nameColor']),
-    equippedBackgroundItemId:
-    _stringOrNull(json['equippedStoreItems']?['background']),
-    phoneNumber: _stringOrNull(json['phoneNumber']),
-    gender: json['gender'] ?? 'prefer_not',
-    genderOther: json['genderOther'] ?? '',
-    birthDate: _parseDate(json['birthDate']),
-    educationLevel: json['education']?['level'] ??
-      json['educationLevel'] ?? 'higher',
-    visibility: UserVisibilitySettings.fromMap(
-    json['visibility'] is Map<String, dynamic>
-      ? json['visibility'] as Map<String, dynamic>
-      : json['visibility'] is Map
-        ? (json['visibility'] as Map)
-          .map((key, value) => MapEntry('$key', value))
-        : null,
-    ),
-    preferences: UserPreferences.fromMap(
-    json['preferences'] is Map<String, dynamic>
-      ? json['preferences'] as Map<String, dynamic>
-      : json['preferences'] is Map
-        ? (json['preferences'] as Map)
-          .map((key, value) => MapEntry('$key', value))
-        : null,
-    ),
+      equippedFrameItemId: _stringOrNull(json['equippedStoreItems']?['frame']),
+      equippedBadgeItemIds: _safeStringList(
+        json['equippedStoreItems']?['badges'],
+      ),
+      equippedNameColorItemId: _stringOrNull(
+        json['equippedStoreItems']?['nameColor'],
+      ),
+      equippedBackgroundItemId: _stringOrNull(
+        json['equippedStoreItems']?['background'],
+      ),
+      phoneNumber: _stringOrNull(json['phoneNumber']),
+      gender: json['gender'] ?? 'prefer_not',
+      genderOther: json['genderOther'] ?? '',
+      birthDate: _parseDate(json['birthDate']),
+      educationLevel:
+          json['education']?['level'] ?? json['educationLevel'] ?? 'higher',
+      visibility: UserVisibilitySettings.fromMap(
+        json['visibility'] is Map<String, dynamic>
+            ? json['visibility'] as Map<String, dynamic>
+            : json['visibility'] is Map
+            ? (json['visibility'] as Map).map(
+                (key, value) => MapEntry('$key', value),
+              )
+            : null,
+      ),
+      preferences: UserPreferences.fromMap(
+        json['preferences'] is Map<String, dynamic>
+            ? json['preferences'] as Map<String, dynamic>
+            : json['preferences'] is Map
+            ? (json['preferences'] as Map).map(
+                (key, value) => MapEntry('$key', value),
+              )
+            : null,
+      ),
+      isSuperAdmin: json['isSuperAdmin'] ?? (json['email'] == 'umityeke@gmail.com'),
+      moderatedCategories: List<String>.from(json['moderatedCategories'] ?? const []),
+      categoryPermissions: _parseCategoryPermissions(json['categoryPermissions']),
     );
   }
 
   // Firebase Firestore serialization
   factory User.fromMap(Map<String, dynamic> map) {
     final rawId = map['id'] ?? map['uid'] ?? map['userId'];
-  final normalizedId = rawId is String
-    ? rawId.trim()
+    final normalizedId = rawId is String
+        ? rawId.trim()
         : rawId != null
-      ? rawId.toString().trim()
-            : '';
+        ? rawId.toString().trim()
+        : '';
 
     final equipped = _asEquippedMap(map['equippedStoreItems']);
 
     return User(
       id: normalizedId,
       username: map['username'] ?? '',
-  email: map['email'] ?? '',
-  fullName: map['fullName'] ?? map['displayName'] ?? '',
-  displayName: map['displayName'] ?? map['fullName'] ?? map['username'] ?? '',
+      email: map['email'] ?? '',
+      fullName: map['fullName'] ?? map['displayName'] ?? '',
+      displayName:
+          map['displayName'] ?? map['fullName'] ?? map['username'] ?? '',
       avatar: map['avatar'] ?? '👤',
       bio: map['bio'] ?? '',
       krepScore: map['krepScore'] ?? 0,
@@ -284,48 +292,53 @@ class User {
       followersCount: map['followersCount'] ?? 0,
       followingCount: map['followingCount'] ?? 0,
       entriesCount: map['entriesCount'] ?? 0,
-    coins: map['coins'] ?? map['coinBalance'] ?? 0,
-      joinDate: map['joinDate'] != null 
-          ? (map['joinDate'] as dynamic).toDate() 
+      coins: map['coins'] ?? map['coinBalance'] ?? 0,
+      joinDate: map['joinDate'] != null
+          ? (map['joinDate'] as dynamic).toDate()
           : DateTime.now(),
-      lastActive: map['lastActive'] != null 
+      lastActive: map['lastActive'] != null
           ? (map['lastActive'] as dynamic).toDate()
           : DateTime.now(),
       rozetler: List<String>.from(map['rozetler'] ?? []),
       isPremium: map['isPremium'] ?? false,
       isVerified: map['isVerified'] ?? false,
-  isPrivate: map['isPrivate'] ?? map['is_private'] ?? false,
-  isSuspended: map['isSuspended'] ?? map['is_suspended'] ?? false,
+      isPrivate: map['isPrivate'] ?? map['is_private'] ?? false,
+      isSuspended: map['isSuspended'] ?? map['is_suspended'] ?? false,
       ownedStoreItems: _mergeLists(
         _safeStringList(map['ownedStoreItems']),
         _safeStringList(map['ownedItems']),
       ),
       equippedFrameItemId: _stringOrNull(equipped['frame']),
-    equippedBadgeItemIds: _safeStringList(equipped['badges']),
-    equippedNameColorItemId: _stringOrNull(equipped['nameColor']),
-    equippedBackgroundItemId: _stringOrNull(equipped['background']),
-    phoneNumber: _stringOrNull(map['phoneNumber']),
-    gender: map['gender'] ?? 'prefer_not',
-    genderOther: map['genderOther'] ?? '',
-    birthDate: _parseDate(map['birthDate']),
-    educationLevel:
-      map['education']?['level'] ?? map['educationLevel'] ?? 'higher',
-    visibility: UserVisibilitySettings.fromMap(
-    map['visibility'] is Map<String, dynamic>
-      ? map['visibility'] as Map<String, dynamic>
-      : map['visibility'] is Map
-        ? (map['visibility'] as Map)
-          .map((key, value) => MapEntry('$key', value))
-        : null,
-    ),
-    preferences: UserPreferences.fromMap(
-    map['preferences'] is Map<String, dynamic>
-      ? map['preferences'] as Map<String, dynamic>
-      : map['preferences'] is Map
-        ? (map['preferences'] as Map)
-          .map((key, value) => MapEntry('$key', value))
-        : null,
-    ),
+      equippedBadgeItemIds: _safeStringList(equipped['badges']),
+      equippedNameColorItemId: _stringOrNull(equipped['nameColor']),
+      equippedBackgroundItemId: _stringOrNull(equipped['background']),
+      phoneNumber: _stringOrNull(map['phoneNumber']),
+      gender: map['gender'] ?? 'prefer_not',
+      genderOther: map['genderOther'] ?? '',
+      birthDate: _parseDate(map['birthDate']),
+      educationLevel:
+          map['education']?['level'] ?? map['educationLevel'] ?? 'higher',
+      visibility: UserVisibilitySettings.fromMap(
+        map['visibility'] is Map<String, dynamic>
+            ? map['visibility'] as Map<String, dynamic>
+            : map['visibility'] is Map
+            ? (map['visibility'] as Map).map(
+                (key, value) => MapEntry('$key', value),
+              )
+            : null,
+      ),
+      preferences: UserPreferences.fromMap(
+        map['preferences'] is Map<String, dynamic>
+            ? map['preferences'] as Map<String, dynamic>
+            : map['preferences'] is Map
+            ? (map['preferences'] as Map).map(
+                (key, value) => MapEntry('$key', value),
+              )
+            : null,
+      ),
+      isSuperAdmin: map['isSuperAdmin'] ?? (map['email'] == 'umityeke@gmail.com'),
+      moderatedCategories: List<String>.from(map['moderatedCategories'] ?? const []),
+      categoryPermissions: _parseCategoryPermissions(map['categoryPermissions']),
     );
   }
 
@@ -334,8 +347,8 @@ class User {
       'id': id,
       'username': username,
       'email': email,
-  'fullName': fullName,
-  'displayName': displayName,
+      'fullName': fullName,
+      'displayName': displayName,
       'avatar': avatar,
       'bio': bio,
       'krepScore': krepScore,
@@ -343,28 +356,29 @@ class User {
       'followersCount': followersCount,
       'followingCount': followingCount,
       'entriesCount': entriesCount,
-  'coins': coins,
+      'coins': coins,
       'joinDate': joinDate,
       'lastActive': lastActive,
       'rozetler': rozetler,
       'isPremium': isPremium,
       'isVerified': isVerified,
-  'isPrivate': isPrivate,
-  'isSuspended': isSuspended,
-  'is_private': isPrivate,
-  'is_suspended': isSuspended,
+      'isPrivate': isPrivate,
+      'isSuspended': isSuspended,
+      'is_private': isPrivate,
+      'is_suspended': isSuspended,
       'ownedStoreItems': ownedStoreItems,
       'ownedItems': ownedStoreItems,
       'phoneNumber': phoneNumber,
       'gender': gender,
       'genderOther': genderOther,
       'birthDate': birthDate,
-      'education': {
-        'level': educationLevel,
-      },
-    'educationLevel': educationLevel,
+      'education': {'level': educationLevel},
+      'educationLevel': educationLevel,
       'visibility': visibility.toMap(),
       'preferences': preferences.toMap(),
+      'isSuperAdmin': isSuperAdmin,
+      'moderatedCategories': moderatedCategories,
+      'categoryPermissions': categoryPermissions,
     };
 
     final equipped = <String, dynamic>{};
@@ -393,8 +407,8 @@ class User {
       'id': id,
       'username': username,
       'email': email,
-  'fullName': fullName,
-  'displayName': displayName,
+      'fullName': fullName,
+      'displayName': displayName,
       'avatar': avatar,
       'bio': bio,
       'krepScore': krepScore,
@@ -402,7 +416,7 @@ class User {
       'followersCount': followersCount,
       'followingCount': followingCount,
       'entriesCount': entriesCount,
-  'coins': coins,
+      'coins': coins,
       'joinDate': joinDate.toIso8601String(),
       'lastActive': lastActive.toIso8601String(),
       'rozetler': rozetler,
@@ -413,12 +427,13 @@ class User {
       'gender': gender,
       'genderOther': genderOther,
       'birthDate': birthDate?.toIso8601String(),
-      'education': {
-        'level': educationLevel,
-      },
+      'education': {'level': educationLevel},
       'educationLevel': educationLevel,
       'visibility': visibility.toMap(),
       'preferences': preferences.toMap(),
+      'isSuperAdmin': isSuperAdmin,
+      'moderatedCategories': moderatedCategories,
+      'categoryPermissions': categoryPermissions,
     };
 
     json['isPrivate'] = isPrivate;
@@ -467,8 +482,8 @@ class User {
     bool? isPremium,
     bool? isVerified,
     int? coins,
-  bool? isPrivate,
-  bool? isSuspended,
+    bool? isPrivate,
+    bool? isSuspended,
     List<String>? ownedStoreItems,
     String? equippedFrameItemId,
     List<String>? equippedBadgeItemIds,
@@ -481,6 +496,9 @@ class User {
     String? educationLevel,
     UserVisibilitySettings? visibility,
     UserPreferences? preferences,
+    bool? isSuperAdmin,
+    List<String>? moderatedCategories,
+    Map<String, List<String>>? categoryPermissions,
   }) {
     return User(
       id: id ?? this.id,
@@ -495,22 +513,21 @@ class User {
       followersCount: followersCount ?? this.followersCount,
       followingCount: followingCount ?? this.followingCount,
       entriesCount: entriesCount ?? this.entriesCount,
-  coins: coins ?? this.coins,
+      coins: coins ?? this.coins,
       joinDate: joinDate ?? this.joinDate,
       lastActive: lastActive ?? this.lastActive,
       rozetler: rozetler ?? this.rozetler,
       isPremium: isPremium ?? this.isPremium,
       isVerified: isVerified ?? this.isVerified,
-  isPrivate: isPrivate ?? this.isPrivate,
-  isSuspended: isSuspended ?? this.isSuspended,
-    ownedStoreItems: ownedStoreItems ?? this.ownedStoreItems,
-    equippedFrameItemId: equippedFrameItemId ?? this.equippedFrameItemId,
-    equippedBadgeItemIds:
-      equippedBadgeItemIds ?? this.equippedBadgeItemIds,
-    equippedNameColorItemId:
-      equippedNameColorItemId ?? this.equippedNameColorItemId,
-    equippedBackgroundItemId:
-      equippedBackgroundItemId ?? this.equippedBackgroundItemId,
+      isPrivate: isPrivate ?? this.isPrivate,
+      isSuspended: isSuspended ?? this.isSuspended,
+      ownedStoreItems: ownedStoreItems ?? this.ownedStoreItems,
+      equippedFrameItemId: equippedFrameItemId ?? this.equippedFrameItemId,
+      equippedBadgeItemIds: equippedBadgeItemIds ?? this.equippedBadgeItemIds,
+      equippedNameColorItemId:
+          equippedNameColorItemId ?? this.equippedNameColorItemId,
+      equippedBackgroundItemId:
+          equippedBackgroundItemId ?? this.equippedBackgroundItemId,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       gender: gender ?? this.gender,
       genderOther: genderOther ?? this.genderOther,
@@ -518,6 +535,9 @@ class User {
       educationLevel: educationLevel ?? this.educationLevel,
       visibility: visibility ?? this.visibility,
       preferences: preferences ?? this.preferences,
+      isSuperAdmin: isSuperAdmin ?? this.isSuperAdmin,
+      moderatedCategories: moderatedCategories ?? this.moderatedCategories,
+      categoryPermissions: categoryPermissions ?? this.categoryPermissions,
     );
   }
 
@@ -541,10 +561,9 @@ class User {
     return now.difference(lastActive).inMinutes < 30;
   }
 
-  String get preferredDisplayName =>
-      displayName.trim().isNotEmpty
-          ? displayName.trim()
-          : (fullName.trim().isNotEmpty ? fullName.trim() : username);
+  String get preferredDisplayName => displayName.trim().isNotEmpty
+      ? displayName.trim()
+      : (fullName.trim().isNotEmpty ? fullName.trim() : username);
 
   List<String> get ownedItems => ownedStoreItems;
 
@@ -553,7 +572,7 @@ class User {
   String get memberSince {
     final now = DateTime.now();
     final difference = now.difference(joinDate);
-    
+
     if (difference.inDays < 1) {
       return 'Bugün katıldı';
     } else if (difference.inDays < 30) {
@@ -570,7 +589,7 @@ class User {
   String get lastActiveString {
     final now = DateTime.now();
     final difference = now.difference(lastActive);
-    
+
     if (difference.inMinutes < 1) {
       return 'Az önce aktifti';
     } else if (difference.inMinutes < 60) {
@@ -624,15 +643,15 @@ String _normalizeDisplayName(
   String fullName,
   String username,
 ) {
-    final primary = _collapseWhitespace(candidate ?? '');
-    if (primary.isNotEmpty) {
-      return primary;
-    }
-    final fallback = _collapseWhitespace(fullName);
-    if (fallback.isNotEmpty) {
-      return fallback;
-    }
-    return username.trim();
+  final primary = _collapseWhitespace(candidate ?? '');
+  if (primary.isNotEmpty) {
+    return primary;
+  }
+  final fallback = _collapseWhitespace(fullName);
+  if (fallback.isNotEmpty) {
+    return fallback;
+  }
+  return username.trim();
 }
 
 String _normalizeGender(String candidate) {
@@ -719,7 +738,8 @@ String _collapseWhitespace(String? value) {
 List<String> _mergeLists(List<String> a, List<String> b) {
   if (a.isEmpty) return b;
   if (b.isEmpty) return a;
-  final merged = <String>{...a, ...b}..removeWhere((value) => value.trim().isEmpty);
+  final merged = <String>{...a, ...b}
+    ..removeWhere((value) => value.trim().isEmpty);
   return merged.toList(growable: false);
 }
 
@@ -729,9 +749,12 @@ List<String> _safeStringList(dynamic source) {
     return source.isEmpty ? const [] : [source];
   }
   if (source is Iterable) {
-    return source.map((value) => value.toString()).where((value) {
-      return value.trim().isNotEmpty;
-    }).toList(growable: false);
+    return source
+        .map((value) => value.toString())
+        .where((value) {
+          return value.trim().isNotEmpty;
+        })
+        .toList(growable: false);
   }
   return const [];
 }
@@ -744,6 +767,29 @@ Map<String, dynamic> _asEquippedMap(dynamic source) {
     return source.map((key, value) => MapEntry(key.toString(), value));
   }
   return const <String, dynamic>{};
+}
+
+Map<String, List<String>> _parseCategoryPermissions(dynamic source) {
+  if (source == null) return const {};
+  if (source is Map<String, dynamic>) {
+    final result = <String, List<String>>{};
+    source.forEach((key, value) {
+      if (value is List) {
+        result[key] = value.map((e) => e.toString()).toList();
+      }
+    });
+    return result;
+  }
+  if (source is Map) {
+    final result = <String, List<String>>{};
+    source.forEach((key, value) {
+      if (value is List) {
+        result[key.toString()] = value.map((e) => e.toString()).toList();
+      }
+    });
+    return result;
+  }
+  return const {};
 }
 
 String? _stringOrNull(dynamic value) {

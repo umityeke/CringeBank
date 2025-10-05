@@ -8,6 +8,7 @@ import '../services/cringe_entry_service.dart';
 import '../services/user_service.dart';
 import '../widgets/animated_bubble_background.dart';
 import '../widgets/modern_cringe_card.dart';
+import '../utils/entry_actions.dart';
 
 class ModernHomeScreen extends StatefulWidget {
   const ModernHomeScreen({super.key});
@@ -26,6 +27,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
   bool _darkModeEnabled = true;
   String? _selectedMood;
   static const double _headerExpandedHeight = 95;
+  final Set<String> _deletingEntryIds = <String>{};
 
   static const List<_MoodCategory> _moodCategories = [];
 
@@ -97,10 +99,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
               child: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      Color(0xFF121B2E),
-                      Color(0xFF090C14),
-                    ],
+                    colors: [Color(0xFF121B2E), Color(0xFF090C14)],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                   ),
@@ -186,9 +185,10 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
       ),
       flexibleSpace: LayoutBuilder(
         builder: (context, constraints) {
-          final t = ((constraints.maxHeight - kToolbarHeight) /
-                  (expandedHeight - kToolbarHeight))
-              .clamp(0.0, 1.0);
+          final t =
+              ((constraints.maxHeight - kToolbarHeight) /
+                      (expandedHeight - kToolbarHeight))
+                  .clamp(0.0, 1.0);
 
           return Stack(
             fit: StackFit.expand,
@@ -337,16 +337,10 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
           width: size,
           height: size,
           fit: BoxFit.cover,
-          placeholder: (_, __) => SizedBox(
-            width: size,
-            height: size,
-            child: buildInitialAvatar(),
-          ),
-          errorWidget: (_, __, ___) => SizedBox(
-            width: size,
-            height: size,
-            child: buildInitialAvatar(),
-          ),
+          placeholder: (context, url) =>
+              SizedBox(width: size, height: size, child: buildInitialAvatar()),
+          errorWidget: (context, url, error) =>
+              SizedBox(width: size, height: size, child: buildInitialAvatar()),
         ),
       );
     }
@@ -373,7 +367,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: const Color(0x33FF6B6B),
-  border: Border.all(color: borderColor, width: 1),
+        border: Border.all(color: borderColor, width: 1),
         boxShadow: const [
           BoxShadow(
             color: Color(0x55000000),
@@ -435,9 +429,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
       builder: (modalContext) {
         final mediaQuery = MediaQuery.of(modalContext);
         return Padding(
-          padding: EdgeInsets.only(
-            bottom: mediaQuery.viewInsets.bottom,
-          ),
+          padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
           child: FractionallySizedBox(
             heightFactor: 0.92,
             child: Container(
@@ -466,10 +458,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      constraints: const BoxConstraints(
-        maxHeight: 68,
-        minHeight: 68,
-      ),
+      constraints: const BoxConstraints(maxHeight: 68, minHeight: 68),
       decoration: BoxDecoration(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
@@ -478,11 +467,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            width: 48,
-            height: 48,
-            child: _buildAvatar(user),
-          ),
+          SizedBox(width: 48, height: 48, child: _buildAvatar(user)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -499,9 +484,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                               displayName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge
+                              style: Theme.of(context).textTheme.titleLarge
                                   ?.copyWith(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w700,
@@ -532,9 +515,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                               '@$username',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     color: Colors.white.withValues(alpha: 0.64),
                                     letterSpacing: 0.4,
@@ -638,14 +619,16 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                     title: 'Push bildirimleri',
                     subtitle: 'Yeni paylaşılan cringe anlarında haber al',
                     value: _pushNotificationsEnabled,
-                    onChanged: (value) => setState(() => _pushNotificationsEnabled = value),
+                    onChanged: (value) =>
+                        setState(() => _pushNotificationsEnabled = value),
                   ),
                   _buildToggleTile(
                     icon: Icons.email_outlined,
                     title: 'Haftalık özet e-postası',
                     subtitle: 'Her pazartesi en popüler cringe anları gelsin',
                     value: _emailSummaryEnabled,
-                    onChanged: (value) => setState(() => _emailSummaryEnabled = value),
+                    onChanged: (value) =>
+                        setState(() => _emailSummaryEnabled = value),
                   ),
                   const SizedBox(height: 24),
                   _buildSectionTitle('Deneyim'),
@@ -654,7 +637,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                     title: 'Koyu tema',
                     subtitle: 'Gece kullanımında göz konforu',
                     value: _darkModeEnabled,
-                    onChanged: (value) => setState(() => _darkModeEnabled = value),
+                    onChanged: (value) =>
+                        setState(() => _darkModeEnabled = value),
                   ),
                   _buildSettingsTile(
                     icon: Icons.translate_outlined,
@@ -829,15 +813,17 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                 Text(
                   'Topluluk Akışı',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const Spacer(),
                 IconButton(
                   onPressed: () => _showComingSoonSnack('Arama & filtre'),
-                  icon:
-                      const Icon(Icons.filter_list_rounded, color: Colors.white60),
+                  icon: const Icon(
+                    Icons.filter_list_rounded,
+                    color: Colors.white60,
+                  ),
                 ),
               ],
             ),
@@ -934,8 +920,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
     );
   }
 
-
-
   Widget _buildSettingsTile({
     required IconData icon,
     required String title,
@@ -995,7 +979,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                 ),
               )
             : null,
-        trailing: trailing ??
+        trailing:
+            trailing ??
             const Icon(Icons.chevron_right_rounded, color: Colors.white38),
       ),
     );
@@ -1066,6 +1051,38 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
     );
   }
 
+  Future<void> _handleEditEntry(CringeEntry entry) async {
+    final edited = await EntryActionHelper.editEntry(context, entry);
+    if (!mounted) return;
+    if (edited) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _handleDeleteEntry(CringeEntry entry) async {
+    if (_deletingEntryIds.contains(entry.id)) {
+      return;
+    }
+
+    setState(() => _deletingEntryIds.add(entry.id));
+
+    final deleted = await EntryActionHelper.confirmAndDeleteEntry(
+      context,
+      entry,
+    );
+
+    if (!mounted) {
+      _deletingEntryIds.remove(entry.id);
+      return;
+    }
+
+    setState(() => _deletingEntryIds.remove(entry.id));
+
+    if (deleted) {
+      setState(() {});
+    }
+  }
+
   Widget _buildComingSoonTag([String label = 'Yakında']) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1122,8 +1139,11 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    const Icon(Icons.error_rounded,
-                        color: Color(0xFFFF8A80), size: 48),
+                    const Icon(
+                      Icons.error_rounded,
+                      color: Color(0xFFFF8A80),
+                      size: 48,
+                    ),
                     const SizedBox(height: 16),
                     const Text(
                       'Hata oluştu!',
@@ -1186,17 +1206,24 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
         return SliverList(
           delegate: SliverChildBuilderDelegate((context, index) {
             if (index >= entries.length) return null;
+
+            final entry = entries[index];
+            final canManage = EntryActionHelper.canManageEntry(entry);
+
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ModernCringeCard(entry: entries[index]),
+              child: ModernCringeCard(
+                entry: entry,
+                onEdit: canManage ? () => _handleEditEntry(entry) : null,
+                onDelete: canManage ? () => _handleDeleteEntry(entry) : null,
+                isDeleteInProgress: _deletingEntryIds.contains(entry.id),
+              ),
             );
           }, childCount: entries.length),
         );
       },
     );
   }
-
-
 }
 
 class _MoodCategory {
@@ -1210,4 +1237,3 @@ class _MoodCategory {
     required this.color,
   });
 }
-

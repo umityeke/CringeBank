@@ -8,7 +8,7 @@ enum AIProvider { openAI, gemini }
 
 class AdvancedAIService {
   static const String _openAIKey = 'YOUR_OPENAI_API_KEY_HERE';
-  static const String _geminiKey = 'YOUR_GEMINI_API_KEY_HERE';
+  static const String _geminiKey = 'YOUR_GEminI_API_KEY_HERE';
 
   static AIProvider _currentProvider = AIProvider.gemini;
   static GenerativeModel? _geminiModel;
@@ -21,7 +21,7 @@ class AdvancedAIService {
     }
 
     // Gemini setup
-    if (_geminiKey.isNotEmpty && _geminiKey != 'YOUR_GEMINI_API_KEY_HERE') {
+    if (_geminiKey.isNotEmpty && _geminiKey != 'YOUR_GEminI_API_KEY_HERE') {
       _geminiModel = GenerativeModel(model: 'gemini-pro', apiKey: _geminiKey);
     }
   }

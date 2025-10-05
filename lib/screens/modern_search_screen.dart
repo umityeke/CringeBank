@@ -12,6 +12,7 @@ import '../widgets/modern_cringe_card.dart';
 import '../widgets/animated_bubble_background.dart';
 import '../widgets/search/user_search_tile.dart';
 import 'simple_profile_screen.dart';
+import '../utils/entry_actions.dart';
 
 enum SearchResultView { entries, users, all }
 
@@ -38,6 +39,7 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
   bool _showSearchSuggestions = false;
   List<String> _currentSuggestions = [];
   final Set<String> _locallyLikedEntryIds = <String>{};
+  final Set<String> _deletingEntryIds = <String>{};
   Timer? _suggestionDebounce;
 
   late AnimationController _backgroundController;
@@ -603,6 +605,20 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
     );
   }
 
+  Widget _buildManagedCringeCard(CringeEntry entry) {
+    final canManage = EntryActionHelper.canManageEntry(entry);
+    return ModernCringeCard(
+      entry: entry,
+      onTap: () => _openCringeDetail(entry),
+      onLike: () => _likeCringe(entry),
+      onComment: () => _commentCringe(entry),
+      onShare: () => _shareCringe(entry),
+      onEdit: canManage ? () => _handleEditEntry(entry) : null,
+      onDelete: canManage ? () => _handleDeleteEntry(entry) : null,
+      isDeleteInProgress: _deletingEntryIds.contains(entry.id),
+    );
+  }
+
   Widget _buildEntriesList() {
     final entries = _searchResult?.entries ?? const <CringeEntry>[];
     return ListView.builder(
@@ -613,13 +629,7 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
         final entry = entries[index];
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
-          child: ModernCringeCard(
-            entry: entry,
-            onTap: () => _openCringeDetail(entry),
-            onLike: () => _likeCringe(entry),
-            onComment: () => _commentCringe(entry),
-            onShare: () => _shareCringe(entry),
-          ),
+          child: _buildManagedCringeCard(entry),
         );
       },
     );
@@ -674,11 +684,13 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
 
     if (style != null && style.hashtags.items.isNotEmpty) {
       children
-        ..add(_buildSectionHeader(
-          title: 'Etiketler',
-          count: style.hashtags.items.length,
-          totalCount: style.hashtags.totalCount,
-        ))
+        ..add(
+          _buildSectionHeader(
+            title: 'Etiketler',
+            count: style.hashtags.items.length,
+            totalCount: style.hashtags.totalCount,
+          ),
+        )
         ..add(const SizedBox(height: 12))
         ..add(_buildHashtagWrap(style.hashtags.items))
         ..add(const SizedBox(height: 24));
@@ -686,11 +698,13 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
 
     if (style != null && style.places.items.isNotEmpty) {
       children
-        ..add(_buildSectionHeader(
-          title: 'Mekanlar',
-          count: style.places.items.length,
-          totalCount: style.places.totalCount,
-        ))
+        ..add(
+          _buildSectionHeader(
+            title: 'Mekanlar',
+            count: style.places.items.length,
+            totalCount: style.places.totalCount,
+          ),
+        )
         ..add(const SizedBox(height: 12))
         ..addAll(style.places.items.map(_buildPlaceTile))
         ..add(const SizedBox(height: 24));
@@ -743,13 +757,7 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
           entryPreview.map(
             (entry) => Padding(
               padding: const EdgeInsets.only(bottom: 16),
-              child: ModernCringeCard(
-                entry: entry,
-                onTap: () => _openCringeDetail(entry),
-                onLike: () => _likeCringe(entry),
-                onComment: () => _commentCringe(entry),
-                onShare: () => _shareCringe(entry),
-              ),
+              child: _buildManagedCringeCard(entry),
             ),
           ),
         );
@@ -848,20 +856,16 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
         );
       case StyleSearchEntityType.hashtag:
         final hashtag = result.item as StyleSearchHashtag;
-        return _buildHashtagChip('#${hashtag.tag}',
-            subtitle: 'Trend puanı: ${hashtag.trendScore.toStringAsFixed(2)}');
+        return _buildHashtagChip(
+          '#${hashtag.tag}',
+          subtitle: 'Trend puanı: ${hashtag.trendScore.toStringAsFixed(2)}',
+        );
       case StyleSearchEntityType.place:
         final place = result.item as StyleSearchPlace;
         return _buildPlaceTile(place);
       case StyleSearchEntityType.post:
         final entry = result.item as CringeEntry;
-        return ModernCringeCard(
-          entry: entry,
-          onTap: () => _openCringeDetail(entry),
-          onLike: () => _likeCringe(entry),
-          onComment: () => _commentCringe(entry),
-          onShare: () => _shareCringe(entry),
-        );
+        return _buildManagedCringeCard(entry);
     }
   }
 
@@ -931,9 +935,10 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
   }
 
   Widget _buildPlaceTile(StyleSearchPlace place) {
-    final location = [place.city, place.country]
-        .where((value) => value != null && value.trim().isNotEmpty)
-        .join(', ');
+    final location = [
+      place.city,
+      place.country,
+    ].where((value) => value != null && value.trim().isNotEmpty).join(', ');
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
@@ -1180,6 +1185,50 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
     });
   }
 
+  Future<void> _refreshAfterEntryChange() async {
+    final query = _searchController.text.trim();
+    if (query.isNotEmpty) {
+      await _performSearch(query);
+    } else {
+      _initializeSearch();
+    }
+  }
+
+  Future<void> _handleEditEntry(CringeEntry entry) async {
+    final edited = await EntryActionHelper.editEntry(context, entry);
+    if (!mounted) return;
+    if (edited) {
+      await _refreshAfterEntryChange();
+    }
+  }
+
+  Future<void> _handleDeleteEntry(CringeEntry entry) async {
+    if (_deletingEntryIds.contains(entry.id)) {
+      return;
+    }
+
+    setState(() => _deletingEntryIds.add(entry.id));
+
+    final deleted = await EntryActionHelper.confirmAndDeleteEntry(
+      context,
+      entry,
+    );
+
+    if (!mounted) {
+      _deletingEntryIds.remove(entry.id);
+      return;
+    }
+
+    setState(() {
+      _deletingEntryIds.remove(entry.id);
+      _locallyLikedEntryIds.remove(entry.id);
+    });
+
+    if (deleted) {
+      await _refreshAfterEntryChange();
+    }
+  }
+
   void _openCringeDetail(CringeEntry entry) {
     HapticFeedback.selectionClick();
     // Navigate to detail screen
@@ -1205,9 +1254,8 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
         _locallyLikedEntryIds.add(entry.id);
         _searchResult = _mapSearchResultEntry(
           entryId: entry.id,
-          mapper: (current) => current.copyWith(
-            begeniSayisi: current.begeniSayisi + 1,
-          ),
+          mapper: (current) =>
+              current.copyWith(begeniSayisi: current.begeniSayisi + 1),
         );
       });
     } catch (_) {
@@ -1235,9 +1283,8 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
           setState(() {
             _searchResult = _mapSearchResultEntry(
               entryId: entry.id,
-              mapper: (current) => current.copyWith(
-                yorumSayisi: current.yorumSayisi + 1,
-              ),
+              mapper: (current) =>
+                  current.copyWith(yorumSayisi: current.yorumSayisi + 1),
             );
           });
         },
@@ -1266,8 +1313,9 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
       totalCount: currentResult.totalCount,
       aiSuggestion: currentResult.aiSuggestion,
       relatedSearches: List<String>.from(currentResult.relatedSearches),
-      categoryDistribution:
-          Map<CringeCategory, int>.from(currentResult.categoryDistribution),
+      categoryDistribution: Map<CringeCategory, int>.from(
+        currentResult.categoryDistribution,
+      ),
       searchDuration: currentResult.searchDuration,
     );
   }

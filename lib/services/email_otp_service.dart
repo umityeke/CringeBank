@@ -196,7 +196,9 @@ class EmailOtpService {
       });
       return EmailOtpVerificationResult.fromResponse(result.data);
     } on FirebaseFunctionsException catch (e, stack) {
-      debugPrint('Cloud Function confirmEmailUpdate failed: ${e.message}\n$stack');
+      debugPrint(
+        'Cloud Function confirmEmailUpdate failed: ${e.message}\n$stack',
+      );
       rethrow;
     } catch (e, stack) {
       debugPrint('Unexpected error calling confirmEmailUpdate: $e\n$stack');

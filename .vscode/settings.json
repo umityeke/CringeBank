@@ -22,5 +22,25 @@
         "etiketler",
         "kullanici"
     ],
-    "java.configuration.updateBuildConfiguration": "interactive"
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "dart.flutterSdkPath": "C:\\src\\flutter",
+    "dart.debugExternalPackageLibraries": true,
+    "dart.debugSdkLibraries": false,
+    "dart.flutterRunLogFile": "C:\\dev\\cringebank\\flutter_run.log",
+    "git.ignoreLimitWarning": true,
+    "files.exclude": {
+        "**/.github": true,
+        "**/node_modules": true,
+        "**/build": true
+    },
+    "search.exclude": {
+        "**/build": true,
+        "**/.github": true,
+        "**/node_modules": true
+    },
+    "files.watcherExclude": {
+        "**/build/**": true,
+        "**/.github/**": true,
+        "**/node_modules/**": true
+    }
 }

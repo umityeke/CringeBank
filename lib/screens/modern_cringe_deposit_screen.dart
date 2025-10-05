@@ -16,7 +16,7 @@ class ModernCringeDepositScreen extends StatefulWidget {
   final VoidCallback? onCringeSubmitted;
   final VoidCallback? onCloseRequested;
   final Competition? competition;
-  
+
   const ModernCringeDepositScreen({
     super.key,
     this.existingEntry,
@@ -26,7 +26,8 @@ class ModernCringeDepositScreen extends StatefulWidget {
   });
 
   @override
-  State<ModernCringeDepositScreen> createState() => _ModernCringeDepositScreenState();
+  State<ModernCringeDepositScreen> createState() =>
+      _ModernCringeDepositScreenState();
 }
 
 class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
@@ -36,17 +37,16 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
 
-
-  final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final PageController _pageController = PageController();
-  
+
   CringeCategory _selectedCategory = CringeCategory.fizikselRezillik;
+  PostType _selectedPostType = PostType.spill; // Security Contract: Default post type
   int _currentStep = 0;
   int _severity = 5;
   bool _isAnonymous = false;
   bool _isSubmitting = false;
-  
+
   // Fotoğraf için yeni değişkenler
   Uint8List? _selectedImageBytes;
   String? _selectedImageName;
@@ -71,24 +71,20 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
     _scaleAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.elasticOut,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
 
-    _opacityAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.3, 1.0, curve: Curves.easeInOut),
-    ));
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.3, 1.0, curve: Curves.easeInOut),
+      ),
+    );
 
     if (_isEditing) {
       final entry = widget.existingEntry!;
-      _titleController.text = entry.baslik;
       _descriptionController.text = entry.aciklama;
       _selectedCategory = entry.kategori;
+      _selectedPostType = entry.type; // Security Contract: Load post type
       _severity = entry.krepSeviyesi.clamp(1, 10).round();
       _isAnonymous = entry.isAnonim;
       _existingImageUrls = List<String>.from(entry.imageUrls);
@@ -101,7 +97,6 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
   void dispose() {
     _controller.dispose();
     _submitController.dispose();
-    _titleController.dispose();
     _descriptionController.dispose();
     _pageController.dispose();
     super.dispose();
@@ -132,7 +127,8 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
 
   @override
   Widget build(BuildContext context) {
-    final bool canSystemPop = widget.onCloseRequested == null && _currentStep == 0;
+    final bool canSystemPop =
+        widget.onCloseRequested == null && _currentStep == 0;
     return PopScope(
       canPop: canSystemPop,
       onPopInvokedWithResult: (didPop, _) {
@@ -152,10 +148,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                 child: Container(
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
-                        Color(0xFF121B2E),
-                        Color(0xFF090C14),
-                      ],
+                      colors: [Color(0xFF121B2E), Color(0xFF090C14)],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                     ),
@@ -212,8 +205,6 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
       ),
     );
   }
-
-
 
   Widget _buildHeader() {
     return AnimatedBuilder(
@@ -282,8 +273,8 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                             _isEditing
                                 ? 'Krepi Güncelle'
                                 : (_isCompetitionEntry
-                                    ? 'Yarışma Anısı Paylaş'
-                                    : 'Yeni Krep Paylaş'),
+                                      ? 'Yarışma Anısı Paylaş'
+                                      : 'Yeni Krep Paylaş'),
                             style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -293,11 +284,11 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                         ),
                         const SizedBox(height: 4),
                         Text(
-              _isEditing
-                ? 'Paylaşımını düzenleyip topluluğa tekrar sun'
-                : (_isCompetitionEntry
-                  ? '"${widget.competition!.title}" yarışması için anını hazırla'
-                  : 'Utanç verici anınızı toplulukla paylaşın'),
+                          _isEditing
+                              ? 'Paylaşımını düzenleyip topluluğa tekrar sun'
+                              : (_isCompetitionEntry
+                                    ? '"${widget.competition!.title}" yarışması için anını hazırla'
+                                    : 'Utanç verici anınızı toplulukla paylaşın'),
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.white.withOpacity(0.7),
@@ -379,7 +370,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
   Widget _buildStepIndicator(int step, String title) {
     final isActive = step <= _currentStep;
     final isCompleted = step < _currentStep;
-    
+
     return Column(
       children: [
         Container(
@@ -392,20 +383,22 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                     colors: [Colors.orange, Colors.orange.withOpacity(0.7)],
                   )
                 : null,
-            color: isCompleted || isActive ? null : Colors.white.withOpacity(0.2),
+            color: isCompleted || isActive
+                ? null
+                : Colors.white.withOpacity(0.2),
             border: Border.all(
-              color: isCompleted || isActive 
-                  ? Colors.orange 
+              color: isCompleted || isActive
+                  ? Colors.orange
                   : Colors.white.withOpacity(0.3),
               width: 2,
             ),
           ),
           child: Icon(
-            isCompleted 
-                ? Icons.check 
-                : isActive 
-                    ? Icons.circle 
-                    : Icons.circle_outlined,
+            isCompleted
+                ? Icons.check
+                : isActive
+                ? Icons.circle
+                : Icons.circle_outlined,
             color: Colors.white,
             size: 16,
           ),
@@ -423,8 +416,6 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
     );
   }
 
-
-
   Widget _buildStepOne() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -436,12 +427,39 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
             _buildCompetitionBanner(widget.competition!),
             const SizedBox(height: 20),
           ],
+          // POST TİPİ SEÇİMİ (Security Contract)
           _buildGlassCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  '1. Başlık ve Açıklama',
+                  'Post Tipi Seçin',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Paylaşımınızın türünü belirleyin',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.7),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildPostTypeSelector(),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          _buildGlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Ne Paylaşmak İstiyorsun?',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -450,18 +468,11 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                 ),
                 const SizedBox(height: 20),
                 _buildTextField(
-                  controller: _titleController,
-                  label: 'Başlık',
-                  hint: 'Kısa ve öz bir başlık yazın',
-                  maxLength: 100,
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(
                   controller: _descriptionController,
-                  label: 'Açıklama',
-                  hint: 'Ne oldu? Detayları anlatın...',
-                  maxLines: 5,
-                  maxLength: 500,
+                  label: 'İçerik',
+                  hint: _getDescriptionHint(),
+                  maxLines: 8,
+                  maxLength: _getMaxTextLength(),
                 ),
               ],
             ),
@@ -495,13 +506,13 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                         ),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(20),
-              color: isSelected
-                ? Colors.orange.withOpacity(0.8)
-                : Colors.white.withOpacity(0.1),
+                          color: isSelected
+                              ? Colors.orange.withOpacity(0.8)
+                              : Colors.white.withOpacity(0.1),
                           border: Border.all(
-              color: isSelected
-                ? Colors.orange
-                : Colors.white.withOpacity(0.2),
+                            color: isSelected
+                                ? Colors.orange
+                                : Colors.white.withOpacity(0.2),
                             width: 1,
                           ),
                         ),
@@ -509,8 +520,8 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                           _getCategoryText(category),
                           style: TextStyle(
                             color: Colors.white,
-                            fontWeight: isSelected 
-                                ? FontWeight.bold 
+                            fontWeight: isSelected
+                                ? FontWeight.bold
                                 : FontWeight.normal,
                           ),
                         ),
@@ -685,8 +696,15 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                       ),
                       TextButton.icon(
                         onPressed: _removeImage,
-                        icon: const Icon(Icons.delete, color: Colors.red, size: 18),
-                        label: const Text('Kaldır', style: TextStyle(color: Colors.red)),
+                        icon: const Icon(
+                          Icons.delete,
+                          color: Colors.red,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          'Kaldır',
+                          style: TextStyle(color: Colors.red),
+                        ),
                       ),
                     ],
                   ),
@@ -696,9 +714,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                     height: 200,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.orange.withOpacity(0.3),
-                      ),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
@@ -714,7 +730,9 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                               child: const SizedBox(
                                 width: 24,
                                 height: 24,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               ),
                             ),
                             errorWidget: (context, error, stackTrace) {
@@ -876,9 +894,18 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildSummaryItem('Başlık', _titleController.text.isEmpty 
-                    ? 'Belirtilmedi' : _titleController.text),
-                _buildSummaryItem('Kategori', _getCategoryText(_selectedCategory)),
+                _buildSummaryItem(
+                  'İçerik Önizleme',
+                  _descriptionController.text.isEmpty
+                      ? 'Belirtilmedi'
+                      : _descriptionController.text.length > 100
+                          ? '${_descriptionController.text.substring(0, 97)}...'
+                          : _descriptionController.text,
+                ),
+                _buildSummaryItem(
+                  'Kategori',
+                  _getCategoryText(_selectedCategory),
+                ),
                 _buildSummaryItem('Utanç Seviyesi', '$_severity/10'),
                 _buildSummaryItem('Gizlilik', _isAnonymous ? 'Anonim' : 'Açık'),
               ],
@@ -905,10 +932,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
               ),
             ),
           ),
-          const Text(
-            ': ',
-            style: TextStyle(color: Colors.white),
-          ),
+          const Text(': ', style: TextStyle(color: Colors.white)),
           Expanded(
             child: Text(
               value,
@@ -929,11 +953,8 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-  color: Colors.white.withOpacity(0.1),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.2),
-          width: 1,
-        ),
+        color: Colors.white.withOpacity(0.1),
+        border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
@@ -971,33 +992,22 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(
-              color: Colors.white.withOpacity(0.5),
-            ),
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
             filled: true,
             fillColor: Colors.white.withOpacity(0.1),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: Colors.white.withOpacity(0.2),
-              ),
+              borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: Colors.white.withOpacity(0.2),
-              ),
+              borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: Colors.orange,
-                width: 2,
-              ),
+              borderSide: BorderSide(color: Colors.orange, width: 2),
             ),
-            counterStyle: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-            ),
+            counterStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
           ),
         ),
       ],
@@ -1102,10 +1112,10 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
   void _handleNext() {
     // Form validasyonu
     if (_currentStep == 0) {
-      if (_titleController.text.trim().isEmpty) {
+      if (_descriptionController.text.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Lütfen bir başlık girin'),
+            content: Text('Lütfen içerik girin'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -1123,7 +1133,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         return;
       }
     }
-    
+
     if (_currentStep < 2) {
       setState(() => _currentStep++);
       _pageController.nextPage(
@@ -1153,7 +1163,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         throw Exception('Kullanıcı oturum açmamış');
       }
 
-  final user = currentUser;
+      final user = currentUser;
 
       final imageUrls = <String>[];
       if (_existingImageUrls.isNotEmpty) {
@@ -1164,38 +1174,45 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         imageUrls.add('data:image/jpeg;base64,$base64Image');
       }
 
-    final displayName = user.displayName.trim().isNotEmpty
-      ? user.displayName.trim()
-      : user.username.trim().isNotEmpty
-        ? user.username.trim()
-              : 'Anonim';
+      final displayName = user.displayName.trim().isNotEmpty
+          ? user.displayName.trim()
+          : user.username.trim().isNotEmpty
+          ? user.username.trim()
+          : 'Anonim';
 
-    final usernameHandle = user.username.trim().isNotEmpty
-      ? user.username.trim()
-      : (user.email.contains('@')
-        ? user.email.split('@').first
-        : user.id.substring(0, 6));
+      final usernameHandle = user.username.trim().isNotEmpty
+          ? user.username.trim()
+          : (user.email.contains('@')
+                ? user.email.split('@').first
+                : user.id.substring(0, 6));
 
       final authorAvatar = _isAnonymous
           ? null
-      : (user.avatar.trim().isNotEmpty
-        ? user.avatar.trim()
-              : null);
+          : (user.avatar.trim().isNotEmpty ? user.avatar.trim() : null);
 
       if (_isEditing) {
+        // Auto-generate title from description (first 100 chars)
+        final contentText = _descriptionController.text.trim();
+        final autoTitle = contentText.length > 100 
+            ? '${contentText.substring(0, 97)}...' 
+            : contentText;
+
         final updatedEntry = widget.existingEntry!.copyWith(
           authorName: _isAnonymous ? 'Anonim' : displayName,
           authorHandle: _isAnonymous ? '@anonim' : '@$usernameHandle',
-          baslik: _titleController.text.trim(),
-          aciklama: _descriptionController.text.trim(),
+          baslik: autoTitle, // Auto-generated from content
+          aciklama: contentText, // Full content
           kategori: _selectedCategory,
           krepSeviyesi: _severity.toDouble(),
           isAnonim: _isAnonymous,
           imageUrls: imageUrls,
           authorAvatarUrl: authorAvatar,
+          type: _selectedPostType, // Security Contract: Update post type
         );
 
-        final success = await CringeEntryService.instance.updateEntry(updatedEntry);
+        final success = await CringeEntryService.instance.updateEntry(
+          updatedEntry,
+        );
 
         if (!success) {
           throw Exception('Krep güncellenemedi, tekrar deneyin');
@@ -1212,19 +1229,27 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
 
       final competition = widget.competition;
 
+      // Auto-generate title from description (first 100 chars)
+      final contentText = _descriptionController.text.trim();
+      final autoTitle = contentText.length > 100 
+          ? '${contentText.substring(0, 97)}...' 
+          : contentText;
+
       final entry = CringeEntry(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-  userId: user.id,
+        userId: user.id,
         authorName: _isAnonymous ? 'Anonim' : displayName,
         authorHandle: _isAnonymous ? '@anonim' : '@$usernameHandle',
-        baslik: _titleController.text.trim(),
-        aciklama: _descriptionController.text.trim(),
+        baslik: autoTitle, // Auto-generated from content
+        aciklama: contentText, // Full content
         kategori: _selectedCategory,
         krepSeviyesi: _severity.toDouble(),
         createdAt: DateTime.now(),
         isAnonim: _isAnonymous,
         imageUrls: imageUrls,
         authorAvatarUrl: authorAvatar,
+        type: _selectedPostType, // Security Contract: Add post type
+        status: ModerationStatus.pending, // Security Contract: All posts start as pending
       );
 
       if (_isCompetitionEntry) {
@@ -1236,14 +1261,17 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
           throw Exception('Anı paylaşmak için önce yarışmaya katılmalısın.');
         }
 
-        final hasSubmitted = competition.entries
-            .any((existing) => existing.userId == user.id);
+        final hasSubmitted = competition.entries.any(
+          (existing) => existing.userId == user.id,
+        );
         if (hasSubmitted) {
           throw Exception('Bu yarışmaya zaten bir anı gönderdin.');
         }
 
-        final submitted =
-            await CompetitionService.submitEntry(competition.id, entry);
+        final submitted = await CompetitionService.submitEntry(
+          competition.id,
+          entry,
+        );
         if (!submitted) {
           throw Exception(
             'Anı yarışmaya gönderilemedi. Daha önce bir anı eklemiş olabilirsin.',
@@ -1268,15 +1296,16 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(imageUrls.isNotEmpty
-              ? 'Fotoğraflı krep başarıyla paylaşıldı!'
-              : 'Krep başarıyla paylaşıldı!'),
+          content: Text(
+            imageUrls.isNotEmpty
+                ? 'Fotoğraflı krep başarıyla paylaşıldı!'
+                : 'Krep başarıyla paylaşıldı!',
+          ),
           backgroundColor: Colors.orange,
           behavior: SnackBarBehavior.floating,
         ),
       );
 
-      _titleController.clear();
       _descriptionController.clear();
       _selectedImageBytes = null;
       _selectedImageName = null;
@@ -1394,7 +1423,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
   // Fotoğraf seçme fonksiyonu
   Future<void> _pickImage() async {
     setState(() => _isImageLoading = true);
-    
+
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.image,
@@ -1420,7 +1449,9 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Fotoğraf eklendi: ${(compressedBytes.length / 1024).toStringAsFixed(1)}KB'),
+            content: Text(
+              'Fotoğraf eklendi: ${(compressedBytes.length / 1024).toStringAsFixed(1)}KB',
+            ),
             backgroundColor: Colors.orange,
             behavior: SnackBarBehavior.floating,
           ),
@@ -1449,14 +1480,14 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
 
     // Maksimum boyut: 800px
     img.Image resizedImage = img.copyResize(
-      image, 
+      image,
       width: image.width > image.height ? 800 : null,
       height: image.height > image.width ? 800 : null,
     );
 
     // JPEG olarak compress et (%70 kalite)
     List<int> compressedBytes = img.encodeJpg(resizedImage, quality: 70);
-    
+
     return Uint8List.fromList(compressedBytes);
   }
 
@@ -1472,5 +1503,164 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
     setState(() {
       _existingImageUrls = [];
     });
+  }
+
+  // ============================================================================
+  // POST TYPE SELECTOR & HELPERS (Security Contract)
+  // ============================================================================
+
+  Widget _buildPostTypeSelector() {
+    return Column(
+      children: PostType.values.map((type) {
+        final isSelected = _selectedPostType == type;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: GestureDetector(
+            onTap: () => setState(() => _selectedPostType = type),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: isSelected
+                    ? Colors.orange.withOpacity(0.3)
+                    : Colors.white.withOpacity(0.05),
+                border: Border.all(
+                  color: isSelected
+                      ? Colors.orange
+                      : Colors.white.withOpacity(0.1),
+                  width: 2,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isSelected
+                          ? Colors.orange.withOpacity(0.3)
+                          : Colors.white.withOpacity(0.1),
+                    ),
+                    child: Icon(
+                      _getPostTypeIcon(type),
+                      color: isSelected ? Colors.orange : Colors.white70,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _getPostTypeTitle(type),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? Colors.white : Colors.white70,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _getPostTypeDescription(type),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.white.withOpacity(0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isSelected)
+                    const Icon(
+                      Icons.check_circle,
+                      color: Colors.orange,
+                      size: 24,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  IconData _getPostTypeIcon(PostType type) {
+    switch (type) {
+      case PostType.spill:
+        return Icons.chat_bubble_outline;
+      case PostType.clap:
+        return Icons.celebration;
+      case PostType.frame:
+        return Icons.photo_camera;
+      case PostType.cringecast:
+        return Icons.videocam;
+      case PostType.mash:
+        return Icons.compare_arrows;
+    }
+  }
+
+  String _getPostTypeTitle(PostType type) {
+    switch (type) {
+      case PostType.spill:
+        return 'Spill (İtiraf/Sır)';
+      case PostType.clap:
+        return 'Clap (Alkış/Başarı)';
+      case PostType.frame:
+        return 'Frame (Fotoğraf Story)';
+      case PostType.cringecast:
+        return 'CringeCast (Video)';
+      case PostType.mash:
+        return 'Mash (Karşılaştırma)';
+    }
+  }
+
+  String _getPostTypeDescription(PostType type) {
+    switch (type) {
+      case PostType.spill:
+        return 'Bir sır paylaş, itiraf et (sadece metin)';
+      case PostType.clap:
+        return 'Bir başarını kutla, övün (metin + opsiyonel medya)';
+      case PostType.frame:
+        return 'Fotoğraf/görsel paylaş (zorunlu görsel)';
+      case PostType.cringecast:
+        return 'Video paylaş (zorunlu video)';
+      case PostType.mash:
+        return 'İki seçeneği karşılaştır (zorunlu medya)';
+    }
+  }
+
+  String _getDescriptionHint() {
+    switch (_selectedPostType) {
+      case PostType.spill:
+        return 'Sırrını anlat, itiraf et...';
+      case PostType.clap:
+        return 'Başarını paylaş, övün!';
+      case PostType.frame:
+        return 'Fotoğrafın hikayesini anlat...';
+      case PostType.cringecast:
+        return 'Videonun açıklamasını yaz...';
+      case PostType.mash:
+        return 'Hangi seçeneği tercih ediyorsun? Neden?';
+    }
+  }
+
+  int _getMaxTextLength() {
+    // Security Contract: Type-specific text length limits
+    switch (_selectedPostType) {
+      case PostType.spill:
+        return 2000; // Long text for confessions
+      case PostType.clap:
+        return 500; // Medium text
+      case PostType.frame:
+        return 300; // Short caption
+      case PostType.cringecast:
+        return 300; // Short description
+      case PostType.mash:
+        return 200; // Brief comparison
+    }
   }
 }

@@ -57,8 +57,8 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         speed: 1.0,
         phase: 0.0,
         colors: [
-          const Color(0xFF3C8CE7).withOpacity(0.55),
-          const Color(0xFF00EAFF).withOpacity(0.25),
+          const Color(0xFF3C8CE7).withValues(alpha: 0.55),
+          const Color(0xFF00EAFF).withValues(alpha: 0.25),
         ],
       ),
       _BubbleConfig(
@@ -69,8 +69,8 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         speed: 0.75,
         phase: 0.35,
         colors: [
-          const Color(0xFF6A11CB).withOpacity(0.45),
-          const Color(0xFF2575FC).withOpacity(0.22),
+          const Color(0xFF6A11CB).withValues(alpha: 0.45),
+          const Color(0xFF2575FC).withValues(alpha: 0.22),
         ],
       ),
       _BubbleConfig(
@@ -81,8 +81,8 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         speed: 1.25,
         phase: 0.6,
         colors: [
-          const Color(0xFF00B4DB).withOpacity(0.5),
-          const Color(0xFF0083B0).withOpacity(0.2),
+          const Color(0xFF00B4DB).withValues(alpha: 0.5),
+          const Color(0xFF0083B0).withValues(alpha: 0.2),
         ],
       ),
       _BubbleConfig(
@@ -93,8 +93,8 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         speed: 0.9,
         phase: 0.9,
         colors: [
-          const Color(0xFFE96443).withOpacity(0.42),
-          const Color(0xFF904E95).withOpacity(0.18),
+          const Color(0xFFE96443).withValues(alpha: 0.42),
+          const Color(0xFF904E95).withValues(alpha: 0.18),
         ],
       ),
     ];
@@ -145,7 +145,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Colors.black.withOpacity(0.25),
+                    Colors.black.withValues(alpha: 0.25),
                     Colors.transparent,
                   ],
                   begin: Alignment.topCenter,
@@ -174,13 +174,13 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
   }
 
   Widget _buildLoginCard(BuildContext context, double cardWidth) {
-  final cardColor = Colors.white.withOpacity(0.04);
-  final borderColor = Colors.white.withOpacity(0.08);
+    final cardColor = Colors.white.withValues(alpha: 0.04);
+    final borderColor = Colors.white.withValues(alpha: 0.08);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
       child: BackdropFilter(
-  filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: Container(
           width: cardWidth,
           decoration: BoxDecoration(
@@ -189,7 +189,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
             border: Border.all(color: borderColor, width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.45),
+                color: Colors.black.withValues(alpha: 0.45),
                 blurRadius: 30,
                 offset: const Offset(0, 22),
                 spreadRadius: -18,
@@ -205,8 +205,8 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
 
   Widget _buildCardContent(BuildContext context, double cardWidth) {
     final double contentWidth = math.max(cardWidth - 56, 92.0);
-  final double logoWidth = math.max(92.0, math.min(92.0 * 3.0, contentWidth));
-  const double logoHeightFactor = 0.42;
+    final double logoWidth = math.max(92.0, math.min(92.0 * 3.0, contentWidth));
+    const double logoHeightFactor = 0.42;
     final double logoHeight = logoWidth * logoHeightFactor;
     final double liftAmount = 0.0;
 
@@ -217,10 +217,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         const SizedBox(height: 20),
         Align(
           alignment: Alignment.center,
-          child: _LogoCropper(
-            targetWidth: logoWidth,
-            targetHeight: logoHeight,
-          ),
+          child: _LogoCropper(targetWidth: logoWidth, targetHeight: logoHeight),
         ),
         const SizedBox(height: 40),
         Transform.translate(
@@ -292,20 +289,20 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
     TextInputAction textInputAction = TextInputAction.next,
     TextInputType? keyboardType,
   }) {
-  final borderColor = Colors.white.withOpacity(0.12);
+    final borderColor = Colors.white.withValues(alpha: 0.12);
     const focusedBorderColor = Color(0xFF2D79F3);
 
     return Container(
       height: 56,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-  border: Border.all(color: borderColor, width: 1.4),
-  color: Colors.white.withOpacity(0.06),
+        border: Border.all(color: borderColor, width: 1.4),
+        color: Colors.white.withValues(alpha: 0.06),
       ),
       child: Row(
         children: [
           const SizedBox(width: 16),
-          Icon(icon, size: 20, color: Colors.white.withOpacity(0.7)),
+          Icon(icon, size: 20, color: Colors.white.withValues(alpha: 0.7)),
           const SizedBox(width: 12),
           Expanded(
             child: TextField(
@@ -322,7 +319,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                 hintText: hintText,
                 border: InputBorder.none,
                 hintStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -371,10 +368,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         _rememberedEmailKey,
         _usernameController.text.trim(),
       );
-      await prefs.setString(
-        _rememberedPasswordKey,
-        _passwordController.text,
-      );
+      await prefs.setString(_rememberedPasswordKey, _passwordController.text);
     } else {
       await prefs.setBool(_rememberMeFlagKey, false);
       await prefs.remove(_rememberedEmailKey);
@@ -440,8 +434,9 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
   Future<void> _handleForgotPassword() async {
     if (!mounted) return;
 
-    final emailController =
-        TextEditingController(text: _usernameController.text.trim());
+    final emailController = TextEditingController(
+      text: _usernameController.text.trim(),
+    );
     String? errorText;
     bool isSubmitting = false;
     bool requestSent = false;
@@ -464,10 +459,14 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-              actionsPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 20,
+              ),
+              actionsPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -475,7 +474,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                   Text(
                     'E-posta adresini gir, sıfırlama bağlantısı gönderelim.',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       fontSize: 13,
                       height: 1.4,
                     ),
@@ -493,26 +492,28 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                     decoration: InputDecoration(
                       labelText: 'E-posta adresi',
                       labelStyle: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.white.withValues(alpha: 0.7),
                       ),
                       errorText: errorText,
                       filled: true,
-                      fillColor: Colors.white.withOpacity(0.08),
+                      fillColor: Colors.white.withValues(alpha: 0.08),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(
-                          color: Colors.white.withOpacity(0.18),
+                          color: Colors.white.withValues(alpha: 0.18),
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide:
-                            const BorderSide(color: Color(0xFF2D79F3), width: 1.6),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF2D79F3),
+                          width: 1.6,
+                        ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(
-                          color: Colors.white.withOpacity(0.16),
+                          color: Colors.white.withValues(alpha: 0.16),
                         ),
                       ),
                       errorBorder: OutlineInputBorder(
@@ -539,14 +540,12 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                           final email = emailController.text.trim();
                           if (email.isEmpty) {
                             setState(
-                              () => errorText =
-                                  'Lütfen e-posta adresini gir.',
+                              () => errorText = 'Lütfen e-posta adresini gir.',
                             );
                             return;
                           }
 
-                          const emailPattern =
-                              r'^[^@\s]+@[^@\s]+\.[^@\s]+$';
+                          const emailPattern = r'^[^@\s]+@[^@\s]+\.[^@\s]+$';
                           if (!RegExp(emailPattern).hasMatch(email)) {
                             setState(
                               () => errorText =
@@ -560,10 +559,10 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                             isSubmitting = true;
                           });
 
-              final success =
-                await UserService.instance.resetPassword(email);
+                          final success = await UserService.instance
+                              .resetPassword(email);
 
-              if (!context.mounted) return;
+                          if (!context.mounted) return;
 
                           if (success) {
                             requestSent = true;
@@ -593,8 +592,9 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
                       : const Text('Gönder'),
@@ -618,7 +618,9 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
     return SizedBox(
       width: double.infinity,
       child: MouseRegion(
-        cursor: _isLoading ? SystemMouseCursors.basic : SystemMouseCursors.click,
+        cursor: _isLoading
+            ? SystemMouseCursors.basic
+            : SystemMouseCursors.click,
         onEnter: (_) => setState(() => _isButtonHovered = true),
         onExit: (_) => setState(() => _isButtonHovered = false),
         child: GestureDetector(
@@ -630,22 +632,24 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
               gradient: LinearGradient(
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
-                colors: _isButtonHovered ? [
-                  const Color(0xFF1A1A1A),
-                  const Color(0xFF374151),
-                  const Color(0xFF3B82F6),
-                ] : [
-                  const Color(0xFF000000),
-                  const Color(0xFF1F2937),
-                  const Color(0xFF2D79F3),
-                ],
+                colors: _isButtonHovered
+                    ? [
+                        const Color(0xFF1A1A1A),
+                        const Color(0xFF374151),
+                        const Color(0xFF3B82F6),
+                      ]
+                    : [
+                        const Color(0xFF000000),
+                        const Color(0xFF1F2937),
+                        const Color(0xFF2D79F3),
+                      ],
                 stops: const [0.0, 0.4, 1.0],
               ),
               borderRadius: BorderRadius.circular(16),
               boxShadow: _isButtonHovered
                   ? [
                       BoxShadow(
-                        color: const Color(0xFF2D79F3).withOpacity(0.3),
+                        color: const Color(0xFF2D79F3).withValues(alpha: 0.3),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -665,7 +669,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                   : const Text(
                       'Giriş Yap',
                       style: TextStyle(
-                        fontSize: 17, 
+                        fontSize: 17,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                       ),
@@ -683,14 +687,14 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         Expanded(
           child: Container(
             height: 1,
-            color: Colors.white.withOpacity(0.1),
+            color: Colors.white.withValues(alpha: 0.1),
           ),
         ),
         const SizedBox(width: 12),
         Text(
           'ya da',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
+            color: Colors.white.withValues(alpha: 0.6),
             fontSize: 13,
           ),
         ),
@@ -698,7 +702,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         Expanded(
           child: Container(
             height: 1,
-            color: Colors.white.withOpacity(0.1),
+            color: Colors.white.withValues(alpha: 0.1),
           ),
         ),
       ],
@@ -721,7 +725,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
             }
           },
         ),
-  const SizedBox(height: 0),
+        const SizedBox(height: 0),
         _buildSocialButton(
           icon: Icons.apple,
           label: 'Apple ile giriş yap',
@@ -750,12 +754,12 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
-          side: BorderSide(color: Colors.white.withOpacity(0.16)),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.16)),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
           foregroundColor: Colors.white,
-          backgroundColor: Colors.white.withOpacity(0.04),
+          backgroundColor: Colors.white.withValues(alpha: 0.04),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -782,7 +786,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w400,
-            color: Colors.white.withOpacity(0.7),
+            color: Colors.white.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(width: 4),
@@ -879,10 +883,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
 }
 
 class _LogoCropper extends StatefulWidget {
-  const _LogoCropper({
-    required this.targetWidth,
-    required this.targetHeight,
-  });
+  const _LogoCropper({required this.targetWidth, required this.targetHeight});
 
   final double targetWidth;
   final double targetHeight;
@@ -905,8 +906,7 @@ class _LogoCropperState extends State<_LogoCropper> {
     final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
     final frame = await codec.getNextFrame();
     final image = frame.image;
-    final byteData =
-        await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
 
     if (byteData == null) {
       return _TrimmedImage(
@@ -920,7 +920,7 @@ class _LogoCropperState extends State<_LogoCropper> {
       );
     }
 
-  final Uint8List bytes = byteData.buffer.asUint8List();
+    final Uint8List bytes = byteData.buffer.asUint8List();
     final width = image.width;
     final height = image.height;
 
@@ -929,7 +929,7 @@ class _LogoCropperState extends State<_LogoCropper> {
     int maxX = -1;
     int maxY = -1;
 
-  const alphaThreshold = 80;
+    const alphaThreshold = 80;
 
     for (int y = 0; y < height; y++) {
       for (int x = 0; x < width; x++) {
@@ -1086,10 +1086,13 @@ class _BubblesPainter extends CustomPainter {
 
       final center = Offset(dx, dy);
       final paint = ui.Paint()
-        ..shader = RadialGradient(
-          colors: bubble.colors,
-          stops: const [0.0, 1.0],
-        ).createShader(ui.Rect.fromCircle(center: center, radius: bubble.radius));
+        ..shader =
+            RadialGradient(
+              colors: bubble.colors,
+              stops: const [0.0, 1.0],
+            ).createShader(
+              ui.Rect.fromCircle(center: center, radius: bubble.radius),
+            );
 
       canvas.drawCircle(center, bubble.radius, paint);
     }

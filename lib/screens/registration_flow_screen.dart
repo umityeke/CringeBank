@@ -18,7 +18,7 @@ class RegistrationFlowScreen extends StatefulWidget {
 }
 
 class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
-  with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
@@ -150,10 +150,7 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    Colors.black.withOpacity(0.25),
-                    Colors.transparent,
-                  ],
+                  colors: [Colors.black.withOpacity(0.25), Colors.transparent],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -170,9 +167,7 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildRegistrationCard(context, cardWidth),
-                ],
+                children: [_buildRegistrationCard(context, cardWidth)],
               ),
             ),
           ),
@@ -195,8 +190,8 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
   }
 
   Widget _buildRegistrationCard(BuildContext context, double cardWidth) {
-  final cardColor = Colors.white.withOpacity(0.04);
-  final borderColor = Colors.white.withOpacity(0.08);
+    final cardColor = Colors.white.withOpacity(0.04);
+    final borderColor = Colors.white.withOpacity(0.08);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
@@ -481,7 +476,7 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
     int? maxLength,
     TextInputAction textInputAction = TextInputAction.next,
   }) {
-  final borderColor = Colors.white.withOpacity(0.12);
+    final borderColor = Colors.white.withOpacity(0.12);
     const focusedBorderColor = Color(0xFF2D79F3);
 
     return Column(
@@ -766,28 +761,18 @@ class _GradientButtonState extends State<_GradientButton> {
   Widget build(BuildContext context) {
     final bool isDisabled = widget.onPressed == null;
     final List<Color> colors = isDisabled
-        ? const [
-            Color(0xFF1F2937),
-            Color(0xFF1F2937),
-            Color(0xFF1F2937),
-          ]
+        ? const [Color(0xFF1F2937), Color(0xFF1F2937), Color(0xFF1F2937)]
         : _isHovered
-            ? const [
-                Color(0xFF1A1A1A),
-                Color(0xFF374151),
-                Color(0xFF3B82F6),
-              ]
-            : const [
-                Color(0xFF000000),
-                Color(0xFF1F2937),
-                Color(0xFF2D79F3),
-              ];
+        ? const [Color(0xFF1A1A1A), Color(0xFF374151), Color(0xFF3B82F6)]
+        : const [Color(0xFF000000), Color(0xFF1F2937), Color(0xFF2D79F3)];
 
     return SizedBox(
       height: 56,
       width: double.infinity,
       child: MouseRegion(
-        cursor: isDisabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+        cursor: isDisabled
+            ? SystemMouseCursors.basic
+            : SystemMouseCursors.click,
         onEnter: (_) => _setHovered(true),
         onExit: (_) => _setHovered(false),
         child: GestureDetector(
@@ -872,20 +857,21 @@ class _BubblesPainter extends CustomPainter {
           (progress * bubble.speed + bubble.phase) * 2 * math.pi;
       final dx =
           (bubble.origin.dx +
-                  math.cos(animationPhase) * bubble.horizontalShift) *
-              size.width;
+              math.cos(animationPhase) * bubble.horizontalShift) *
+          size.width;
       final dy =
           (bubble.origin.dy + math.sin(animationPhase) * bubble.verticalShift) *
-              size.height;
+          size.height;
 
       final center = Offset(dx, dy);
       final paint = ui.Paint()
-        ..shader = RadialGradient(
-          colors: bubble.colors,
-          stops: const [0.0, 1.0],
-        ).createShader(
-          ui.Rect.fromCircle(center: center, radius: bubble.radius),
-        );
+        ..shader =
+            RadialGradient(
+              colors: bubble.colors,
+              stops: const [0.0, 1.0],
+            ).createShader(
+              ui.Rect.fromCircle(center: center, radius: bubble.radius),
+            );
 
       canvas.drawCircle(center, bubble.radius, paint);
     }

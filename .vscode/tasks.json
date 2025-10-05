@@ -1,0 +1,88 @@
+{
+  // VS Code tasks to run cleanup quickly
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Clean: Dry Run",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}/scripts/clean_local.ps1",
+        "-DryRun"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Clean: Safe",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}/scripts/clean_local.ps1"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Clean: Deep",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}/scripts/clean_local.ps1",
+        "-Deep"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Windows app verbose",
+      "type": "shell",
+      "command": "flutter run -d windows --verbose",
+      "options": { "cwd": "${workspaceFolder}" }
+    }
+    ,
+    {
+      "label": "Run Windows app",
+      "type": "shell",
+      "command": "flutter run -d windows",
+      "options": { "cwd": "${workspaceFolder}" }
+    },
+    {
+      "label": "Run Windows app (init)",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-Command",
+        "flutter pub get; flutter run -d windows"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Pub Get",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["pub", "get"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Windows: Clean + Get + Run",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-Command",
+        "${workspaceFolder}/scripts/clean_local.ps1; flutter pub get; flutter run -d windows"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    }
+  ]
+}

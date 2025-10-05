@@ -177,7 +177,7 @@ class CringeSearchService {
       }
     }
 
-  final fetchLimit = ((page * limit).clamp(20, 500)).toInt();
+    final fetchLimit = ((page * limit).clamp(20, 500)).toInt();
     final fetchedEntries = await _fetchEntriesFromFirestore(limit: fetchLimit);
 
     if (fetchedEntries.isNotEmpty) {
@@ -253,7 +253,10 @@ class CringeSearchService {
       );
     }
 
-    final tokens = SearchNormalizer.tokenizeQuery(normalizedQuery, maxTokens: 10);
+    final tokens = SearchNormalizer.tokenizeQuery(
+      normalizedQuery,
+      maxTokens: 10,
+    );
     if (tokens.isEmpty) {
       return const UserSearchResult(
         users: [],
@@ -274,13 +277,12 @@ class CringeSearchService {
           .limit(limit * 3)
           .get();
 
-      final users = snapshot.docs.map((doc) {
-        final data = doc.data();
-        return User.fromMap({
-          ...data,
-          'id': doc.id,
-        });
-      }).toList(growable: true);
+      final users = snapshot.docs
+          .map((doc) {
+            final data = doc.data();
+            return User.fromMap({...data, 'id': doc.id});
+          })
+          .toList(growable: true);
 
       final fetchedIds = users.map((user) => user.id).toSet();
       final normalizedQueryNoSpaces = normalizedQuery.replaceAll(' ', '');
@@ -303,10 +305,7 @@ class CringeSearchService {
           for (final doc in snap.docs) {
             if (fetchedIds.contains(doc.id)) continue;
             final data = doc.data();
-            final user = User.fromMap({
-              ...data,
-              'id': doc.id,
-            });
+            final user = User.fromMap({...data, 'id': doc.id});
             users.add(user);
             fetchedIds.add(user.id);
           }
@@ -323,10 +322,7 @@ class CringeSearchService {
         for (final doc in fallbackSnapshot.docs) {
           if (fetchedIds.contains(doc.id)) continue;
           final data = doc.data();
-          final user = User.fromMap({
-            ...data,
-            'id': doc.id,
-          });
+          final user = User.fromMap({...data, 'id': doc.id});
 
           final fallbackScore = _scoreUserMatch(
             user: user,
@@ -343,32 +339,40 @@ class CringeSearchService {
       }
 
       final scored = users
-          .map((user) => _UserScore(
+          .map(
+            (user) => _UserScore(
+              user: user,
+              score: _scoreUserMatch(
                 user: user,
-                score: _scoreUserMatch(
-                  user: user,
-                  tokens: tokens,
-                  normalizedQuery: normalizedQuery,
-                  normalizedQueryNoSpaces: normalizedQueryNoSpaces,
-                ),
-              ))
+                tokens: tokens,
+                normalizedQuery: normalizedQuery,
+                normalizedQueryNoSpaces: normalizedQueryNoSpaces,
+              ),
+            ),
+          )
           .toList();
 
       scored.sort((a, b) {
         final scoreCompare = b.score.compareTo(a.score);
         if (scoreCompare != 0) return scoreCompare;
 
-        final verifyCompare = (b.user.isVerified ? 1 : 0)
-            .compareTo(a.user.isVerified ? 1 : 0);
+        final verifyCompare = (b.user.isVerified ? 1 : 0).compareTo(
+          a.user.isVerified ? 1 : 0,
+        );
         if (verifyCompare != 0) return verifyCompare;
 
-        final followerCompare = b.user.followersCount.compareTo(a.user.followersCount);
+        final followerCompare = b.user.followersCount.compareTo(
+          a.user.followersCount,
+        );
         if (followerCompare != 0) return followerCompare;
 
         return b.user.lastActive.compareTo(a.user.lastActive);
       });
 
-      final topUsers = scored.take(limit).map((item) => item.user).toList(growable: false);
+      final topUsers = scored
+          .take(limit)
+          .map((item) => item.user)
+          .toList(growable: false);
 
       return UserSearchResult(
         users: topUsers,
@@ -411,7 +415,8 @@ class CringeSearchService {
       }
 
       // Date filter
-      if (filter.startDate != null && entry.createdAt.isBefore(filter.startDate!)) {
+      if (filter.startDate != null &&
+          entry.createdAt.isBefore(filter.startDate!)) {
         return false;
       }
       if (filter.endDate != null && entry.createdAt.isAfter(filter.endDate!)) {
@@ -431,9 +436,11 @@ class CringeSearchService {
 
       // Tags filter
       if (filter.tags.isNotEmpty) {
-        final hasTag = filter.tags.any((tag) =>
-            entry.etiketler.any((entryTag) =>
-                entryTag.toLowerCase().contains(tag.toLowerCase())));
+        final hasTag = filter.tags.any(
+          (tag) => entry.etiketler.any(
+            (entryTag) => entryTag.toLowerCase().contains(tag.toLowerCase()),
+          ),
+        );
         if (!hasTag) return false;
       }
 
@@ -485,12 +492,12 @@ class CringeSearchService {
     required int limit,
   }) async {
     try {
-    final safeLimit = limit.clamp(1, 500).toInt();
-    final snapshot = await _firestore
-      .collection('cringe_entries')
-      .orderBy('createdAt', descending: true)
-      .limit(safeLimit)
-      .get();
+      final safeLimit = limit.clamp(1, 500).toInt();
+      final snapshot = await _firestore
+          .collection('cringe_entries')
+          .orderBy('createdAt', descending: true)
+          .limit(safeLimit)
+          .get();
 
       final entries = snapshot.docs.map((doc) {
         final data = doc.data();
@@ -526,95 +533,98 @@ class CringeSearchService {
     if (input.isEmpty) return [];
 
     final suggestions = <String>[];
-    
+
     // Add matching recent searches
-    suggestions.addAll(_recentSearches
-        .where((search) => search.toLowerCase().contains(input.toLowerCase()))
-        .take(3));
+    suggestions.addAll(
+      _recentSearches
+          .where((search) => search.toLowerCase().contains(input.toLowerCase()))
+          .take(3),
+    );
 
     // Add matching trending tags
-    suggestions.addAll(_trendingTags
-        .where((tag) => tag.toLowerCase().contains(input.toLowerCase()))
-        .take(5));
+    suggestions.addAll(
+      _trendingTags
+          .where((tag) => tag.toLowerCase().contains(input.toLowerCase()))
+          .take(5),
+    );
 
     return suggestions.take(8).toList();
   }
 }
 
-  class _UserScore {
-    final User user;
-    final int score;
+class _UserScore {
+  final User user;
+  final int score;
 
-    const _UserScore({
-      required this.user,
-      required this.score,
-    });
-  }
+  const _UserScore({required this.user, required this.score});
+}
 
-  int _scoreUserMatch({
-    required User user,
-    required List<String> tokens,
-    required String normalizedQuery,
-    required String normalizedQueryNoSpaces,
-  }) {
-    final keywordSet = SearchNormalizer.generateUserSearchKeywords(
-      fullName: user.fullName,
-      username: user.username,
-      email: user.email,
-    ).toSet();
+int _scoreUserMatch({
+  required User user,
+  required List<String> tokens,
+  required String normalizedQuery,
+  required String normalizedQueryNoSpaces,
+}) {
+  final keywordSet = SearchNormalizer.generateUserSearchKeywords(
+    fullName: user.fullName,
+    username: user.username,
+    email: user.email,
+  ).toSet();
 
-    final normalizedFullName = SearchNormalizer.normalizeForSearch(user.fullName);
-    final normalizedUsername = SearchNormalizer
-        .normalizeForSearch(user.username)
-        .replaceAll(RegExp(r'[@\s]+'), '');
+  final normalizedFullName = SearchNormalizer.normalizeForSearch(user.fullName);
+  final normalizedUsername = SearchNormalizer.normalizeForSearch(
+    user.username,
+  ).replaceAll(RegExp(r'[@\s]+'), '');
 
-    var score = 0;
+  var score = 0;
 
-    for (final token in tokens) {
-      if (keywordSet.contains(token)) {
-        score += 8;
-      } else if (keywordSet.any((kw) => kw.contains(token))) {
-        score += 4;
-      }
-
-      if (normalizedFullName.contains(token)) {
-        score += 2;
-      }
+  for (final token in tokens) {
+    if (keywordSet.contains(token)) {
+      score += 8;
+    } else if (keywordSet.any((kw) => kw.contains(token))) {
+      score += 4;
     }
 
-    if (normalizedFullName.startsWith(normalizedQuery) && normalizedQuery.isNotEmpty) {
-      score += 10;
-    }
-
-    if (normalizedUsername.startsWith(normalizedQueryNoSpaces) &&
-        normalizedQueryNoSpaces.isNotEmpty) {
-      score += 12;
-    }
-
-    if (normalizedUsername == normalizedQueryNoSpaces && normalizedUsername.isNotEmpty) {
-      score += 15;
-    }
-
-    if (normalizedFullName == normalizedQuery && normalizedFullName.isNotEmpty) {
-      score += 12;
-    }
-
-    if (user.isVerified) {
-      score += 3;
-    }
-
-    if (user.isPremium) {
-      score += 1;
-    }
-
-    score += (user.followersCount ~/ 1000).clamp(0, 5);
-
-    final daysSinceActive = DateTime.now().difference(user.lastActive).inDays;
-    if (daysSinceActive <= 7) {
+    if (normalizedFullName.contains(token)) {
       score += 2;
-    } else if (daysSinceActive <= 30) {
-      score += 1;
     }
-
-    return score;
   }
+
+  if (normalizedFullName.startsWith(normalizedQuery) &&
+      normalizedQuery.isNotEmpty) {
+    score += 10;
+  }
+
+  if (normalizedUsername.startsWith(normalizedQueryNoSpaces) &&
+      normalizedQueryNoSpaces.isNotEmpty) {
+    score += 12;
+  }
+
+  if (normalizedUsername == normalizedQueryNoSpaces &&
+      normalizedUsername.isNotEmpty) {
+    score += 15;
+  }
+
+  if (normalizedFullName == normalizedQuery && normalizedFullName.isNotEmpty) {
+    score += 12;
+  }
+
+  if (user.isVerified) {
+    score += 3;
+  }
+
+  if (user.isPremium) {
+    score += 1;
+  }
+
+  score += (user.followersCount ~/ 1000).clamp(0, 5);
+
+  final daysSinceActive = DateTime.now().difference(user.lastActive).inDays;
+  if (daysSinceActive <= 7) {
+    score += 2;
+  } else if (daysSinceActive <= 30) {
+    score += 1;
+  }
+
+  return score;
+}

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -11,26 +10,32 @@ import 'firebase_options.dart';
 import 'services/advanced_ai_service.dart';
 import 'services/competition_service.dart';
 import 'services/cringe_entry_service.dart';
-import 'services/cringe_notification_service.dart';
 import 'services/cringe_search_service.dart';
 import 'services/user_service.dart';
+import 'services/crash_reporting/crash_reporting_service_factory.dart';
+import 'services/crash_reporting/i_crash_reporting_service.dart';
+import 'services/notifications/notification_service_factory.dart';
+import 'services/notifications/i_notification_service.dart';
 
-const String _sentryDsn = String.fromEnvironment('SENTRY_DSN', defaultValue: '');
-bool _crashlyticsEnabled = false;
+const String _sentryDsn = String.fromEnvironment(
+  'SENTRY_DSN',
+  defaultValue: '',
+);
+
+// Platform-aware services - created once during bootstrap
+late final ICrashReportingService _crashReportingService;
+late final INotificationService _notificationService;
 
 bool get _hasSentry => _sentryDsn.isNotEmpty;
 
 Future<void> bootstrap(Widget app) async {
   if (_hasSentry) {
-    await SentryFlutter.init(
-      (options) {
-        options.dsn = _sentryDsn;
-        options.tracesSampleRate = kReleaseMode ? 0.2 : 1.0;
-        options.environment = kReleaseMode ? 'production' : 'development';
-        options.enableAutoSessionTracking = true;
-      },
-      appRunner: () async => _runAppWithGuards(app),
-    );
+    await SentryFlutter.init((options) {
+      options.dsn = _sentryDsn;
+      options.tracesSampleRate = kReleaseMode ? 0.2 : 1.0;
+      options.environment = kReleaseMode ? 'production' : 'development';
+      options.enableAutoSessionTracking = true;
+    }, appRunner: () async => _runAppWithGuards(app));
   } else {
     await _runAppWithGuards(app);
   }
@@ -42,23 +47,46 @@ void _configureLogging() {
   }
 }
 
+void _configureErrorHandlers() {
+  // Configure Flutter error handler
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    unawaited(
+      _recordFatalError(details.exception, details.stack ?? StackTrace.current),
+    );
+  };
+
+  // Configure platform dispatcher error handler
+  PlatformDispatcher.instance.onError = (error, stack) {
+    _logSevereError(error, stack);
+    return true;
+  };
+}
+
 Future<void> _runAppWithGuards(Widget app) async {
   await runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
     _configureLogging();
 
+    // Initialize Firebase (safely handles platforms where it's not available)
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    await _configureCrashReporting();
+    // Create platform-aware services
+    _crashReportingService = CrashReportingServiceFactory.create();
+    _notificationService = NotificationServiceFactory.create();
+
+    // Initialize services
+    await _crashReportingService.initialize();
+    _configureErrorHandlers();
     await _configureFirestore();
 
     AdvancedAIService.initialize();
 
     await Future.wait([
-      CringeNotificationService.initialize(),
+      _notificationService.initialize(),
       CringeSearchService.initialize(),
     ]);
 
@@ -96,49 +124,20 @@ void _setupPostAuthInitializers() {
 }
 
 void _logSevereError(Object error, StackTrace stackTrace) {
-  debugPrint('🔥 Unhandled exception: $error');
+  debugPrint('ğ” Unhandled exception: $error');
   debugPrint(stackTrace.toString());
   unawaited(_recordFatalError(error, stackTrace));
 }
 
-Future<void> _configureCrashReporting() async {
-  if (kIsWeb) {
-    debugPrint('Crashlytics is not supported on web platforms.');
-    return;
-  }
-
-  try {
-    await FirebaseCrashlytics.instance
-        .setCrashlyticsCollectionEnabled(!kDebugMode);
-    _crashlyticsEnabled = true;
-  } catch (error, stackTrace) {
-    debugPrint('Crashlytics initialization failed: $error');
-    _crashlyticsEnabled = false;
-    _logSevereError(error, stackTrace);
-  }
-
-  FlutterError.onError = (details) {
-    FlutterError.presentError(details);
-    unawaited(
-      _recordFatalError(details.exception, details.stack ?? StackTrace.current),
-    );
-  };
-
-  PlatformDispatcher.instance.onError = (error, stack) {
-    _logSevereError(error, stack);
-    return true;
-  };
-}
-
 Future<void> _recordFatalError(Object error, StackTrace stackTrace) async {
-  if (_crashlyticsEnabled) {
-    await FirebaseCrashlytics.instance.recordError(
-      error,
-      stackTrace,
-      fatal: true,
-    );
-  }
+  // Record error using platform-aware crash reporting service
+  await _crashReportingService.recordFatalError(
+    error,
+    stackTrace,
+    reason: 'Unhandled exception',
+  );
 
+  // Also send to Sentry if configured
   if (_hasSentry) {
     await Sentry.captureException(error, stackTrace: stackTrace);
   }

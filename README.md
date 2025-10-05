@@ -1,6 +1,6 @@
 # Cringe Bankası
 
-Flutter ile geliştirilmiş bu proje, `cringe_entries` koleksiyonundan gerçek zamanlı verileri çeken kurumsal seviyede bir akış servisi içerir. Bu döngüyü güçlendirmek için Firestore zaman aşımı yönetimi, kalıcı önbellek, telemetri ve indeks yapılandırmaları güncellendi.
+Flutter ile geliştirilmiş bu proje, paylaşımları Firestore üzerinde paylaşım türüne göre gruplanmış `cringe_entries_by_type/{paylasimTuru}/categories/{kategori}/entries` alt koleksiyonlarında tutan kurumsal seviyede bir akış servisi içerir. Bu döngüyü güçlendirmek için Firestore zaman aşımı yönetimi, kalıcı önbellek, telemetri ve indeks yapılandırmaları güncellendi.
 
 ## Özellik Özeti
 
@@ -21,6 +21,17 @@ Flutter ile geliştirilmiş bu proje, `cringe_entries` koleksiyonundan gerçek z
 - Timeout durumları `cringe_entries_stream_timeout` eventiyle Firebase Analytics’e raporlanır.
 - UI, `streamHint` üzerinden “bağlantı yavaş” gibi mesajlar gösterebilir.
 
+## Responsive Master Rulebook
+
+CringeBank’ın tüm UI bileşenleri [CringeBank Responsive Master Rulebook](docs/responsive_master_rulebook.md) dokümanındaki breakpoint, grid, oran ve erişilebilirlik kriterlerine uymak zorundadır. Bu kurallar:
+
+- xs-sm cihazlarda tek, md cihazlarda iki, lg-xl cihazlarda üç-dört, xxl cihazlarda beş-altı kolon layout’u zorunlu kılar.
+- Kart ve görsel oranları için 16:9 ± %1 toleransını dayatır.
+- Metinlerde `TextOverflow.ellipsis`, butonlarda minimum 44×44 px dokunma alanı gerektirir.
+- Web tarafında Lighthouse `accessibility` ve `best-practices` skorlarının ≥ 90 olmasını şart koşar.
+
+Herhangi bir breakpoint’te taşma veya scroll sapması tespit edilmesi build sürecinde başarısızlık nedeni sayılır.
+
 ## Testler
 
 Yeni önbellek davranışını doğrulamak için aşağıdaki testi çalıştırın:
@@ -32,7 +43,7 @@ flutter test test/services/cringe_entry_service_test.dart
 
 ## Firestore Yapılandırması
 
-- `firestore.rules` dosyasında `cringe_entries` için okuma erişimi oturum açmış kullanıcılarla sınırlandırılmıştır.
+- `firestore.rules` dosyasında `cringe_entries_by_type/{paylasimTuru}/categories/{kategori}/entries` için okuma erişimi oturum açmış kullanıcılarla sınırlandırılmıştır.
 - `firestore.indexes.json` dosyası `createdAt` alanı için zorunlu indeks tanımını içerir. Değişiklikleri dağıtmak için:
 
 ```powershell

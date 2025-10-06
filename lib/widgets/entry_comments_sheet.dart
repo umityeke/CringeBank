@@ -99,7 +99,7 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.entry.baslik,
+                  widget.entry.headline,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,

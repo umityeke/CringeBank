@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "X0L2hVlEzCI=",
+  "success": true,
+  "projectFilePath": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Application\\CringeBank.Application.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Ümit YEKE\\.nuget\\packages\\fluentvalidation\\11.9.0\\fluentvalidation.11.9.0.nupkg.sha512",
+    "C:\\Users\\Ümit YEKE\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\9.0.0\\microsoft.extensions.dependencyinjection.abstractions.9.0.0.nupkg.sha512",
+    "C:\\Users\\Ümit YEKE\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\9.0.0\\microsoft.extensions.logging.abstractions.9.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

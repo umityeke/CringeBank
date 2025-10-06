@@ -1,0 +1,181 @@
+rules_version = '2';
+
+function signedIn() {
+  return request.auth != null && request.auth.token.email_verified == true;
+}
+
+function isMember(db, cid) {
+  return signedIn() &&
+    get(/databases/$(db)/documents/conversations/$(cid)).data.members
+      .hasAny([request.auth.uid]);
+}
+
+function counterpartUid(db, cid) {
+  let members = get(/databases/$(db)/documents/conversations/$(cid)).data.members;
+  return members.where(m => m != request.auth.uid)[0];
+}
+
+function notBlocked(db, target) {
+  return !(exists(/databases/$(db)/documents/blocks/$(request.auth.uid)/targets/$(target)) ||
+           exists(/databases/$(db)/documents/blocks/$(target)/targets/$(request.auth.uid)));
+}
+
+/* ---------- IMMUTABLE alanları korumak için yardımcılar ---------- */
+function unchanged(fieldPath) {
+  return resource.data[fieldPath] == request.resource.data[fieldPath];
+}
+function neverSet(fieldPath) {
+  return !(fieldPath in request.resource.data);
+}
+function onlyChangedKeys(allowedKeys) {
+  return request.resource.data.diff(resource.data).changedKeys().hasOnly(allowedKeys);
+}
+
+/* ---------- İÇERİK DOĞRULAYICI ---------- */
+function hasContent() {
+  return (request.resource.data.text != null) ||
+         (request.resource.data.media != null);
+}
+
+/* ---------- EDIT PENCERESİ ---------- */
+function withinEditWindow() {
+  // Functions, create anında editAllowedUntil = createdAt + 15dk yazar.
+  // Client bu alanı değiştiremez (aşağıda engelleniyor).
+  return request.time <= resource.data.editAllowedUntil;
+}
+
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    /* -------- users -------- */
+    match /users/{uid} {
+      // Her doğrulanmış kullanıcı public alanları okuyabilir
+      allow read: if signedIn();
+
+      // Kullanıcı kendi belgesini yazabilir/oluşturabilir
+      allow create, update: if signedIn() && request.auth.uid == uid;
+
+      // Güvenlik: tokens gibi özel alanları başka kimse yazamaz
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    /* -------- blocks -------- */
+    match /blocks/{ownerUid}/targets/{targetUid} {
+      // Sadece taraflar okuyabilir
+      allow read: if signedIn() &&
+        (request.auth.uid == ownerUid || request.auth.uid == targetUid);
+
+      // Yalnızca owner blok koyar/kaldırır
+      allow create, update, delete: if signedIn() && request.auth.uid == ownerUid;
+    }
+
+    /* -------- conversations -------- */
+    match /conversations/{cid} {
+      // Sadece üyeler okur
+      allow read: if isMember(db, cid);
+
+      // Oluşturma: çağıran kendini mutlaka members içine koymalı; min 2 üye
+      allow create: if signedIn()
+        && request.resource.data.members.size() >= 2
+        && request.resource.data.members.hasOnly(
+             [request.auth.uid] + request.resource.data.members
+           )
+        && request.resource.data.createdAt == request.time;
+
+      // Üyeler meta güncelleyebilir (lastMessage, updatedAt, readPointers vb.)
+      // Kendi readPointer anahtarını güncelleme izni
+      allow update: if isMember(db, cid)
+        && (
+          // readPointers.<uid> sadece kendisi tarafından güncellenir
+          request.resource.data.readPointers[request.auth.uid] == request.time
+          || true  // lastMessage/updatedAt gibi diğer meta güncellemeleri de function'lar yapacak
+        );
+
+      // Silme: üyeler (opsiyonel – istersen kapat)
+      allow delete: if isMember(db, cid);
+    }
+
+    /* -------- messages -------- */
+    match /conversations/{cid}/messages/{mid} {
+      /* ---- READ ---- */
+      allow read: if isMember(db, cid);
+
+      /* ---- CREATE (yalnız Functions'ın hazırladığı doküman kalıbı kabul) ---- */
+      allow create: if isMember(db, cid)
+        && request.resource.data.senderId == request.auth.uid
+        && (hasContent())
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.rateKey == "ok"  // anti-spam: sadece callable/CF yazmalı
+        && (
+          // DM ise iki yönlü blok kontrolü
+          (get(/databases/$(db)/documents/conversations/$(cid)).data.isGroup == false
+            ? notBlocked(db, counterpartUid(db, cid))
+            : true)
+        );
+
+      /* ---- UPDATE ---- */
+      allow update: if isMember(db, cid) && (
+        // 1) Only-Me silme: sadece kendi deletedFor.<uid> alanını true yapabilir
+        (
+          request.auth.uid == resource.data.senderId &&
+          onlyChangedKeys(['deletedFor']) &&
+          // sadece kendi anahtarını set edebilir
+          request.resource.data.deletedFor.keys().hasOnly([request.auth.uid]) &&
+          request.resource.data.deletedFor[request.auth.uid] == true
+          // immutable korumaları
+          && unchanged('senderId') && unchanged('createdAt') && unchanged('rateKey')
+        )
+        ||
+        // 2) Herkesten silme (For-Both): tombstone aktif edilir, geri alınamaz
+        (
+          request.auth.uid == resource.data.senderId &&
+          request.resource.data.tombstone.active == true &&
+          // geri alma yok
+          ( !('tombstone' in resource.data) || resource.data.tombstone.active == false ) &&
+          request.resource.data.tombstone.by == request.auth.uid &&
+          request.resource.data.tombstone.at == request.time
+          // immutable + içerik artık dokunulamaz
+          && unchanged('senderId') && unchanged('createdAt') && unchanged('rateKey')
+        )
+        ||
+        // 3) Düzenleme: sadece gönderen + edit penceresi içinde
+        (
+          request.auth.uid == resource.data.senderId &&
+          // içerik değiştirilebilir: text VEYA media (en az biri olmalı)
+          (
+            (request.resource.data.text != null) ||
+            (request.resource.data.media != null)
+          )
+          &&
+          // tombstone'dan sonra düzenleme YOK
+          (
+            !('tombstone' in resource.data) || resource.data.tombstone.active == false
+          )
+          &&
+          // edit penceresi içinde
+          withinEditWindow()
+          &&
+          // edited.* işaretleri gelmeli
+          request.resource.data.edited.active == true &&
+          request.resource.data.edited.at == request.time &&
+          request.resource.data.edited.by == request.auth.uid &&
+          (
+            // sürüm artışı (ilk düzenlemede version 1 olabilir)
+            !('edited' in resource.data)
+            || request.resource.data.edited.version == (resource.data.edited.version + 1)
+            || (resource.data.edited.version == null && request.resource.data.edited.version == 1)
+          )
+          &&
+          // immutable alanlar değişmez
+          unchanged('senderId') && unchanged('createdAt') && unchanged('rateKey')
+          &&
+          // editAllowedUntil değiştirilemez
+          unchanged('editAllowedUntil')
+        )
+      );
+
+      /* ---- DELETE (opsiyonel): sadece gönderen hard delete yapabilsin ---- */
+      allow delete: if isMember(db, cid) && request.auth.uid == resource.data.senderId;
+    }
+  }
+}

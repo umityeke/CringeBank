@@ -198,7 +198,7 @@ class CringeSearchService {
     if (query.isNotEmpty) {
       filteredEntries = filteredEntries.where((entry) {
         final searchText =
-            '${entry.baslik} ${entry.aciklama} ${entry.etiketler.join(' ')}'
+            '${entry.headline} ${entry.aciklama} ${entry.etiketler.join(' ')}'
                 .toLowerCase();
         return searchText.contains(query.toLowerCase());
       }).toList();
@@ -241,7 +241,7 @@ class CringeSearchService {
 
   static Future<UserSearchResult> searchUsers({
     required String query,
-    int limit = 20,
+    int? limit,
   }) async {
     final normalizedQuery = SearchNormalizer.normalizeForSearch(query);
     if (normalizedQuery.length < 2) {
@@ -267,15 +267,21 @@ class CringeSearchService {
     }
 
     final startTime = DateTime.now();
+    final int? effectiveLimit = (limit != null && limit > 0) ? limit : null;
+    final targetSize = effectiveLimit ?? 1000000;
 
     try {
       final queryTokens = tokens.take(10).toList(growable: false);
 
-      final snapshot = await _firestore
+      var userQuery = _firestore
           .collection('users')
-          .where('searchKeywords', arrayContainsAny: queryTokens)
-          .limit(limit * 3)
-          .get();
+          .where('searchKeywords', arrayContainsAny: queryTokens);
+
+      if (effectiveLimit != null) {
+        userQuery = userQuery.limit(effectiveLimit * 3);
+      }
+
+      final snapshot = await userQuery.get();
 
       final users = snapshot.docs
           .map((doc) {
@@ -287,7 +293,7 @@ class CringeSearchService {
       final fetchedIds = users.map((user) => user.id).toSet();
       final normalizedQueryNoSpaces = normalizedQuery.replaceAll(' ', '');
 
-      if (users.length < limit && normalizedQueryNoSpaces.isNotEmpty) {
+      if (users.length < targetSize && normalizedQueryNoSpaces.isNotEmpty) {
         final usernameSnapshots = await Future.wait([
           _firestore
               .collection('users')
@@ -312,12 +318,18 @@ class CringeSearchService {
         }
       }
 
-      if (users.length < limit) {
-        final fallbackSnapshot = await _firestore
+      if (users.length < targetSize) {
+        var fallbackQuery = _firestore
             .collection('users')
-            .orderBy('lastActive', descending: true)
-            .limit(limit * 2)
-            .get();
+            .orderBy('lastActive', descending: true);
+
+        if (effectiveLimit != null) {
+          fallbackQuery = fallbackQuery.limit(effectiveLimit * 2);
+        } else {
+          fallbackQuery = fallbackQuery.limit(400);
+        }
+
+        final fallbackSnapshot = await fallbackQuery.get();
 
         for (final doc in fallbackSnapshot.docs) {
           if (fetchedIds.contains(doc.id)) continue;
@@ -369,10 +381,12 @@ class CringeSearchService {
         return b.user.lastActive.compareTo(a.user.lastActive);
       });
 
-      final topUsers = scored
-          .take(limit)
-          .map((item) => item.user)
-          .toList(growable: false);
+      final topUsers = effectiveLimit != null
+          ? scored
+                .take(effectiveLimit)
+                .map((item) => item.user)
+                .toList(growable: false)
+          : scored.map((item) => item.user).toList(growable: false);
 
       return UserSearchResult(
         users: topUsers,
@@ -430,7 +444,7 @@ class CringeSearchService {
       }
 
       // Likes filter
-      if (filter.minLikes != null && entry.begeniSayisi < filter.minLikes!) {
+      if (filter.minLikes != null && entry.likeCount < filter.minLikes!) {
         return false;
       }
 
@@ -464,7 +478,7 @@ class CringeSearchService {
         entries.sort((a, b) => a.krepSeviyesi.compareTo(b.krepSeviyesi));
         break;
       case SearchSortBy.mostLiked:
-        entries.sort((a, b) => b.begeniSayisi.compareTo(a.begeniSayisi));
+        entries.sort((a, b) => b.likeCount.compareTo(a.likeCount));
         break;
       case SearchSortBy.mostCommented:
         entries.sort((a, b) => b.yorumSayisi.compareTo(a.yorumSayisi));

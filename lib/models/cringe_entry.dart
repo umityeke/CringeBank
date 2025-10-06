@@ -22,10 +22,28 @@ enum ModerationStatus {
 
 // Post Type (5 types from security contract)
 enum PostType {
-  spill('spill', 'Spill', 'Metin odaklı paylaşım', Icons.article, 1, 2000, 0, 1),
+  spill(
+    'spill',
+    'Spill',
+    'Metin odaklı paylaşım',
+    Icons.article,
+    1,
+    2000,
+    0,
+    1,
+  ),
   clap('clap', 'Clap', 'Kısa vurucu metin', Icons.flash_on, 1, 140, 0, 1),
   frame('frame', 'Frame', 'Görsel paylaşım', Icons.image, 0, 1000, 1, 20),
-  cringecast('cringecast', 'CringeCast', 'Video paylaşım', Icons.video_library, 0, 1000, 1, 1),
+  cringecast(
+    'cringecast',
+    'CringeCast',
+    'Video paylaşım',
+    Icons.video_library,
+    0,
+    1000,
+    1,
+    1,
+  ),
   mash('mash', 'Mash', 'Karışık medya', Icons.collections, 0, 2000, 1, 5);
 
   const PostType(
@@ -165,8 +183,16 @@ class CringeEntry {
   final PostType type; // spill, clap, frame, cringecast, mash
   final ModerationStatus status; // pending, approved, rejected, blocked
   final DateTime? updatedAt; // Son güncelleme zamanı
-  final Map<String, dynamic>? moderation; // Moderasyon notları (only mods can write)
-  final List<String> media; // Storage paths: user_uploads/{ownerId}/{postId}/filename
+  final Map<String, dynamic>?
+  moderation; // Moderasyon notları (only mods can write)
+  final List<String>
+  media; // Storage paths: user_uploads/{ownerId}/{postId}/filename
+
+  // === ENGAGEMENT FIELDS ===
+  final int likeCount; // Beğeni sayısı
+  final List<String> likedBy; // Beğenen kullanıcı ID'leri (max 100 gösterilir)
+  final int viewCount; // Görüntülenme sayısı
+  final int shareCount; // Paylaşım sayısı
 
   const CringeEntry({
     required this.id,
@@ -194,6 +220,11 @@ class CringeEntry {
     this.updatedAt,
     this.moderation,
     this.media = const [],
+    // Engagement fields
+    this.likeCount = 0,
+    this.likedBy = const [],
+    this.viewCount = 0,
+    this.shareCount = 0,
   });
 
   static int _parseInt(dynamic value) {
@@ -305,7 +336,9 @@ class CringeEntry {
       krepSeviyesi: (json['krepSeviyesi'] as num?)?.toDouble() ?? 0.0,
       createdAt: json['createdAt'] is int
           ? DateTime.fromMillisecondsSinceEpoch(json['createdAt'])
-          : DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
+          : DateTime.parse(
+              json['createdAt'] ?? DateTime.now().toIso8601String(),
+            ),
       etiketler: List<String>.from(json['etiketler'] ?? []),
       isAnonim: json['isAnonim'] ?? false,
       begeniSayisi: _parseInt(json['begeniSayisi']),
@@ -321,9 +354,16 @@ class CringeEntry {
       status: ModerationStatus.fromString(json['status']),
       updatedAt: json['updatedAt'] is int
           ? DateTime.fromMillisecondsSinceEpoch(json['updatedAt'])
-          : (json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null),
+          : (json['updatedAt'] != null
+                ? DateTime.parse(json['updatedAt'])
+                : null),
       moderation: json['moderation'] as Map<String, dynamic>?,
       media: List<String>.from(json['media'] ?? json['imageUrls'] ?? []),
+      // Engagement fields
+      likeCount: _parseInt(json['likeCount']),
+      likedBy: List<String>.from(json['likedBy'] ?? []),
+      viewCount: _parseInt(json['viewCount']),
+      shareCount: _parseInt(json['shareCount']),
     );
   }
 
@@ -361,6 +401,11 @@ class CringeEntry {
       'updatedAt': updatedAt?.millisecondsSinceEpoch,
       'moderation': moderation,
       'media': media,
+      // Engagement fields
+      'likeCount': likeCount,
+      'likedBy': likedBy,
+      'viewCount': viewCount,
+      'shareCount': shareCount,
     };
   }
 
@@ -389,6 +434,10 @@ class CringeEntry {
     DateTime? updatedAt,
     Map<String, dynamic>? moderation,
     List<String>? media,
+    int? likeCount,
+    List<String>? likedBy,
+    int? viewCount,
+    int? shareCount,
   }) {
     return CringeEntry(
       id: id ?? this.id,
@@ -415,7 +464,51 @@ class CringeEntry {
       updatedAt: updatedAt ?? this.updatedAt,
       moderation: moderation ?? this.moderation,
       media: media ?? this.media,
+      likeCount: likeCount ?? this.likeCount,
+      likedBy: likedBy ?? this.likedBy,
+      viewCount: viewCount ?? this.viewCount,
+      shareCount: shareCount ?? this.shareCount,
     );
+  }
+
+  /// Returns the most suitable display title by falling back to description.
+  String get headline => baslik.isNotEmpty ? baslik : aciklama;
+
+  /// Normalizes a title by collapsing whitespace and truncating it.
+  static String deriveTitle(
+    String candidateTitle,
+    String description, {
+    int maxLength = 100,
+  }) {
+    final normalizedTitle = _normalizeText(candidateTitle);
+    final normalizedDescription = _normalizeText(description);
+
+    final source = normalizedTitle.isNotEmpty
+        ? normalizedTitle
+        : normalizedDescription;
+
+    if (source.isEmpty) {
+      return '';
+    }
+
+    return _truncate(source, maxLength);
+  }
+
+  static String _normalizeText(String value) {
+    return value.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  static String _truncate(String value, int maxLength) {
+    if (maxLength <= 0) {
+      return '';
+    }
+    if (value.length <= maxLength) {
+      return value;
+    }
+    if (maxLength <= 3) {
+      return value.substring(0, maxLength);
+    }
+    return '${value.substring(0, maxLength - 3)}...';
   }
 
   // Firestore için factory constructor
@@ -451,7 +544,10 @@ class CringeEntry {
 
     return CringeEntry(
       id: data['id'] ?? '',
-      userId: data['ownerId'] ?? data['userId'] ?? '', // Firestore rules use 'ownerId'
+      userId:
+          data['ownerId'] ??
+          data['userId'] ??
+          '', // Firestore rules use 'ownerId'
       authorName: data['authorName'] ?? data['username'] ?? 'Anonim',
       authorHandle: data['authorHandle'] ?? '@${data['username'] ?? 'anonim'}',
       baslik: data['baslik'] ?? data['title'] ?? '',
@@ -472,10 +568,16 @@ class CringeEntry {
       authorAvatarUrl: data['authorAvatarUrl'],
       isAnonim: data['isAnonim'] ?? false,
       // Security contract fields
-      type: data['type'] != null ? PostType.fromString(data['type']) : PostType.spill,
-      status: data['status'] != null ? ModerationStatus.fromString(data['status']) : ModerationStatus.pending,
+      type: data['type'] != null
+          ? PostType.fromString(data['type'])
+          : PostType.spill,
+      status: data['status'] != null
+          ? ModerationStatus.fromString(data['status'])
+          : ModerationStatus.pending,
       updatedAt: parsedUpdatedAt,
-      moderation: data['moderation'] != null ? Map<String, dynamic>.from(data['moderation']) : null,
+      moderation: data['moderation'] != null
+          ? Map<String, dynamic>.from(data['moderation'])
+          : null,
       media: data['media'] != null ? List<String>.from(data['media']) : [],
     );
   }

@@ -13,7 +13,7 @@ class AdminTestPage extends StatefulWidget {
 class _AdminTestPageState extends State<AdminTestPage> {
   final _adminService = AdminPanelService.instance;
   final _auth = FirebaseAuth.instance;
-  
+
   bool _isLoading = false;
   bool? _isSuperAdmin;
   String _output = '';
@@ -26,14 +26,14 @@ class _AdminTestPageState extends State<AdminTestPage> {
 
   Future<void> _checkAdminStatus() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final isSA = await _adminService.isSuperAdmin;
       setState(() {
         _isSuperAdmin = isSA;
-        _output = isSA 
-          ? '✅ Super Admin: ${_auth.currentUser?.email}'
-          : '❌ Not super admin. Please logout and login.';
+        _output = isSA
+            ? '✅ Super Admin: ${_auth.currentUser?.email}'
+            : '❌ Not super admin. Please logout and login.';
       });
     } catch (e) {
       setState(() {
@@ -98,9 +98,9 @@ class _AdminTestPageState extends State<AdminTestPage> {
           children: [
             // Status Card
             Card(
-              color: _isSuperAdmin == true 
-                ? Colors.green.shade50 
-                : Colors.orange.shade50,
+              color: _isSuperAdmin == true
+                  ? Colors.green.shade50
+                  : Colors.orange.shade50,
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -109,18 +109,18 @@ class _AdminTestPageState extends State<AdminTestPage> {
                     Row(
                       children: [
                         Icon(
-                          _isSuperAdmin == true 
-                            ? Icons.verified_user 
-                            : Icons.warning,
-                          color: _isSuperAdmin == true 
-                            ? Colors.green 
-                            : Colors.orange,
+                          _isSuperAdmin == true
+                              ? Icons.verified_user
+                              : Icons.warning,
+                          color: _isSuperAdmin == true
+                              ? Colors.green
+                              : Colors.orange,
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          _isSuperAdmin == true 
-                            ? 'Super Admin' 
-                            : 'Not Super Admin',
+                          _isSuperAdmin == true
+                              ? 'Super Admin'
+                              : 'Not Super Admin',
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -148,9 +148,9 @@ class _AdminTestPageState extends State<AdminTestPage> {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Test Buttons
             ElevatedButton.icon(
               onPressed: _isLoading ? null : _checkAdminStatus,
@@ -161,13 +161,13 @@ class _AdminTestPageState extends State<AdminTestPage> {
                 foregroundColor: Colors.white,
               ),
             ),
-            
+
             const SizedBox(height: 8),
-            
+
             ElevatedButton.icon(
-              onPressed: (_isLoading || _isSuperAdmin != true) 
-                ? null 
-                : _runCategoryAdminTest,
+              onPressed: (_isLoading || _isSuperAdmin != true)
+                  ? null
+                  : _runCategoryAdminTest,
               icon: const Icon(Icons.admin_panel_settings),
               label: const Text('Test: Category Admin'),
               style: ElevatedButton.styleFrom(
@@ -175,13 +175,13 @@ class _AdminTestPageState extends State<AdminTestPage> {
                 foregroundColor: Colors.white,
               ),
             ),
-            
+
             const SizedBox(height: 8),
-            
+
             ElevatedButton.icon(
-              onPressed: (_isLoading || _isSuperAdmin != true) 
-                ? null 
-                : _runCompetitionTest,
+              onPressed: (_isLoading || _isSuperAdmin != true)
+                  ? null
+                  : _runCompetitionTest,
               icon: const Icon(Icons.emoji_events),
               label: const Text('Test: Create Competition'),
               style: ElevatedButton.styleFrom(
@@ -189,9 +189,9 @@ class _AdminTestPageState extends State<AdminTestPage> {
                 foregroundColor: Colors.white,
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Output Console
             Expanded(
               child: Card(
@@ -211,7 +211,7 @@ class _AdminTestPageState extends State<AdminTestPage> {
                 ),
               ),
             ),
-            
+
             // Loading Indicator
             if (_isLoading)
               const Padding(

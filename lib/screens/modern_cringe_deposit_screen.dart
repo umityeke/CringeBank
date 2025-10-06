@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:image/image.dart' as img;
 import '../models/cringe_entry.dart';
+import '../models/competition_model.dart';
 import '../widgets/animated_bubble_background.dart';
 import '../services/competition_service.dart';
 import '../services/cringe_entry_service.dart';
@@ -32,6 +33,7 @@ class ModernCringeDepositScreen extends StatefulWidget {
 
 class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
     with TickerProviderStateMixin {
+  late final CompetitionService _competitionService;
   late AnimationController _controller;
   late AnimationController _submitController;
   late Animation<double> _scaleAnimation;
@@ -41,7 +43,8 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
   final PageController _pageController = PageController();
 
   CringeCategory _selectedCategory = CringeCategory.fizikselRezillik;
-  PostType _selectedPostType = PostType.spill; // Security Contract: Default post type
+  PostType _selectedPostType =
+      PostType.spill; // Security Contract: Default post type
   int _currentStep = 0;
   int _severity = 5;
   bool _isAnonymous = false;
@@ -59,6 +62,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
   @override
   void initState() {
     super.initState();
+    _competitionService = CompetitionService();
     _controller = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
@@ -899,8 +903,8 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                   _descriptionController.text.isEmpty
                       ? 'Belirtilmedi'
                       : _descriptionController.text.length > 100
-                          ? '${_descriptionController.text.substring(0, 97)}...'
-                          : _descriptionController.text,
+                      ? '${_descriptionController.text.substring(0, 97)}...'
+                      : _descriptionController.text,
                 ),
                 _buildSummaryItem(
                   'Kategori',
@@ -1193,9 +1197,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
       if (_isEditing) {
         // Auto-generate title from description (first 100 chars)
         final contentText = _descriptionController.text.trim();
-        final autoTitle = contentText.length > 100 
-            ? '${contentText.substring(0, 97)}...' 
-            : contentText;
+        final autoTitle = CringeEntry.deriveTitle('', contentText);
 
         final updatedEntry = widget.existingEntry!.copyWith(
           authorName: _isAnonymous ? 'Anonim' : displayName,
@@ -1231,9 +1233,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
 
       // Auto-generate title from description (first 100 chars)
       final contentText = _descriptionController.text.trim();
-      final autoTitle = contentText.length > 100 
-          ? '${contentText.substring(0, 97)}...' 
-          : contentText;
+      final autoTitle = CringeEntry.deriveTitle('', contentText);
 
       final entry = CringeEntry(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -1249,7 +1249,8 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         imageUrls: imageUrls,
         authorAvatarUrl: authorAvatar,
         type: _selectedPostType, // Security Contract: Add post type
-        status: ModerationStatus.pending, // Security Contract: All posts start as pending
+        status:
+            ModerationStatus.approved, // Auto-approved - moderation via reports
       );
 
       if (_isCompetitionEntry) {
@@ -1257,26 +1258,37 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
           throw Exception('Yarışma bilgisi eksik.');
         }
 
-        if (!competition.participantUserIds.contains(user.id)) {
-          throw Exception('Anı paylaşmak için önce yarışmaya katılmalısın.');
+        if (competition.type != CompetitionType.upload) {
+          throw Exception(
+            'Bu yarışma için anı paylaşımı desteklenmiyor. Lütfen upload türü yarışmalar için tekrar deneyin.',
+          );
         }
 
-        final hasSubmitted = competition.entries.any(
-          (existing) => existing.userId == user.id,
+        final existingEntry = await _competitionService.getMyEntry(
+          competition.id,
         );
-        if (hasSubmitted) {
+        if (existingEntry != null) {
           throw Exception('Bu yarışmaya zaten bir anı gönderdin.');
         }
 
-        final submitted = await CompetitionService.submitEntry(
-          competition.id,
-          entry,
-        );
-        if (!submitted) {
-          throw Exception(
-            'Anı yarışmaya gönderilemedi. Daha önce bir anı eklemiş olabilirsin.',
-          );
+        final mediaRefs = <String>[];
+        if (_existingImageUrls.isNotEmpty) {
+          mediaRefs.addAll(_existingImageUrls);
         }
+        if (_selectedImageBytes != null) {
+          final base64Image = base64Encode(_selectedImageBytes!);
+          mediaRefs.add('inline:$base64Image');
+        }
+
+        if (mediaRefs.isEmpty) {
+          throw Exception('Yarışma için en az bir görsel eklemelisin.');
+        }
+
+        await _competitionService.createEntry(
+          competitionId: competition.id,
+          caption: contentText,
+          mediaRefs: mediaRefs,
+        );
       }
 
       final success = await CringeEntryService.instance.addEntry(entry);

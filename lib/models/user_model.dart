@@ -79,6 +79,131 @@ class UserPreferences {
   }
 }
 
+class AdminRoleAssignment {
+  final String role;
+  final String status; // active, pending, revoked
+  final Map<String, dynamic> scope;
+  final DateTime grantedAt;
+  final DateTime? expiresAt;
+
+  const AdminRoleAssignment({
+    required this.role,
+    this.status = 'active',
+    this.scope = const <String, dynamic>{},
+    required this.grantedAt,
+    this.expiresAt,
+  });
+
+  bool get isActive => status == 'active' && (expiresAt == null || expiresAt!.isAfter(DateTime.now()));
+
+  Map<String, dynamic> toMap() {
+    return {
+      'role': role,
+      'status': status,
+      'scope': scope,
+      'grantedAt': grantedAt.toIso8601String(),
+      if (expiresAt != null) 'expiresAt': expiresAt!.toIso8601String(),
+    };
+  }
+
+  AdminRoleAssignment copyWith({
+    String? role,
+    String? status,
+    Map<String, dynamic>? scope,
+    DateTime? grantedAt,
+    DateTime? expiresAt,
+  }) {
+    return AdminRoleAssignment(
+      role: role ?? this.role,
+      status: status ?? this.status,
+      scope: scope ?? this.scope,
+      grantedAt: grantedAt ?? this.grantedAt,
+      expiresAt: expiresAt ?? this.expiresAt,
+    );
+  }
+
+  factory AdminRoleAssignment.fromMap(dynamic source) {
+    if (source == null) {
+      return AdminRoleAssignment(role: 'unknown', grantedAt: DateTime.now());
+    }
+    final map = _mapFromDynamic(source);
+    return AdminRoleAssignment(
+      role: _stringOrNull(map['role']) ?? 'unknown',
+      status: _stringOrNull(map['status']) ?? 'active',
+      scope: _mapFromDynamic(map['scope']),
+      grantedAt: _parseTimestamp(map['grantedAt']) ?? DateTime.now(),
+      expiresAt: _parseTimestamp(map['expiresAt']),
+    );
+  }
+}
+
+class PendingAdminApproval {
+  final String id;
+  final String type; // e.g. superadmin_nomination, demotion
+  final String status; // pending, approved, rejected, expired
+  final DateTime createdAt;
+  final int requiredApprovals;
+  final List<String> approverUids;
+  final Map<String, dynamic> metadata;
+
+  const PendingAdminApproval({
+    required this.id,
+    required this.type,
+    this.status = 'pending',
+    required this.createdAt,
+    this.requiredApprovals = 2,
+    this.approverUids = const [],
+    this.metadata = const <String, dynamic>{},
+  });
+
+  bool get isResolved => status != 'pending';
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'type': type,
+      'status': status,
+      'createdAt': createdAt.toIso8601String(),
+      'requiredApprovals': requiredApprovals,
+      'approverUids': approverUids,
+      'metadata': metadata,
+    };
+  }
+
+  PendingAdminApproval copyWith({
+    String? id,
+    String? type,
+    String? status,
+    DateTime? createdAt,
+    int? requiredApprovals,
+    List<String>? approverUids,
+    Map<String, dynamic>? metadata,
+  }) {
+    return PendingAdminApproval(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      requiredApprovals: requiredApprovals ?? this.requiredApprovals,
+      approverUids: approverUids ?? this.approverUids,
+      metadata: metadata ?? this.metadata,
+    );
+  }
+
+  factory PendingAdminApproval.fromMap(dynamic source) {
+    final map = _mapFromDynamic(source);
+    return PendingAdminApproval(
+      id: _stringOrNull(map['id']) ?? _stringOrNull(map['approvalId']) ?? '',
+      type: _stringOrNull(map['type']) ?? 'unknown',
+      status: _stringOrNull(map['status']) ?? 'pending',
+      createdAt: _parseTimestamp(map['createdAt']) ?? DateTime.now(),
+      requiredApprovals: _readInt(map['requiredApprovals'], fallback: 2),
+      approverUids: _safeStringList(map['approverUids'] ?? map['approvers']),
+      metadata: _mapFromDynamic(map['metadata']),
+    );
+  }
+}
+
 class User {
   final String id;
   final String username;
@@ -90,6 +215,7 @@ class User {
   final int krepScore;
   final int krepLevel;
   final int followersCount;
+  final double popularityScore;
   final int followingCount;
   final int entriesCount;
   final int coins;
@@ -112,6 +238,10 @@ class User {
   final String educationLevel;
   final UserVisibilitySettings visibility;
   final UserPreferences preferences;
+  final List<AdminRoleAssignment> adminRoles;
+  final List<String> grantedPermissions;
+  final int claimsVersion;
+  final List<PendingAdminApproval> pendingApprovals;
   final bool isSuperAdmin;
   final List<String> moderatedCategories;
   final Map<String, List<String>> categoryPermissions;
@@ -127,6 +257,7 @@ class User {
     this.krepScore = 0,
     this.krepLevel = 1,
     this.followersCount = 0,
+    this.popularityScore = 0,
     this.followingCount = 0,
     this.entriesCount = 0,
     this.coins = 0,
@@ -149,7 +280,11 @@ class User {
     String educationLevel = 'higher',
     UserVisibilitySettings? visibility,
     UserPreferences? preferences,
-    this.isSuperAdmin = false,
+    List<AdminRoleAssignment>? adminRoles,
+    List<String>? grantedPermissions,
+    int? claimsVersion,
+    List<PendingAdminApproval>? pendingApprovals,
+    bool? superAdminOverride,
     this.moderatedCategories = const [],
     this.categoryPermissions = const {},
   }) : displayName = _normalizeDisplayName(displayName, fullName, username),
@@ -159,7 +294,16 @@ class User {
        birthDate = _normalizeBirthDate(birthDate),
        educationLevel = _normalizeEducationLevel(educationLevel),
        visibility = visibility ?? const UserVisibilitySettings(),
-       preferences = preferences ?? const UserPreferences();
+       preferences = preferences ?? const UserPreferences(),
+       adminRoles = adminRoles ?? const [],
+       grantedPermissions = grantedPermissions ?? const [],
+       claimsVersion = claimsVersion ?? 0,
+       pendingApprovals = pendingApprovals ?? const [],
+       isSuperAdmin = _deriveIsSuperAdmin(
+         superAdminOverride,
+         adminRoles ?? const [],
+         email,
+       );
 
   // Seviye hesaplama
   String get seviyeAdi {
@@ -197,6 +341,22 @@ class User {
 
   // JSON Serialization
   factory User.fromJson(Map<String, dynamic> json) {
+    final adminRolesData = _parseAdminRoles(json['adminRoles'] ?? json['roles']);
+    final pendingApprovalsData = _parsePendingApprovals(
+      json['pendingAdminApprovals'] ?? json['pendingApprovals'],
+    );
+    final grantedPermissionsData = _safeStringList(
+      json['grantedPermissions'] ?? json['permissions'],
+    );
+    final claimsVersionValue = _readInt(
+      json['claimsVersion'] ?? json['claims_version'],
+      fallback: 0,
+    );
+    final dynamic superAdminRaw = json['isSuperAdmin'];
+    final bool? superAdminOverride = superAdminRaw == null
+        ? null
+        : _readBool(superAdminRaw, false);
+
     return User(
       id: json['id'] ?? '',
       username: json['username'] ?? '',
@@ -209,6 +369,7 @@ class User {
       krepScore: json['krepScore'] ?? 0,
       krepLevel: json['krepLevel'] ?? 1,
       followersCount: json['followersCount'] ?? 0,
+      popularityScore: _doubleOrZero(json['popularityScore']),
       followingCount: json['followingCount'] ?? 0,
       entriesCount: json['entriesCount'] ?? 0,
       coins: json['coins'] ?? json['coinBalance'] ?? 0,
@@ -261,9 +422,17 @@ class User {
               )
             : null,
       ),
-      isSuperAdmin: json['isSuperAdmin'] ?? (json['email'] == 'umityeke@gmail.com'),
-      moderatedCategories: List<String>.from(json['moderatedCategories'] ?? const []),
-      categoryPermissions: _parseCategoryPermissions(json['categoryPermissions']),
+      adminRoles: adminRolesData,
+      grantedPermissions: grantedPermissionsData,
+      claimsVersion: claimsVersionValue,
+      pendingApprovals: pendingApprovalsData,
+      superAdminOverride: superAdminOverride,
+      moderatedCategories: List<String>.from(
+        json['moderatedCategories'] ?? const [],
+      ),
+      categoryPermissions: _parseCategoryPermissions(
+        json['categoryPermissions'],
+      ),
     );
   }
 
@@ -277,6 +446,21 @@ class User {
         : '';
 
     final equipped = _asEquippedMap(map['equippedStoreItems']);
+    final adminRolesData = _parseAdminRoles(map['adminRoles'] ?? map['roles']);
+    final pendingApprovalsData = _parsePendingApprovals(
+      map['pendingAdminApprovals'] ?? map['pendingApprovals'],
+    );
+    final grantedPermissionsData = _safeStringList(
+      map['grantedPermissions'] ?? map['permissions'],
+    );
+    final claimsVersionValue = _readInt(
+      map['claimsVersion'] ?? map['claims_version'],
+      fallback: 0,
+    );
+    final dynamic superAdminRaw = map['isSuperAdmin'];
+    final bool? superAdminOverride = superAdminRaw == null
+        ? null
+        : _readBool(superAdminRaw, false);
 
     return User(
       id: normalizedId,
@@ -290,6 +474,7 @@ class User {
       krepScore: map['krepScore'] ?? 0,
       krepLevel: map['krepLevel'] ?? 1,
       followersCount: map['followersCount'] ?? 0,
+      popularityScore: _doubleOrZero(map['popularityScore']),
       followingCount: map['followingCount'] ?? 0,
       entriesCount: map['entriesCount'] ?? 0,
       coins: map['coins'] ?? map['coinBalance'] ?? 0,
@@ -336,9 +521,17 @@ class User {
               )
             : null,
       ),
-      isSuperAdmin: map['isSuperAdmin'] ?? (map['email'] == 'umityeke@gmail.com'),
-      moderatedCategories: List<String>.from(map['moderatedCategories'] ?? const []),
-      categoryPermissions: _parseCategoryPermissions(map['categoryPermissions']),
+      adminRoles: adminRolesData,
+      grantedPermissions: grantedPermissionsData,
+      claimsVersion: claimsVersionValue,
+      pendingApprovals: pendingApprovalsData,
+      superAdminOverride: superAdminOverride,
+      moderatedCategories: List<String>.from(
+        map['moderatedCategories'] ?? const [],
+      ),
+      categoryPermissions: _parseCategoryPermissions(
+        map['categoryPermissions'],
+      ),
     );
   }
 
@@ -354,6 +547,7 @@ class User {
       'krepScore': krepScore,
       'krepLevel': krepLevel,
       'followersCount': followersCount,
+      'popularityScore': popularityScore,
       'followingCount': followingCount,
       'entriesCount': entriesCount,
       'coins': coins,
@@ -380,6 +574,29 @@ class User {
       'moderatedCategories': moderatedCategories,
       'categoryPermissions': categoryPermissions,
     };
+
+    if (adminRoles.isNotEmpty) {
+      map['adminRoles'] = adminRoles.map((role) => role.toMap()).toList();
+      map['roles'] = adminRoles.map((role) => role.role).toList();
+    } else {
+      map['adminRoles'] = const [];
+      map['roles'] = const [];
+    }
+
+    if (grantedPermissions.isNotEmpty) {
+      map['grantedPermissions'] = grantedPermissions;
+      map['permissions'] = grantedPermissions;
+    }
+
+    map['claimsVersion'] = claimsVersion;
+    map['claims_version'] = claimsVersion;
+
+    if (pendingApprovals.isNotEmpty) {
+      final serialized =
+          pendingApprovals.map((approval) => approval.toMap()).toList();
+      map['pendingAdminApprovals'] = serialized;
+      map['pendingApprovals'] = serialized;
+    }
 
     final equipped = <String, dynamic>{};
     if (equippedFrameItemId?.isNotEmpty == true) {
@@ -414,6 +631,7 @@ class User {
       'krepScore': krepScore,
       'krepLevel': krepLevel,
       'followersCount': followersCount,
+      'popularityScore': popularityScore,
       'followingCount': followingCount,
       'entriesCount': entriesCount,
       'coins': coins,
@@ -435,6 +653,29 @@ class User {
       'moderatedCategories': moderatedCategories,
       'categoryPermissions': categoryPermissions,
     };
+
+    if (adminRoles.isNotEmpty) {
+      json['adminRoles'] = adminRoles.map((role) => role.toMap()).toList();
+      json['roles'] = adminRoles.map((role) => role.role).toList();
+    } else {
+      json['adminRoles'] = const [];
+      json['roles'] = const [];
+    }
+
+    if (grantedPermissions.isNotEmpty) {
+      json['grantedPermissions'] = grantedPermissions;
+      json['permissions'] = grantedPermissions;
+    }
+
+    json['claimsVersion'] = claimsVersion;
+    json['claims_version'] = claimsVersion;
+
+    if (pendingApprovals.isNotEmpty) {
+      final serialized =
+          pendingApprovals.map((approval) => approval.toMap()).toList();
+      json['pendingAdminApprovals'] = serialized;
+      json['pendingApprovals'] = serialized;
+    }
 
     json['isPrivate'] = isPrivate;
     json['isSuspended'] = isSuspended;
@@ -474,6 +715,7 @@ class User {
     int? krepScore,
     int? krepLevel,
     int? followersCount,
+    double? popularityScore,
     int? followingCount,
     int? entriesCount,
     DateTime? joinDate,
@@ -496,7 +738,11 @@ class User {
     String? educationLevel,
     UserVisibilitySettings? visibility,
     UserPreferences? preferences,
-    bool? isSuperAdmin,
+    List<AdminRoleAssignment>? adminRoles,
+    List<String>? grantedPermissions,
+    int? claimsVersion,
+    List<PendingAdminApproval>? pendingApprovals,
+    bool? superAdminOverride,
     List<String>? moderatedCategories,
     Map<String, List<String>>? categoryPermissions,
   }) {
@@ -511,6 +757,7 @@ class User {
       krepScore: krepScore ?? this.krepScore,
       krepLevel: krepLevel ?? this.krepLevel,
       followersCount: followersCount ?? this.followersCount,
+      popularityScore: popularityScore ?? this.popularityScore,
       followingCount: followingCount ?? this.followingCount,
       entriesCount: entriesCount ?? this.entriesCount,
       coins: coins ?? this.coins,
@@ -535,7 +782,11 @@ class User {
       educationLevel: educationLevel ?? this.educationLevel,
       visibility: visibility ?? this.visibility,
       preferences: preferences ?? this.preferences,
-      isSuperAdmin: isSuperAdmin ?? this.isSuperAdmin,
+      adminRoles: adminRoles ?? this.adminRoles,
+      grantedPermissions: grantedPermissions ?? this.grantedPermissions,
+      claimsVersion: claimsVersion ?? this.claimsVersion,
+      pendingApprovals: pendingApprovals ?? this.pendingApprovals,
+  superAdminOverride: superAdminOverride ?? isSuperAdmin,
       moderatedCategories: moderatedCategories ?? this.moderatedCategories,
       categoryPermissions: categoryPermissions ?? this.categoryPermissions,
     );
@@ -568,6 +819,38 @@ class User {
   List<String> get ownedItems => ownedStoreItems;
 
   List<String> get equippedItems => _deriveEquippedItemsList();
+
+  List<String> get activeRoles => adminRoles
+      .where((role) => role.isActive)
+      .map((role) => role.role)
+      .toList(growable: false);
+
+  bool get hasPendingSuperAdminNomination => pendingApprovals.any(
+        (approval) =>
+            approval.type == 'superadmin_nomination' && !approval.isResolved,
+      );
+
+  PendingAdminApproval? get pendingSuperAdminApproval {
+    for (final approval in pendingApprovals) {
+      if (approval.type == 'superadmin_nomination' &&
+          approval.status == 'pending') {
+        return approval;
+      }
+    }
+    return null;
+  }
+
+  int get remainingSuperAdminApprovals {
+    final approval = pendingSuperAdminApproval;
+    if (approval == null) {
+      return 0;
+    }
+    final remaining = approval.requiredApprovals - approval.approverUids.length;
+    if (remaining < 0) {
+      return 0;
+    }
+    return remaining;
+  }
 
   String get memberSince {
     final now = DateTime.now();
@@ -743,6 +1026,20 @@ List<String> _mergeLists(List<String> a, List<String> b) {
   return merged.toList(growable: false);
 }
 
+double _doubleOrZero(dynamic value) {
+  if (value == null) return 0;
+  if (value is num) return value.toDouble();
+  if (value is String) {
+    final normalized = value.trim();
+    if (normalized.isEmpty) return 0;
+    final parsed = double.tryParse(normalized);
+    if (parsed != null) {
+      return parsed;
+    }
+  }
+  return 0;
+}
+
 List<String> _safeStringList(dynamic source) {
   if (source == null) return const [];
   if (source is String) {
@@ -803,4 +1100,148 @@ String? _stringOrNull(dynamic value) {
   final trimmed = converted.trim();
   if (trimmed.isEmpty) return null;
   return trimmed;
+}
+
+Map<String, dynamic> _mapFromDynamic(dynamic source) {
+  if (source == null) {
+    return const <String, dynamic>{};
+  }
+  if (source is Map<String, dynamic>) {
+    return source;
+  }
+  if (source is Map) {
+    return source.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return const <String, dynamic>{};
+}
+
+DateTime? _parseTimestamp(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) {
+    return value.toUtc();
+  }
+  if (value is String) {
+    return DateTime.tryParse(value)?.toUtc();
+  }
+  if (value is num) {
+    // Assume seconds since epoch
+    return DateTime.fromMillisecondsSinceEpoch(
+      (value * 1000).round(),
+      isUtc: true,
+    );
+  }
+  if (value is Map && value.containsKey('_seconds')) {
+    final seconds = value['_seconds'];
+    if (seconds is num) {
+      return DateTime.fromMillisecondsSinceEpoch(
+        (seconds * 1000).round(),
+        isUtc: true,
+      );
+    }
+  }
+  try {
+    final dynamicValue = value as dynamic;
+    if (dynamicValue?.toDate is Function) {
+      final date = dynamicValue.toDate();
+      if (date is DateTime) {
+        return date.toUtc();
+      }
+    }
+    if (dynamicValue?.toDateTime is Function) {
+      final date = dynamicValue.toDateTime();
+      if (date is DateTime) {
+        return date.toUtc();
+      }
+    }
+  } catch (_) {
+    // ignore
+  }
+  return null;
+}
+
+int _readInt(dynamic value, {int fallback = 0}) {
+  if (value == null) return fallback;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) {
+    final parsed = int.tryParse(value.trim());
+    if (parsed != null) {
+      return parsed;
+    }
+  }
+  return fallback;
+}
+
+List<AdminRoleAssignment> _parseAdminRoles(dynamic source) {
+  if (source == null) return const [];
+  if (source is Iterable) {
+    return source
+        .map((item) => AdminRoleAssignment.fromMap(item))
+        .toList(growable: false);
+  }
+  if (source is Map) {
+    final now = DateTime.now();
+    return source.entries
+        .map((entry) {
+          final key = entry.key.toString();
+          final value = entry.value;
+          if (value is Map || value is Map<String, dynamic>) {
+            final map = _mapFromDynamic(value);
+            return AdminRoleAssignment.fromMap({
+              'role': map['role'] ?? key,
+              'status': map['status'] ?? map['state'] ?? 'active',
+              'scope': map['scope'] ?? map['scopes'],
+              'grantedAt': map['grantedAt'] ?? map['createdAt'],
+              'expiresAt': map['expiresAt'],
+            });
+          }
+          final status = _stringOrNull(value) ?? 'active';
+          return AdminRoleAssignment(
+            role: key,
+            status: status,
+            scope: const <String, dynamic>{},
+            grantedAt: now,
+          );
+        })
+        .toList(growable: false);
+  }
+  if (source is String) {
+    return [
+      AdminRoleAssignment(
+        role: source,
+        grantedAt: DateTime.now(),
+      ),
+    ];
+  }
+  return const [];
+}
+
+List<PendingAdminApproval> _parsePendingApprovals(dynamic source) {
+  if (source == null) return const [];
+  if (source is Iterable) {
+    return source
+        .map((item) => PendingAdminApproval.fromMap(item))
+        .toList(growable: false);
+  }
+  if (source is Map) {
+    return source.values
+        .map((value) => PendingAdminApproval.fromMap(value))
+        .where((approval) => approval.id.isNotEmpty)
+        .toList(growable: false);
+  }
+  return const [];
+}
+
+bool _deriveIsSuperAdmin(
+  bool? override,
+  List<AdminRoleAssignment> roles,
+  String email,
+) {
+  if (override != null) {
+    return override;
+  }
+  if (roles.any((role) => role.isActive && role.role == 'superadmin')) {
+    return true;
+  }
+  return email == 'umityeke@gmail.com';
 }

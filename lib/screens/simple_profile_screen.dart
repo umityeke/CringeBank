@@ -1,7 +1,7 @@
 // ignore_for_file: avoid_print
 
 import 'dart:convert';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
@@ -17,6 +17,7 @@ import '../utils/entry_actions.dart';
 import '../utils/safe_haptics.dart';
 import 'cringe_entry_detail_screen.dart';
 import 'cringe_store_screen.dart';
+import 'direct_message_thread_screen.dart';
 import 'modern_login_screen.dart';
 import 'profile_edit_screen.dart';
 
@@ -72,6 +73,8 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
   bool _isFollowActionInProgress = false;
   String? _activeProfileUserId;
   final Set<String> _deletingEntryIds = <String>{};
+  final Set<String> _hiddenEntryIds = <String>{};
+  bool _legacyRepairScheduled = false;
 
   String? get _requestedUserId => widget.userId ?? widget.initialUser?.id;
 
@@ -790,8 +793,8 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     final badgeEffects = _storeService.resolveBadgeEffects(user);
     final nameColor = _storeService.resolveNameColor(user);
     final backgroundGlow = backgroundEffect.backgroundGlow ?? const <Color>[];
-    final canEditProfile = _canEditProfile(user);
-    final showOwnerActions = isOwnProfile && canEditProfile;
+  final canEditProfile = _canEditProfile(user);
+  final showOwnerActions = isOwnProfile && canEditProfile;
 
     const baseGradient = LinearGradient(
       colors: [Color(0xFF1C1A24), Color(0xFF14111C)],
@@ -1201,6 +1204,9 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     }
 
     if (result.wasDeleted) {
+      setState(() {
+        _hiddenEntryIds.add(result.entryId);
+      });
       _showEntrySnack('Krep silindi.', backgroundColor: Colors.redAccent);
     } else if (result.entry != null) {
       _showEntrySnack('Krep güncellendi.', backgroundColor: Colors.green);
@@ -1235,7 +1241,69 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     setState(() => _deletingEntryIds.remove(entry.id));
 
     if (deleted) {
-      setState(() {});
+      setState(() {
+        _hiddenEntryIds.add(entry.id);
+      });
+    }
+  }
+
+  Future<void> _handleMessageEntry(CringeEntry entry) async {
+    SafeHaptics.medium();
+
+    final targetUserId = entry.userId.trim();
+    if (targetUserId.isEmpty) {
+      _showEntrySnack(
+        'Kullanıcı bilgisi bulunamadı.',
+        backgroundColor: Colors.redAccent,
+      );
+      return;
+    }
+
+    final firebaseUser = UserService.instance.firebaseUser;
+    if (firebaseUser == null) {
+      _showEntrySnack(
+        'Mesaj göndermek için giriş yapmalısınız.',
+        backgroundColor: Colors.redAccent,
+      );
+      return;
+    }
+
+    final currentUserId = firebaseUser.uid.trim();
+    if (currentUserId == targetUserId) {
+      _showEntrySnack(
+        'Kendinize mesaj gönderemezsiniz.',
+        backgroundColor: Colors.orange,
+      );
+      return;
+    }
+
+    try {
+      final targetUser = await UserService.instance.getUserById(targetUserId);
+      if (targetUser == null) {
+        if (!mounted) return;
+        _showEntrySnack(
+          'Kullanıcı bulunamadı.',
+          backgroundColor: Colors.redAccent,
+        );
+        return;
+      }
+
+      if (!mounted) return;
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => DirectMessageThreadScreen(
+            otherUserId: targetUserId,
+            initialUser: targetUser,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showEntrySnack(
+        'Mesaj ekranı açılamadı.',
+        backgroundColor: Colors.redAccent,
+      );
     }
   }
 
@@ -1345,10 +1413,11 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     }
 
     final effectiveUser = user.id == userId ? user : user.copyWith(id: userId);
-    
+
     // Security Contract: Determine if viewing own profile
     final currentUserId = UserService.instance.currentUser?.id;
-    final isOwnProfile = currentUserId != null && currentUserId == effectiveUser.id;
+    final isOwnProfile =
+        currentUserId != null && currentUserId == effectiveUser.id;
 
     return StreamBuilder<List<CringeEntry>>(
       stream: CringeEntryService.instance.getUserEntriesStream(
@@ -1360,7 +1429,17 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
             snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData;
         final hasError = snapshot.hasError;
-        final entries = snapshot.data ?? <CringeEntry>[];
+        final rawEntries = snapshot.data ?? <CringeEntry>[];
+
+        if (isOwnProfile &&
+            !_legacyRepairScheduled &&
+            rawEntries.any((entry) => entry.userId.trim().isEmpty)) {
+          _scheduleLegacyEntryRepair(effectiveUser);
+        }
+
+        final entries = rawEntries
+            .where((entry) => !_hiddenEntryIds.contains(entry.id))
+            .toList();
 
         Widget content;
         if (isLoading) {
@@ -1392,17 +1471,16 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
           );
         } else {
           content = ListView.separated(
-            key: ValueKey('entries-${entries.length}'),
+            key: ValueKey(
+              'entries-${entries.length}-${_hiddenEntryIds.length}',
+            ),
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: entries.length,
             separatorBuilder: (context, _) => const SizedBox(height: 14),
             itemBuilder: (context, index) {
               final entry = entries[index];
-              final currentUserId = UserService.instance.firebaseUser?.uid;
-              final canManageEntry =
-                  isOwnProfile ||
-                  (currentUserId != null && currentUserId == entry.userId);
+              final canManageEntry = EntryActionHelper.canManageEntry(entry);
 
               return ModernCringeCard(
                 entry: entry,
@@ -1410,6 +1488,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                     _openEntryDetail(entry, canManageEntry: canManageEntry),
                 onComment: () =>
                     _openEntryDetail(entry, canManageEntry: canManageEntry),
+                onMessage: () => _handleMessageEntry(entry),
                 onEdit: canManageEntry ? () => _handleEditEntry(entry) : null,
                 onDelete: canManageEntry
                     ? () => _handleDeleteEntry(entry)
@@ -1465,5 +1544,17 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
         ],
       ),
     );
+  }
+
+  void _scheduleLegacyEntryRepair(User user) {
+    _legacyRepairScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await CringeEntryService.instance.repairMissingUserIdsForUser(user);
+      } catch (error, stackTrace) {
+        debugPrint('Legacy entry repair failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+    });
   }
 }

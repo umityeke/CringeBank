@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'bootstrap.dart';
 import 'services/user_service.dart';
@@ -23,6 +24,16 @@ class CringeBankApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       scrollBehavior: const _NoScrollbarScrollBehavior(),
       debugShowCheckedModeBanner: false,
+      locale: const Locale('tr', 'TR'),
+      supportedLocales: const [
+        Locale('tr', 'TR'),
+        Locale('en', 'US'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       home: StreamBuilder<firebase_auth.User?>(
         stream: UserService.instance.authStateChanges,
         builder: (context, snapshot) {

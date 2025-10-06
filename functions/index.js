@@ -4,6 +4,7 @@ const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const { google } = require('googleapis');
 const twilio = require('twilio');
+const userSync = require('./user_sync');
 
 admin.initializeApp();
 
@@ -1659,3 +1660,14 @@ exports.deleteCompetition = adminOps.deleteCompetition;
 const setupAdmin = require('./setupAdmin');
 exports.grantSuperAdminOnce = setupAdmin.grantSuperAdminOnce;
 
+// Direct Messaging Functions
+const messagingFunctions = require('./messaging_functions');
+exports.createConversation = messagingFunctions.createConversation;
+exports.sendMessage = messagingFunctions.sendMessage;
+exports.editMessage = messagingFunctions.editMessage;
+exports.deleteMessage = messagingFunctions.deleteMessage;
+exports.setReadPointer = messagingFunctions.setReadPointer;
+
+// User synchronization & claims management
+exports.syncUserClaimsOnUserWrite = userSync.syncUserClaimsOnUserWrite;
+exports.refreshUserClaims = userSync.refreshUserClaims;

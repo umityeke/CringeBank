@@ -13,11 +13,9 @@ class ReportService {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
 
-  ReportService._({
-    FirebaseFirestore? firestore,
-    FirebaseAuth? auth,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _auth = auth ?? FirebaseAuth.instance;
+  ReportService._({FirebaseFirestore? firestore, FirebaseAuth? auth})
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _auth = auth ?? FirebaseAuth.instance;
 
   // === USER ACTIONS ===
 
@@ -44,9 +42,7 @@ class ReportService {
         .get();
 
     if (existingReport.docs.isNotEmpty) {
-      throw Exception(
-        'DUPLICATE_REPORT: Bu içeriği zaten bildirdiniz',
-      );
+      throw Exception('DUPLICATE_REPORT: Bu içeriği zaten bildirdiniz');
     }
 
     final report = Report(
@@ -59,8 +55,9 @@ class ReportService {
       createdAt: DateTime.now(),
     );
 
-    final docRef =
-        await _firestore.collection('reports').add(report.toFirestore());
+    final docRef = await _firestore
+        .collection('reports')
+        .add(report.toFirestore());
 
     debugPrint(
       '📢 REPORT CREATED: ${targetType.value}/$targetId by ${currentUser.uid} (${reason.value})',
@@ -101,9 +98,11 @@ class ReportService {
         .orderBy('createdAt', descending: true)
         .limit(50)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Report.fromFirestore(doc.data(), doc.id))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => Report.fromFirestore(doc.data(), doc.id))
+              .toList(),
+        );
   }
 
   // === MODERATOR ACTIONS ===
@@ -162,9 +161,11 @@ class ReportService {
         .orderBy('createdAt', descending: false)
         .limit(100)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Report.fromFirestore(doc.data(), doc.id))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => Report.fromFirestore(doc.data(), doc.id))
+              .toList(),
+        );
   }
 
   /// Get reports for a specific target (moderators only)
@@ -225,7 +226,7 @@ class ReportService {
       'resolution': resolution,
     });
 
-  debugPrint('✅ REPORT RESOLVED: $reportId by ${currentUser.uid}');
+    debugPrint('✅ REPORT RESOLVED: $reportId by ${currentUser.uid}');
   }
 
   /// Dismiss a report (moderators only)
@@ -255,7 +256,7 @@ class ReportService {
       'resolution': reason,
     });
 
-  debugPrint('❌ REPORT DISMISSED: $reportId by ${currentUser.uid}');
+    debugPrint('❌ REPORT DISMISSED: $reportId by ${currentUser.uid}');
   }
 
   /// Get report statistics (moderators only)
@@ -326,9 +327,7 @@ class ReportService {
     final isReporter = report.reporterId == currentUser.uid;
 
     if (!isReporter && !isModerator) {
-      throw Exception(
-        'NOT_AUTHORIZED: Bu raporu silme yetkiniz yok',
-      );
+      throw Exception('NOT_AUTHORIZED: Bu raporu silme yetkiniz yok');
     }
 
     await _firestore.collection('reports').doc(reportId).delete();

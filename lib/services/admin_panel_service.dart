@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 /// 🛡️ ADMIN PANEL SERVICE - Secure Admin Operations
-/// 
+///
 /// Tüm admin işlemleri Cloud Functions üzerinden yapılır.
 /// Client-side Firestore yazma işlemleri güvenlik nedeniyle kapalıdır.
 class AdminPanelService {
@@ -23,9 +23,9 @@ class AdminPanelService {
     final idTokenResult = await user.getIdTokenResult();
     final claims = idTokenResult.claims;
 
-    return claims?['superadmin'] == true || 
-           claims?['admin'] == true ||
-           user.email?.toLowerCase() == 'umityeke@gmail.com';
+    return claims?['superadmin'] == true ||
+        claims?['admin'] == true ||
+        user.email?.toLowerCase() == 'umityeke@gmail.com';
   }
 
   /// Kategori admin atama (süper admin only)
@@ -35,7 +35,7 @@ class AdminPanelService {
     required String targetUsername,
     List<String> permissions = const ['approve', 'reject'],
   }) async {
-  debugPrint('🔐 Calling assignCategoryAdmin function...');
+    debugPrint('🔐 Calling assignCategoryAdmin function...');
 
     try {
       final callable = _functions.httpsCallable('assignCategoryAdmin');
@@ -46,10 +46,10 @@ class AdminPanelService {
         'permissions': permissions,
       });
 
-  debugPrint('✅ ${result.data['message']}');
+      debugPrint('✅ ${result.data['message']}');
       return Map<String, dynamic>.from(result.data);
     } catch (e) {
-  debugPrint('❌ Error: $e');
+      debugPrint('❌ Error: $e');
       rethrow;
     }
   }
@@ -59,7 +59,7 @@ class AdminPanelService {
     required String category,
     required String targetUserId,
   }) async {
-  debugPrint('🔐 Calling removeCategoryAdmin function...');
+    debugPrint('🔐 Calling removeCategoryAdmin function...');
 
     try {
       final callable = _functions.httpsCallable('removeCategoryAdmin');
@@ -68,10 +68,10 @@ class AdminPanelService {
         'targetUserId': targetUserId,
       });
 
-  debugPrint('✅ ${result.data['message']}');
+      debugPrint('✅ ${result.data['message']}');
       return Map<String, dynamic>.from(result.data);
     } catch (e) {
-  debugPrint('❌ Error: $e');
+      debugPrint('❌ Error: $e');
       rethrow;
     }
   }
@@ -82,7 +82,7 @@ class AdminPanelService {
     required String targetUserId,
     required bool isActive,
   }) async {
-  debugPrint('🔐 Calling toggleCategoryAdminStatus function...');
+    debugPrint('🔐 Calling toggleCategoryAdminStatus function...');
 
     try {
       final callable = _functions.httpsCallable('toggleCategoryAdminStatus');
@@ -92,10 +92,10 @@ class AdminPanelService {
         'isActive': isActive,
       });
 
-  debugPrint('✅ ${result.data['message']}');
+      debugPrint('✅ ${result.data['message']}');
       return Map<String, dynamic>.from(result.data);
     } catch (e) {
-  debugPrint('❌ Error: $e');
+      debugPrint('❌ Error: $e');
       rethrow;
     }
   }
@@ -108,7 +108,7 @@ class AdminPanelService {
     DateTime? startDate,
     DateTime? endDate,
   }) async {
-  debugPrint('🔐 Calling createCompetition function...');
+    debugPrint('🔐 Calling createCompetition function...');
 
     try {
       final callable = _functions.httpsCallable('createCompetition');
@@ -120,10 +120,10 @@ class AdminPanelService {
         'endDate': endDate?.toIso8601String(),
       });
 
-  debugPrint('✅ Competition created: ${result.data['competitionId']}');
+      debugPrint('✅ Competition created: ${result.data['competitionId']}');
       return Map<String, dynamic>.from(result.data);
     } catch (e) {
-  debugPrint('❌ Error: $e');
+      debugPrint('❌ Error: $e');
       rethrow;
     }
   }
@@ -133,7 +133,7 @@ class AdminPanelService {
     required String competitionId,
     required Map<String, dynamic> updates,
   }) async {
-  debugPrint('🔐 Calling updateCompetition function...');
+    debugPrint('🔐 Calling updateCompetition function...');
 
     try {
       final callable = _functions.httpsCallable('updateCompetition');
@@ -142,10 +142,10 @@ class AdminPanelService {
         'updates': updates,
       });
 
-  debugPrint('✅ ${result.data['message']}');
+      debugPrint('✅ ${result.data['message']}');
       return Map<String, dynamic>.from(result.data);
     } catch (e) {
-  debugPrint('❌ Error: $e');
+      debugPrint('❌ Error: $e');
       rethrow;
     }
   }
@@ -154,41 +154,39 @@ class AdminPanelService {
   Future<Map<String, dynamic>> deleteCompetition({
     required String competitionId,
   }) async {
-  debugPrint('🔐 Calling deleteCompetition function...');
+    debugPrint('🔐 Calling deleteCompetition function...');
 
     try {
       final callable = _functions.httpsCallable('deleteCompetition');
-      final result = await callable.call({
-        'competitionId': competitionId,
-      });
+      final result = await callable.call({'competitionId': competitionId});
 
-  debugPrint('✅ ${result.data['message']}');
+      debugPrint('✅ ${result.data['message']}');
       return Map<String, dynamic>.from(result.data);
     } catch (e) {
-  debugPrint('❌ Error: $e');
+      debugPrint('❌ Error: $e');
       rethrow;
     }
   }
 
   /// Test function - Kategori admin atama testi
   Future<void> testAssignCategoryAdmin() async {
-  debugPrint('');
-  debugPrint('🧪 TEST: Category Admin Assignment');
-  debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  debugPrint('');
+    debugPrint('');
+    debugPrint('🧪 TEST: Category Admin Assignment');
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    debugPrint('');
 
     final user = _auth.currentUser;
     if (user == null) {
-  debugPrint('❌ Not logged in!');
+      debugPrint('❌ Not logged in!');
       return;
     }
 
-  debugPrint('👤 Current user: ${user.email}');
-  debugPrint('🔍 Checking super admin status...');
+    debugPrint('👤 Current user: ${user.email}');
+    debugPrint('🔍 Checking super admin status...');
 
     final isSA = await isSuperAdmin;
-  debugPrint(isSA ? '✅ Super admin confirmed' : '❌ Not super admin');
-  debugPrint('');
+    debugPrint(isSA ? '✅ Super admin confirmed' : '❌ Not super admin');
+    debugPrint('');
 
     if (!isSA) {
       debugPrint('⚠️  You must be super admin to run this test');
@@ -238,7 +236,6 @@ class AdminPanelService {
       debugPrint('   Collection: admin_audit');
       debugPrint('   Should contain 3 new entries');
       debugPrint('');
-
     } catch (e) {
       debugPrint('');
       debugPrint('❌ TEST FAILED');
@@ -285,7 +282,6 @@ class AdminPanelService {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('✅ TEST PASSED!');
       debugPrint('');
-
     } catch (e) {
       debugPrint('❌ TEST FAILED: $e');
     }

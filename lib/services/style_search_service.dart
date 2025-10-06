@@ -106,6 +106,7 @@ class StyleSearchService {
     SearchSortBy sortBy = SearchSortBy.relevance,
     int limitPerSection = 8,
     int postsLimit = 10,
+    bool fetchAllAccounts = false,
   }) async {
     await CringeSearchService.initialize();
     final totalWatch = Stopwatch()..start();
@@ -139,7 +140,7 @@ class StyleSearchService {
         if (hasMeaningfulQuery) {
           accountResult = await CringeSearchService.searchUsers(
             query: query,
-            limit: limitPerSection,
+            limit: fetchAllAccounts ? null : limitPerSection,
           );
         } else {
           accountResult = const UserSearchResult(
@@ -425,7 +426,7 @@ class StyleSearchService {
 
   static double _scorePost(CringeEntry entry, {int rank = 0}) {
     final base = 0.8 - min(rank, 5) * 0.1;
-    final popularity = log(entry.begeniSayisi + entry.yorumSayisi + 1) / 8;
+    final popularity = log(entry.likeCount + entry.yorumSayisi + 1) / 8;
     final recencyMinutes = DateTime.now().difference(entry.createdAt).inMinutes;
     final recencyBoost = recencyMinutes <= 0
         ? 0.3

@@ -1,14 +1,14 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_cropper/image_cropper.dart';
+import 'package:image/image.dart' as img;
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
-import 'package:image/image.dart' as img;
 
 import '../models/user_model.dart';
 import '../services/avatar_upload_service.dart';
@@ -228,56 +228,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
     if (trimmed.isEmpty) return true;
     if (trimmed == '👤') return true;
     return false;
-  }
-
-  Future<_AvatarProcessingResult?> _prepareAvatarData(
-    Uint8List rawBytes,
-  ) async {
-    try {
-      final img.Image? decodedImage = img.decodeImage(rawBytes);
-      if (decodedImage == null) {
-        debugPrint('Avatar decode returned null image');
-        return null;
-      }
-
-      final img.Image normalized = img.bakeOrientation(decodedImage);
-      const int maxDimension = 256;
-      final img.Image resized = img.copyResize(
-        normalized,
-        width: normalized.width >= normalized.height ? maxDimension : null,
-        height: normalized.height > normalized.width ? maxDimension : null,
-        interpolation: img.Interpolation.average,
-      );
-
-      const List<int> qualitySteps = <int>[70, 60, 50, 40];
-      Uint8List? bestBytes;
-      int selectedQuality = qualitySteps.first;
-
-      for (final int quality in qualitySteps) {
-        final Uint8List candidate = Uint8List.fromList(
-          img.encodeJpg(resized, quality: quality),
-        );
-        bestBytes = candidate;
-        selectedQuality = quality;
-        if (candidate.lengthInBytes <= 60 * 1024) {
-          break;
-        }
-      }
-
-      if (bestBytes == null) {
-        return null;
-      }
-
-      return _AvatarProcessingResult(
-        bytes: bestBytes,
-        originalSize: rawBytes.length,
-        finalSize: bestBytes.length,
-        quality: selectedQuality,
-      );
-    } catch (error, stackTrace) {
-      debugPrint('Avatar processing failed: $error\n$stackTrace');
-      return null;
-    }
   }
 
   void _onFormChanged() {
@@ -604,70 +554,71 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader(
-          title: 'Profil Fotoğrafı',
-          subtitle:
-              'Kare bir görsel seç, gerekirse kırp. Uygulama otomatik olarak 256px’e düşürüp sıkıştırır.',
-        ),
+        _sectionHeader(title: 'Profil Fotoğrafı'),
         const SizedBox(height: 12),
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  width: previewSize,
-                  height: previewSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFFA726), Color(0xFFFF7043)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.orange.withValues(alpha: 0.35),
-                        blurRadius: 22,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  width: previewSize - 12,
-                  height: previewSize - 12,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.6),
-                      width: 2.2,
-                    ),
-                  ),
-                  child: ClipOval(child: _buildAvatarPreview(previewSize - 20)),
-                ),
-                Positioned(
-                  bottom: 4,
-                  right: 6,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
+            GestureDetector(
+              onTap: _avatarProcessing ? null : _pickAvatar,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    width: previewSize,
+                    height: previewSize,
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.65),
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFFA726), Color(0xFFFF7043)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.orange.withValues(alpha: 0.35),
+                          blurRadius: 22,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: previewSize - 12,
+                    height: previewSize - 12,
+                    decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.4),
-                        width: 1.2,
+                        color: Colors.white.withValues(alpha: 0.6),
+                        width: 2.2,
                       ),
                     ),
-                    child: const Icon(
-                      Icons.camera_alt,
-                      size: 16,
-                      color: Colors.orange,
+                    child: ClipOval(
+                      child: _buildAvatarPreview(previewSize - 20),
                     ),
                   ),
-                ),
-              ],
+                  Positioned(
+                    bottom: 4,
+                    right: 6,
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.65),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.4),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        size: 14,
+                        color: Colors.orange,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(width: 20),
             Expanded(
@@ -678,27 +629,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                     spacing: 12,
                     runSpacing: 12,
                     children: [
-                      FilledButton.icon(
-                        onPressed: _avatarProcessing
-                            ? null
-                            : () => _handleAvatarSelection(useCamera: false),
-                        icon: const Icon(Icons.photo_library_outlined),
-                        label: const Text('Galeriden Seç'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFFF8A50),
-                        ),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: _avatarProcessing
-                            ? null
-                            : () => _handleAvatarSelection(useCamera: true),
-                        icon: const Icon(Icons.photo_camera_outlined),
-                        label: const Text('Kameradan Çek'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.orange,
-                          side: const BorderSide(color: Colors.orange),
-                        ),
-                      ),
                       if (canClearAvatar)
                         TextButton.icon(
                           onPressed: _avatarProcessing
@@ -746,26 +676,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  const Padding(
-                    padding: EdgeInsets.only(top: 12),
-                    child: Text(
-                      'Fotoğraf otomatik olarak en fazla 256px boyutuna küçültülür '
-                      've %40-70 kalite aralığında sıkıştırılır. Böylece profilin '
-                      'hızlı yüklenir ve veri tasarrufu sağlanır.',
-                      style: TextStyle(color: Colors.white60, fontSize: 13),
-                    ),
-                  ),
-                  if (hasCustomAvatar && !_avatarProcessing)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        'Yeni görünümünü kaydetmek için "Kaydet" butonuna basmayı unutma.',
-                        style: TextStyle(
-                          color: Colors.orange.shade200,
-                          fontSize: 12.5,
                         ),
                       ),
                     ),
@@ -867,96 +777,86 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
     );
   }
 
-  Future<void> _handleAvatarSelection({required bool useCamera}) async {
-    if (_avatarProcessing) {
-      return;
-    }
+  Future<void> _pickAvatar() async {
+    final XFile? image = await _avatarUploadService.pickImageFromGallery();
+    if (image == null || !mounted) return;
 
     setState(() {
       _avatarProcessing = true;
-      _avatarOriginalSize = null;
-      _avatarCompressedSize = null;
-      _avatarQuality = null;
     });
 
-    final imageFile = useCamera
-        ? await _avatarUploadService.pickImageFromCamera()
-        : await _avatarUploadService.pickImageFromGallery();
-
-    if (!mounted) {
-      return;
-    }
-
-    if (imageFile == null) {
-      setState(() {
-        _avatarProcessing = false;
-      });
-      return;
-    }
-
-    CroppedFile? croppedFile;
     try {
-      croppedFile = await _avatarUploadService.cropImage(
-        sourcePath: imageFile.path,
-        context: context,
-      );
-    } catch (_) {
-      // Errors already logged within the service
-    }
+      final Uint8List rawBytes = await image.readAsBytes();
 
-    if (!mounted) {
-      return;
-    }
-
-    Uint8List? rawBytes;
-
-    if (croppedFile != null) {
-      rawBytes = await croppedFile.readAsBytes();
-    } else if (kIsWeb) {
-      rawBytes = await imageFile.readAsBytes();
-      if (mounted) {
-        _showSnack(
-          'Web sürümünde kırpma henüz desteklenmiyor, görsel kırpılmadan kullanılacak.',
-        );
+      // Decode image
+      final img.Image? decodedImage = img.decodeImage(rawBytes);
+      if (decodedImage == null) {
+        if (mounted) {
+          _showSnack('Görsel işlenemedi.', isError: true);
+        }
+        setState(() {
+          _avatarProcessing = false;
+        });
+        return;
       }
-    } else {
-      setState(() {
-        _avatarProcessing = false;
-      });
-      _showSnack('Kırpma iptal edildi.');
-      return;
-    }
 
-    final Uint8List rawBytesNonNull = rawBytes;
-    final _AvatarProcessingResult? processed = await _prepareAvatarData(
-      rawBytesNonNull,
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    if (processed == null) {
-      setState(() {
-        _avatarProcessing = false;
-      });
-      _showSnack(
-        'Fotoğraf işlenemedi. Farklı bir görsel seçmeyi dene.',
-        isError: true,
+      // Normalize orientation and resize to 256px
+      final img.Image normalized = img.bakeOrientation(decodedImage);
+      const int maxDimension = 256;
+      final img.Image resized = img.copyResize(
+        normalized,
+        width: normalized.width >= normalized.height ? maxDimension : null,
+        height: normalized.height > normalized.width ? maxDimension : null,
+        interpolation: img.Interpolation.average,
       );
-      return;
-    }
 
-    setState(() {
-      _avatarPreviewBytes = processed.bytes;
-      _pendingAvatarBytes = processed.bytes;
-      _avatarOriginalSize = processed.originalSize;
-      _avatarCompressedSize = processed.finalSize;
-      _avatarQuality = processed.quality;
-      _avatarProcessing = false;
-      _avatarCleared = false;
-    });
-    _markDirty();
+      // Compress with quality steps
+      const List<int> qualitySteps = <int>[70, 60, 50, 40];
+      Uint8List? bestBytes;
+      int selectedQuality = qualitySteps.first;
+
+      for (final int quality in qualitySteps) {
+        final Uint8List candidate = Uint8List.fromList(
+          img.encodeJpg(resized, quality: quality),
+        );
+        bestBytes = candidate;
+        selectedQuality = quality;
+        if (candidate.lengthInBytes <= 60 * 1024) {
+          break;
+        }
+      }
+
+      if (bestBytes == null) {
+        if (mounted) {
+          _showSnack('Görsel sıkıştırılamadı.', isError: true);
+        }
+        setState(() {
+          _avatarProcessing = false;
+        });
+        return;
+      }
+
+      final Uint8List finalBytes = bestBytes;
+
+      setState(() {
+        _avatarPreviewBytes = finalBytes;
+        _pendingAvatarBytes = finalBytes;
+        _avatarCleared = false;
+        _avatarOriginalSize = rawBytes.length;
+        _avatarCompressedSize = finalBytes.length;
+        _avatarQuality = selectedQuality;
+        _avatarProcessing = false;
+      });
+      _markDirty();
+    } catch (e) {
+      debugPrint('Avatar processing error: $e');
+      if (mounted) {
+        _showSnack('Fotoğraf işlenirken hata oluştu.', isError: true);
+      }
+      setState(() {
+        _avatarProcessing = false;
+      });
+    }
   }
 
   void _clearSelectedAvatar() {
@@ -1341,7 +1241,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
     );
   }
 
-  Widget _sectionHeader({required String title, required String subtitle}) {
+  Widget _sectionHeader({required String title, String? subtitle}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1353,15 +1253,17 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
             fontSize: 17,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.62),
-            fontSize: 13,
-            height: 1.35,
+        if (subtitle != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.62),
+              fontSize: 13,
+              height: 1.35,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -2375,20 +2277,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
   String _normalizeVisibility(String value) {
     return _visibilityOptions.contains(value) ? value : 'private';
   }
-}
-
-class _AvatarProcessingResult {
-  final Uint8List bytes;
-  final int originalSize;
-  final int finalSize;
-  final int quality;
-
-  const _AvatarProcessingResult({
-    required this.bytes,
-    required this.originalSize,
-    required this.finalSize,
-    required this.quality,
-  });
 }
 
 class _StatusChip extends StatelessWidget {

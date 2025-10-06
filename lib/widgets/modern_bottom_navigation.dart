@@ -46,7 +46,7 @@ class ModernBottomNavigation extends StatelessWidget {
               ),
               _buildNavItem(
                 context,
-                index: 1,
+                index: 2,
                 icon: Icons.search_outlined,
                 activeIcon: Icons.search,
                 label: 'Arama',
@@ -55,9 +55,9 @@ class ModernBottomNavigation extends StatelessWidget {
               _buildNavItem(
                 context,
                 index: 3,
-                icon: Icons.favorite_outline,
-                activeIcon: Icons.favorite,
-                label: 'Aktivite',
+                icon: Icons.emoji_events_outlined,
+                activeIcon: Icons.emoji_events,
+                label: 'Yarışma',
               ),
               _buildNavItem(
                 context,
@@ -139,7 +139,7 @@ class ModernBottomNavigation extends StatelessWidget {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
-          onTap: () => onTap(2),
+          onTap: () => onTap(1),
           borderRadius: BorderRadius.circular(12),
           child: const Icon(Icons.add, color: Colors.white, size: 24),
         ),

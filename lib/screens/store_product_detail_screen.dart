@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
+import '../data/cringestore_repository.dart';
 import '../models/store_product.dart';
 import '../models/store_wallet.dart';
 import '../models/user_model.dart';
@@ -20,9 +23,11 @@ class StoreProductDetailScreen extends StatefulWidget {
 }
 
 class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
-  final _storeService = CringeStoreService();
+  final CringeStoreRepository _storeRepository = CringeStoreRepository.instance;
+  final CringeStoreService _legacyStoreService = CringeStoreService();
   bool _isPurchasing = false;
   late final Stream<StoreWallet?> _walletStream;
+  late final Stream<StoreProduct?> _productStream;
   Future<User?>? _sellerFuture;
   User? _sellerCache;
   Future<bool>? _shareStatusFuture;
@@ -34,7 +39,8 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _walletStream = _storeService.getCurrentWallet();
+    _walletStream = _storeRepository.watchCurrentWallet();
+    _productStream = _storeRepository.watchProduct(widget.productId);
     _imagePageController = PageController();
   }
 
@@ -48,10 +54,13 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('ürün Detayı')),
-      body: FutureBuilder<StoreProduct?>(
-        future: _storeService.getProduct(widget.productId),
+      body: StreamBuilder<StoreProduct?>(
+        stream: _productStream,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          final product = snapshot.data;
+
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              product == null) {
             return const Center(child: CircularProgressIndicator());
           }
 
@@ -59,7 +68,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
             return Center(child: Text('Hata: ${snapshot.error}'));
           }
 
-          final product = snapshot.data;
           if (product == null) {
             return const Center(child: Text('ürün bulunamadı'));
           }
@@ -105,7 +113,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     User? seller,
     bool isSellerLoading = false,
   }) {
-    _shareStatusFuture ??= _storeService.isProductShared(product.id);
+    _shareStatusFuture ??= _legacyStoreService.isProductShared(product.id);
 
     return FutureBuilder<bool>(
       future: _shareStatusFuture,
@@ -585,12 +593,15 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     setState(() => _isPurchasing = true);
 
     try {
-      final result = await _storeService.lockEscrow(product.id);
+      final result = await _storeRepository.startPurchase(
+        productId: product.id,
+        note: null,
+      );
 
       if (!mounted) return;
 
-      if (result['ok'] == true) {
-        final orderId = result['orderId'];
+      if (result.isSuccess) {
+        final orderId = result.orderId;
         final successMessage = orderId == null
             ? 'Sipariş oluşturuldu!'
             : 'Sipariş oluşturuldu! Sipariş ID: $orderId';
@@ -600,11 +611,13 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
             backgroundColor: Colors.green,
           ),
         );
+        // Refresh cached product data to reflect the new state ASAP
+        unawaited(_storeRepository.fetchProduct(product.id));
         Navigator.pop(context); // Go back to store list
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Hata: ${result['error'] ?? 'Bilinmeyen hata'}'),
+            content: Text('Hata: ${result.error ?? 'Bilinmeyen hata'}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -843,7 +856,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     setState(() => _isSharingProduct = true);
 
     try {
-      final result = await _storeService.shareSoldProduct(
+      final result = await _legacyStoreService.shareSoldProduct(
         product: product,
         seller: seller,
       );

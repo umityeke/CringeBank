@@ -1,0 +1,12 @@
+C:\dev\cringebank\backend\src\CringeBank.Domain\obj\Debug\net9.0\CringeBank.Domain.GeneratedMSBuildEditorConfig.editorconfig
+C:\dev\cringebank\backend\src\CringeBank.Domain\obj\Debug\net9.0\CringeBank.Domain.AssemblyInfoInputs.cache
+C:\dev\cringebank\backend\src\CringeBank.Domain\obj\Debug\net9.0\CringeBank.Domain.AssemblyInfo.cs
+C:\dev\cringebank\backend\src\CringeBank.Domain\obj\Debug\net9.0\CringeBank.Domain.csproj.CoreCompileInputs.cache
+C:\dev\cringebank\backend\src\CringeBank.Domain\obj\Debug\net9.0\CringeBank.Domain.sourcelink.json
+C:\dev\cringebank\backend\src\CringeBank.Domain\bin\Debug\net9.0\CringeBank.Domain.deps.json
+C:\dev\cringebank\backend\src\CringeBank.Domain\bin\Debug\net9.0\CringeBank.Domain.dll
+C:\dev\cringebank\backend\src\CringeBank.Domain\bin\Debug\net9.0\CringeBank.Domain.pdb
+C:\dev\cringebank\backend\src\CringeBank.Domain\obj\Debug\net9.0\CringeBank.Domain.dll
+C:\dev\cringebank\backend\src\CringeBank.Domain\obj\Debug\net9.0\refint\CringeBank.Domain.dll
+C:\dev\cringebank\backend\src\CringeBank.Domain\obj\Debug\net9.0\CringeBank.Domain.pdb
+C:\dev\cringebank\backend\src\CringeBank.Domain\obj\Debug\net9.0\ref\CringeBank.Domain.dll

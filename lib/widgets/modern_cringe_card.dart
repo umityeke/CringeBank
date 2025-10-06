@@ -2,6 +2,7 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../models/cringe_entry.dart';
+import '../services/cringe_entry_service.dart';
 import '../theme/app_theme.dart';
 import 'modern_components.dart';
 
@@ -11,6 +12,7 @@ class ModernCringeCard extends StatefulWidget {
   final VoidCallback? onLike;
   final VoidCallback? onComment;
   final VoidCallback? onShare;
+  final VoidCallback? onMessage;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final bool isDeleteInProgress;
@@ -22,6 +24,7 @@ class ModernCringeCard extends StatefulWidget {
     this.onLike,
     this.onComment,
     this.onShare,
+    this.onMessage,
     this.onEdit,
     this.onDelete,
     this.isDeleteInProgress = false,
@@ -33,6 +36,39 @@ class ModernCringeCard extends StatefulWidget {
 
 class _ModernCringeCardState extends State<ModernCringeCard> {
   bool _isLiked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkIfLiked();
+  }
+
+  @override
+  void didUpdateWidget(ModernCringeCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.entry.id != widget.entry.id) {
+      _checkIfLiked();
+    }
+  }
+
+  Future<void> _checkIfLiked() async {
+    try {
+      final isLiked = await CringeEntryService.instance.isLikedByUser(
+        widget.entry.id,
+      );
+      if (mounted) {
+        setState(() {
+          _isLiked = isLiked;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLiked = false;
+        });
+      }
+    }
+  }
 
   Color _getCringeColor(double level) {
     if (level < 3) return AppTheme.secondaryColor;
@@ -221,7 +257,7 @@ class _ModernCringeCardState extends State<ModernCringeCard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AutoSizeText(
-          widget.entry.baslik,
+          widget.entry.headline,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w600,
             color: AppTheme.textPrimary,
@@ -260,20 +296,29 @@ class _ModernCringeCardState extends State<ModernCringeCard> {
 
   Widget _buildActions() {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         _buildMetricAction(
           icon: _isLiked ? Icons.favorite : Icons.favorite_border,
-          label: _formatCount(widget.entry.begeniSayisi),
+          label: _formatCount(widget.entry.likeCount),
           color: _isLiked ? AppTheme.cringeRed : AppTheme.textSecondary,
           onTap: _handleLike,
         ),
-        const SizedBox(width: AppTheme.spacingL),
         _buildMetricAction(
           icon: Icons.chat_bubble_outline,
           label: _formatCount(widget.entry.yorumSayisi),
           onTap: widget.onComment,
         ),
-        const Spacer(),
+        _buildMetricAction(
+          icon: Icons.visibility_outlined,
+          label: _formatCount(widget.entry.viewCount),
+          color: AppTheme.textMuted,
+        ),
+        _buildSecondaryAction(
+          icon: Icons.send_outlined,
+          label: 'Mesaj',
+          onTap: widget.onMessage,
+        ),
         _buildSecondaryAction(
           icon: Icons.share_outlined,
           label: 'Paylaş',
@@ -348,14 +393,14 @@ class _ModernCringeCardState extends State<ModernCringeCard> {
   }
 
   void _handleLike() {
+    // UI'da hemen güncelle (optimistic update)
     final nextValue = !_isLiked;
     setState(() {
       _isLiked = nextValue;
     });
 
-    if (nextValue) {
-      widget.onLike?.call();
-    }
+    // Backend callback'i çağır (parent screen like işlemini yapacak)
+    widget.onLike?.call();
   }
 
   String _buildInitials() {

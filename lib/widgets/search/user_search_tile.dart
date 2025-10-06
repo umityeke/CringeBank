@@ -119,6 +119,12 @@ class UserSearchTile extends StatelessWidget {
                         icon: Icons.bolt,
                         label: 'Seviye ${user.krepLevel}',
                       ),
+                      if (user.popularityScore > 0)
+                        _buildStatChip(
+                          icon: Icons.trending_up,
+                          label:
+                              '${_formatPopularity(user.popularityScore)} pop',
+                        ),
                     ],
                   ),
                 ],
@@ -210,5 +216,11 @@ class UserSearchTile extends StatelessWidget {
     if (value < 1000) return value.toString();
     if (value < 1000000) return '${(value / 1000).toStringAsFixed(1)}B';
     return '${(value / 1000000).toStringAsFixed(1)}M';
+  }
+
+  String _formatPopularity(double score) {
+    if (score < 1000) return score.toStringAsFixed(0);
+    if (score < 1000000) return '${(score / 1000).toStringAsFixed(1)}B';
+    return '${(score / 1000000).toStringAsFixed(1)}M';
   }
 }

@@ -2,6 +2,13 @@
 
 Flutter ile geliştirilmiş bu proje, paylaşımları Firestore üzerinde paylaşım türüne göre gruplanmış `cringe_entries_by_type/{paylasimTuru}/categories/{kategori}/entries` alt koleksiyonlarında tutan kurumsal seviyede bir akış servisi içerir. Bu döngüyü güçlendirmek için Firestore zaman aşımı yönetimi, kalıcı önbellek, telemetri ve indeks yapılandırmaları güncellendi.
 
+## Mimari Genel Bakış
+
+- **Flutter istemcisi**: Firestore akışlarını tüketir, TTL önbelleği ve telemetri katmanı sayesinde offline dayanıklılık sağlar.
+- **ASP.NET Core 9 API**: Firebase ID token doğrulaması sırasında kullanıcı profillerini MSSQL `Users` tablosuna senkronlar ve istemcilere `/api/session/bootstrap` uç noktasıyla oturum başlatma sözleşmesi sunar.
+- **Firebase Functions**: Firestore `users/{uid}` dokümanlarındaki değişiklikleri custom claim’lere aktarır, `claimsVersion` takibini yapar ve callable endpoint ile manuel yenilemeye izin verir.
+- **Firestore & Storage kuralları**: Claim sürümü ve kullanıcı durumu doğrulaması ile yalnızca `active` ve güncel token’a sahip kullanıcıların yazmasına izin verir.
+
 ## Özellik Özeti
 
 - Firestore `.snapshots()` akışında zaman aşımı 30 saniyeye çıkarıldı; ilk snapshot için daha geniş tolerans sağlar.
@@ -21,6 +28,13 @@ Flutter ile geliştirilmiş bu proje, paylaşımları Firestore üzerinde payla�
 - Timeout durumları `cringe_entries_stream_timeout` eventiyle Firebase Analytics’e raporlanır.
 - UI, `streamHint` üzerinden “bağlantı yavaş” gibi mesajlar gösterebilir.
 
+## Güvenlik ve Kimlik Doğrulama
+
+- Firebase ID token’ları backend’de `FirebaseUserProfileFactory` ile doğrulanır, revocation ve email doğrulama kontrolleri zorunludur.
+- `UserSynchronizationService`, token’dan üretilen profil bilgilerini SQL SSOT tablosuyla eşler, claim sürümü uyumsuzluklarını loglar.
+- Cloud Functions `syncUserClaimsOnUserWrite` tetikleyicisi, Firestore değişikliklerini custom claim’lere yansıtır; callable `refreshUserClaims` manuel yenileme sağlar.
+- Firestore ve Storage güvenlik kuralları `ensureActiveAndFreshClaims()` helper’ı ile `status == active` ve güncel `claimsVersion` koşullarını zorunlu kılar.
+
 ## Responsive Master Rulebook
 
 CringeBank’ın tüm UI bileşenleri [CringeBank Responsive Master Rulebook](docs/responsive_master_rulebook.md) dokümanındaki breakpoint, grid, oran ve erişilebilirlik kriterlerine uymak zorundadır. Bu kurallar:
@@ -34,18 +48,26 @@ Herhangi bir breakpoint’te taşma veya scroll sapması tespit edilmesi build s
 
 ## Testler
 
-Yeni önbellek davranışını doğrulamak için aşağıdaki testi çalıştırın:
-
 ```powershell
-Set-Location 'c:/Users/Ümit YEKE/CRINGE-BANKASI-2'
+# Flutter servis testleri
+Set-Location 'c:/dev/cringebank'
 flutter test test/services/cringe_entry_service_test.dart
+
+# Backend API derleme ve test
+Set-Location 'c:/dev/cringebank/backend'
+dotnet build
+dotnet test
+
+# Firebase Functions birim testleri
+Set-Location 'c:/dev/cringebank/functions'
+npm test
 ```
 
 ## Firestore Yapılandırması
 
 
 ```powershell
-Set-Location 'c:/Users/Ümit YEKE/CRINGE-BANKASI-2'
+Set-Location 'c:/dev/cringebank'
 firebase deploy --only firestore:indexes,firestore:rules
 ```
 
@@ -62,4 +84,9 @@ flutterfire configure --platforms windows
 - Bu dosyalar lokal ortamda oluşturulduktan sonra `git status` çıktısında görünmemelidir. Görünüyorsa `.gitignore` kurallarının doğru uygulandığından emin olun.
 
 ## Faydalı Kaynaklar
+
+- [Firebase kullanıcı senkronizasyonu rollout kılavuzu](docs/user_sync_rollout.md)
+- [CringeStore backend implementasyonu](docs/CRINGESTORE_IMPLEMENTATION.md)
+- [Firebase SSOT mimarisi](docs/cringe_entry_share_type_migration.md)
+
 

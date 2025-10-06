@@ -15,7 +15,6 @@ class EditCringeEntryScreen extends StatefulWidget {
 
 class _EditCringeEntryScreenState extends State<EditCringeEntryScreen> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _titleController;
   late TextEditingController _descriptionController;
   late double _krepLevel;
   late CringeCategory _selectedCategory;
@@ -24,7 +23,6 @@ class _EditCringeEntryScreenState extends State<EditCringeEntryScreen> {
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController(text: widget.entry.baslik);
     _descriptionController = TextEditingController(text: widget.entry.aciklama);
     _krepLevel = widget.entry.krepSeviyesi;
     _selectedCategory = widget.entry.kategori;
@@ -32,7 +30,6 @@ class _EditCringeEntryScreenState extends State<EditCringeEntryScreen> {
 
   @override
   void dispose() {
-    _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -43,10 +40,13 @@ class _EditCringeEntryScreenState extends State<EditCringeEntryScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final updatedDescription = _descriptionController.text.trim();
+      final derivedTitle = CringeEntry.deriveTitle('', updatedDescription);
+
       // Update entry
       final updatedEntry = widget.entry.copyWith(
-        baslik: _titleController.text.trim(),
-        aciklama: _descriptionController.text.trim(),
+        baslik: derivedTitle,
+        aciklama: updatedDescription,
         krepSeviyesi: _krepLevel,
         kategori: _selectedCategory,
       );
@@ -132,55 +132,6 @@ class _EditCringeEntryScreenState extends State<EditCringeEntryScreen> {
         child: ListView(
           padding: EdgeInsets.all(isMobile ? 16 : 24),
           children: [
-            // Title Field
-            Text(
-              'Başlık',
-              style: TextStyle(
-                color: AppTheme.textPrimary,
-                fontSize: isMobile ? 14 : 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _titleController,
-              style: const TextStyle(color: AppTheme.textPrimary),
-              maxLength: 100,
-              decoration: InputDecoration(
-                hintText: 'Krepin başlığı...',
-                hintStyle: TextStyle(color: AppTheme.textMuted),
-                filled: true,
-                fillColor: const Color(0xFF1A1A2E),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.1),
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppTheme.primaryColor,
-                    width: 2,
-                  ),
-                ),
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Başlık gerekli';
-                }
-                if (value.trim().length < 3) {
-                  return 'Başlık en az 3 karakter olmalı';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 24),
-
             // Description Field
             Text(
               'Açıklama',
@@ -228,6 +179,33 @@ class _EditCringeEntryScreenState extends State<EditCringeEntryScreen> {
                 }
                 return null;
               },
+            ),
+            const SizedBox(height: 24),
+
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.auto_fix_high, color: AppTheme.primaryColor),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Başlık artık otomatik oluşturuluyor. Sadece krebin içeriğini güncelle, geri kalanını biz hallediyoruz.',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: isMobile ? 12 : 13,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 24),
 

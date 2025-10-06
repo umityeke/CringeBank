@@ -157,12 +157,21 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
             avatar: '👤',
           );
 
-    final trimmedMessage = thread.lastMessage.trim();
-    final lastMessagePreview = trimmedMessage.isEmpty
-        ? 'Yeni konuyu başlat'
-        : thread.lastSenderId == userId
-        ? 'Sen: $trimmedMessage'
-        : trimmedMessage;
+    final trimmedMessage = (thread.lastMessageText ?? '').trim();
+    String lastMessagePreview;
+    if (trimmedMessage.isEmpty) {
+      lastMessagePreview = thread.lastMessageId == null
+          ? 'Yeni konuyu başlat'
+          : thread.lastSenderId == userId
+          ? 'Son mesaj gönderildi'
+          : 'Mesaj bekleniyor';
+    } else {
+      lastMessagePreview = thread.lastSenderId == userId
+          ? 'Sen: $trimmedMessage'
+          : trimmedMessage;
+    }
+
+    final hasUnread = thread.hasUnread(userId);
 
     return _ThreadTileData(
       displayName: meta.displayName.isNotEmpty
@@ -172,7 +181,7 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
       avatar: meta.avatar,
       lastMessage: lastMessagePreview,
       timestampLabel: _formatTimestamp(thread.lastMessageAt),
-      unreadCount: thread.unreadCount,
+      hasUnread: hasUnread,
     );
   }
 
@@ -300,7 +309,7 @@ class _ThreadTileData {
     required this.avatar,
     required this.lastMessage,
     required this.timestampLabel,
-    required this.unreadCount,
+    required this.hasUnread,
   });
 
   final String displayName;
@@ -308,7 +317,7 @@ class _ThreadTileData {
   final String avatar;
   final String lastMessage;
   final String timestampLabel;
-  final int unreadCount;
+  final bool hasUnread;
 }
 
 class _DirectMessageThreadTile extends StatelessWidget {
@@ -387,23 +396,14 @@ class _DirectMessageThreadTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (data.unreadCount > 0) ...[
+              if (data.hasUnread) ...[
                 const SizedBox(width: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
+                  width: 12,
+                  height: 12,
                   decoration: BoxDecoration(
                     color: theme.colorScheme.secondary,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    data.unreadCount.toString(),
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    shape: BoxShape.circle,
                   ),
                 ),
               ],

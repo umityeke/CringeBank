@@ -103,6 +103,25 @@ service firebase.storage {
     }
 
     // ====================================================================
+    // USER AVATARS - Profile Pictures
+    // Path: media/users/{uid}/{fileName}
+    // ====================================================================
+
+    match /media/users/{uid}/{fileName} {
+      // READ: Avatars are public
+      allow read: if true;
+
+      // CREATE/UPDATE: Only owner can upload their avatar
+      //                Accept image files up to 5 MB
+      allow create, update: if isOwner(uid)
+        && request.resource.contentType.matches('image/.+')
+        && request.resource.size <= 5 * 1024 * 1024;
+
+      // DELETE: Owner or moderator may remove avatar
+      allow delete: if isOwnerOrModerator(uid);
+    }
+
+    // ====================================================================
     // DEFAULT RULE - Deny everything else
     // ====================================================================
     

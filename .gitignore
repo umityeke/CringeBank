@@ -49,3 +49,12 @@ app.*.map.json
 /windows/tools/
 /windows/firebase_app_id_file.json
 /functions/.env
+
+# Firebase & test data
+firebase-debug.log
+*.old
+users.json
+database.rules.json
+
+# Node modules
+node_modules/

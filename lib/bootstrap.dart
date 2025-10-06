@@ -8,7 +8,6 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'firebase_options.dart';
 import 'services/advanced_ai_service.dart';
-import 'services/competition_service.dart';
 import 'services/cringe_entry_service.dart';
 import 'services/cringe_search_service.dart';
 import 'services/user_service.dart';
@@ -115,10 +114,7 @@ Future<void> _configureFirestore() async {
 void _setupPostAuthInitializers() {
   firebase_auth.FirebaseAuth.instance.authStateChanges().listen((user) {
     if (user != null) {
-      unawaited(CompetitionService.initialize());
       unawaited(CringeEntryService.instance.warmUp());
-    } else {
-      CompetitionService.dispose();
     }
   });
 }

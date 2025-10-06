@@ -11,7 +11,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/cringe_comment.dart';
 import '../models/cringe_entry.dart';
 import '../models/user_model.dart';
-import 'competition_service.dart';
 import 'connectivity_service.dart';
 import 'user_service.dart';
 
@@ -25,9 +24,24 @@ class CringeEntryService {
   final FirebaseFirestore _firestore;
   final firebase_auth.FirebaseAuth _auth;
   final FirebaseStorage _storage;
-  final FirebaseAnalytics _analytics;
+  final FirebaseAnalytics? _analytics;
   bool _isDisposed = false;
   StreamSubscription<ConnectivityStatus>? _connectivitySubscription;
+  static bool get _analyticsSupported {
+    if (kIsWeb) {
+      return true;
+    }
+
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        return true;
+      default:
+        return false;
+    }
+  }
+
   CringeEntryService._({
     FirebaseFirestore? firestore,
     firebase_auth.FirebaseAuth? auth,
@@ -36,7 +50,9 @@ class CringeEntryService {
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _auth = auth ?? firebase_auth.FirebaseAuth.instance,
        _storage = storage ?? FirebaseStorage.instance,
-       _analytics = analytics ?? FirebaseAnalytics.instance {
+       _analytics = _analyticsSupported
+           ? (analytics ?? FirebaseAnalytics.instance)
+           : null {
     _connectivitySubscription = ConnectivityService.instance.statusStream
         .listen(
           _handleConnectivityStatus,
@@ -87,6 +103,38 @@ class CringeEntryService {
       'enterprise_cringe_entries_cache_timestamp_v1';
   static const Duration _cacheTTL = Duration(minutes: 5);
   Future<void>? _ongoingWarmUp;
+
+  CringeEntry _normalizeEntry(CringeEntry entry) {
+    final normalizedDescription = entry.aciklama.trim();
+    final normalizedTitle = CringeEntry.deriveTitle(
+      entry.baslik,
+      normalizedDescription,
+    );
+
+    return entry.copyWith(
+      baslik: normalizedTitle,
+      aciklama: normalizedDescription,
+    );
+  }
+
+  Future<void> _logAnalyticsEvent(
+    String name, {
+    Map<String, Object> parameters = const <String, Object>{},
+  }) async {
+    final analytics = _analytics;
+    if (analytics == null) {
+      return;
+    }
+
+    try {
+      await analytics.logEvent(name: name, parameters: parameters);
+    } catch (error, stackTrace) {
+      debugPrint('⚠️ Analytics log failed: $error');
+      if (kDebugMode) {
+        debugPrint(stackTrace.toString());
+      }
+    }
+  }
 
   Future<void> warmUp() async {
     if (_auth.currentUser == null) {
@@ -330,8 +378,8 @@ class CringeEntryService {
       streamHintNotifier.value =
           'Bağlantı beklenenden yavaş. Önbelleğe alınan veriler gösteriliyor.';
       unawaited(
-        _analytics.logEvent(
-          name: 'cringe_entries_stream_timeout',
+        _logAnalyticsEvent(
+          'cringe_entries_stream_timeout',
           parameters: {
             'timeout_count': timeoutExceptionCountNotifier.value,
             'timestamp': DateTime.now().toIso8601String(),
@@ -343,8 +391,8 @@ class CringeEntryService {
       streamHintNotifier.value =
           'Akışta beklenmeyen bir hata oluştu. Yeniden bağlanılıyor…';
       unawaited(
-        _analytics.logEvent(
-          name: 'cringe_entries_stream_error',
+        _logAnalyticsEvent(
+          'cringe_entries_stream_error',
           parameters: {
             'error_type': error.runtimeType.toString(),
             'details': errorDescription.substring(
@@ -448,7 +496,9 @@ class CringeEntryService {
           }
         }
 
-        final entries = _filterHomeFeedEntries(entryMap.values).take(100).toList();
+        final entries = _filterHomeFeedEntries(
+          entryMap.values,
+        ).take(100).toList();
 
         print('✅ FETCH SUCCESS: Retrieved ${entries.length} home feed entries');
         return entries;
@@ -491,6 +541,18 @@ class CringeEntryService {
       );
     } catch (e) {
       print('⚠️ CACHE UPDATE ERROR: Failed to persist cache: $e');
+    }
+  }
+
+  // Clear enterprise cache
+  Future<void> _clearEnterpriseCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_cacheKey);
+      await prefs.remove(_cacheTimestampKey);
+      print('🧹 CACHE CLEARED: Enterprise cache data removed');
+    } catch (e) {
+      print('⚠️ CACHE CLEAR ERROR: Failed to clear cache: $e');
     }
   }
 
@@ -556,7 +618,10 @@ class CringeEntryService {
   }
 
   // Kullanıcının entries'leri
-  Stream<List<CringeEntry>> getUserEntriesStream(User user, {bool isOwnProfile = false}) {
+  Stream<List<CringeEntry>> getUserEntriesStream(
+    User user, {
+    bool isOwnProfile = false,
+  }) {
     final queries = <Query<Map<String, dynamic>>>[];
     final normalizedUserId = user.id.trim();
 
@@ -566,11 +631,11 @@ class CringeEntryService {
       Query<Map<String, dynamic>> query = _firestore
           .collection('cringe_entries')
           .where('userId', isEqualTo: normalizedUserId);
-      
+
       if (!isOwnProfile) {
         query = query.where('status', isEqualTo: 'approved');
       }
-      
+
       queries.add(query);
     }
 
@@ -595,16 +660,16 @@ class CringeEntryService {
 
     for (final candidate in identifierCandidates) {
       final field = candidate.startsWith('@') ? 'authorHandle' : 'authorName';
-      
+
       // Security Contract: For secondary identifiers, also filter by status if not own profile
       Query<Map<String, dynamic>> query = _firestore
           .collection('cringe_entries')
           .where(field, isEqualTo: candidate);
-      
+
       if (!isOwnProfile) {
         query = query.where('status', isEqualTo: 'approved');
       }
-      
+
       queries.add(query);
     }
 
@@ -749,27 +814,28 @@ class CringeEntryService {
   // 🏢 ENTERPRISE LEVEL CRINGE ENTRY CREATION WITH ADVANCED FEATURES
   // Features: Validation, Analytics, Monitoring, Audit Trail, Performance Optimization
   Future<bool> addEntry(CringeEntry entry) async {
+    final normalizedEntry = _normalizeEntry(entry);
     final transactionId = DateTime.now().millisecondsSinceEpoch.toString();
     final stopwatch = Stopwatch()..start();
 
     print(
-      '🚀 ENTERPRISE ADD ENTRY: Starting transaction $transactionId for user ${entry.userId}',
+      '🚀 ENTERPRISE ADD ENTRY: Starting transaction $transactionId for user ${normalizedEntry.userId}',
     );
 
     try {
       // Phase 1: Enterprise Pre-validation
-      await _performEnterpriseValidation(entry, transactionId);
+      await _performEnterpriseValidation(normalizedEntry, transactionId);
 
-      final targetDocId = entry.id.isNotEmpty
-          ? entry.id
+      final targetDocId = normalizedEntry.id.isNotEmpty
+          ? normalizedEntry.id
           : _firestore.collection('cringe_entries').doc().id;
 
       // Phase 2: Content Analysis & Security Scan
-      await _performContentAnalysis(entry, transactionId);
+      await _performContentAnalysis(normalizedEntry, transactionId);
 
       // Phase 3: Data Preparation & Optimization
       final optimizedData = await _prepareEnterpriseData(
-        entry,
+        normalizedEntry,
         transactionId,
         targetDocId,
       );
@@ -781,15 +847,12 @@ class CringeEntryService {
         preferredId: targetDocId,
       );
 
-      if (entry.id.isNotEmpty && entry.id != docRef.id) {
-        await CompetitionService.replaceEntryIdIfPresent(
-          oldEntryId: entry.id,
-          newEntryId: docRef.id,
-        );
-      }
-
       // Phase 5: Post-Creation Analytics & Monitoring
-      await _performPostCreationAnalytics(docRef.id, entry, transactionId);
+      await _performPostCreationAnalytics(
+        docRef.id,
+        normalizedEntry,
+        transactionId,
+      );
 
       final elapsedTime = stopwatch.elapsedMilliseconds;
       print(
@@ -797,7 +860,7 @@ class CringeEntryService {
       );
 
       // Trigger enterprise notifications
-      _triggerEnterpriseNotifications(docRef.id, entry);
+      _triggerEnterpriseNotifications(docRef.id, normalizedEntry);
 
       return true;
     } catch (e) {
@@ -860,9 +923,7 @@ class CringeEntryService {
           );
         }
         if (entry.media.isEmpty || entry.media.length > 20) {
-          throw Exception(
-            'VALIDATION_ERROR: Frame requires 1-20 images',
-          );
+          throw Exception('VALIDATION_ERROR: Frame requires 1-20 images');
         }
         // Verify all media are images
         for (final mediaPath in entry.media) {
@@ -913,13 +974,8 @@ class CringeEntryService {
         break;
     }
 
-    // 2. SECURITY CONTRACT: User cannot set approved/rejected/blocked status
-    if (entry.status != ModerationStatus.pending) {
-      print(
-        '⚠️ SECURITY WARNING: User tried to create entry with status ${entry.status.value}. Forcing to pending.',
-      );
-      // Note: This will be enforced in _prepareEnterpriseData
-    }
+    // 2. Auto-approve all posts - moderation happens post-publication via reports
+    print('✅ AUTO-APPROVE: All posts are auto-approved for instant visibility');
 
     // 3. Basic validation (legacy)
     if (entry.baslik.isEmpty && entry.aciklama.isEmpty) {
@@ -1009,14 +1065,18 @@ class CringeEntryService {
 
     return {
       // === SECURITY CONTRACT REQUIRED FIELDS ===
-  'ownerId': entry.userId, // Firestore rules expect 'ownerId'
-      'type': entry.type.value, // Must be one of: spill, clap, frame, cringecast, mash
-      'status': ModerationStatus.pending.value, // ALWAYS pending on creation
+      'ownerId': entry.userId, // Firestore rules expect 'ownerId'
+      'type': entry
+          .type
+          .value, // Must be one of: spill, clap, frame, cringecast, mash
+      'status': ModerationStatus
+          .approved
+          .value, // Auto-approve all posts - moderation via reports
       'text': textContent, // Required by Firestore rules
-      'createdAt': FieldValue.serverTimestamp(), // Will be converted to int by Firestore
-      'media': mediaPaths, // Storage paths: user_uploads/{ownerId}/{postId}/filename
-      
-      // === LEGACY FIELDS (backward compatibility) ===
+      'createdAt':
+          FieldValue.serverTimestamp(), // Will be converted to int by Firestore
+      'media':
+          mediaPaths, // Storage paths: user_uploads/{ownerId}/{postId}/filename      // === LEGACY FIELDS (backward compatibility) ===
       'userId': entry.userId, // Keep for old clients
       'authorName': entry.authorName,
       'authorHandle': entry.authorHandle,
@@ -1046,7 +1106,6 @@ class CringeEntryService {
       'source': 'mobile_app',
       'transactionId': transactionId,
       'moderationStatus': 'pending', // Legacy field
-
       // Analytics data
       'createdAtClient': DateTime.now().toIso8601String(),
       'platform': 'web',
@@ -1094,17 +1153,17 @@ class CringeEntryService {
   // Max size: 25MB, Content-Type: image/* or video/*
   Future<List<String>> _processEnterpriseImages(
     CringeEntry entry,
-    String transactionId,
-    {required String postId}
-  ) async {
+    String transactionId, {
+    required String postId,
+  }) async {
     if (entry.imageUrls.isEmpty) {
       return const [];
     }
 
-  final processedUrls = <String>[];
-  final effectivePostId = postId;
+    final processedUrls = <String>[];
+    final effectivePostId = postId;
 
-  for (final rawImage in entry.imageUrls) {
+    for (final rawImage in entry.imageUrls) {
       // Already uploaded files (HTTP URLs)
       if (rawImage.startsWith('http')) {
         processedUrls.add(rawImage);
@@ -1113,9 +1172,7 @@ class CringeEntryService {
 
       // Only accept data URIs
       if (!rawImage.startsWith('data:')) {
-        print(
-          '⚠️ MEDIA WARN: Unsupported format received, skipping upload',
-        );
+        print('⚠️ MEDIA WARN: Unsupported format received, skipping upload');
         continue;
       }
 
@@ -1128,13 +1185,15 @@ class CringeEntryService {
         final header = parts.first;
         final base64Data = parts.last;
         final mimeType = header.substring(5, header.indexOf(';'));
-        
+
         // === SECURITY CONTRACT: Validate content type ===
         if (!mimeType.startsWith('image/') && !mimeType.startsWith('video/')) {
-          print('❌ SECURITY: Rejected file with content-type: $mimeType (only image/* and video/* allowed)');
+          print(
+            '❌ SECURITY: Rejected file with content-type: $mimeType (only image/* and video/* allowed)',
+          );
           continue;
         }
-        
+
         final extension = _inferFileExtension(mimeType);
         final bytes = base64Decode(base64Data);
         final Uint8List data = Uint8List.fromList(bytes);
@@ -1142,7 +1201,9 @@ class CringeEntryService {
         // === SECURITY CONTRACT: 25MB limit ===
         const maxSizeBytes = 25 * 1024 * 1024; // 25MB
         if (data.length > maxSizeBytes) {
-          print('❌ SECURITY: File size ${(data.length / 1024 / 1024).toStringAsFixed(2)}MB exceeds 25MB limit');
+          print(
+            '❌ SECURITY: File size ${(data.length / 1024 / 1024).toStringAsFixed(2)}MB exceeds 25MB limit',
+          );
           continue;
         }
 
@@ -1150,26 +1211,29 @@ class CringeEntryService {
         // user_uploads/{ownerId}/{postId}/{fileName}
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         final fileName = '$timestamp.$extension';
-        final storagePath = 'user_uploads/${entry.userId}/$effectivePostId/$fileName';
-        
+        final storagePath =
+            'user_uploads/${entry.userId}/$effectivePostId/$fileName';
+
         final ref = _storage.ref(storagePath);
-        
+
         // === SECURITY CONTRACT: Required metadata ===
         final metadata = SettableMetadata(
           contentType: mimeType,
           customMetadata: {
             'postId': effectivePostId,
-            'status': 'pending', // ALWAYS pending on upload
+            'status': 'approved', // Auto-approved - moderation via reports
             'uploadedAt': DateTime.now().toIso8601String(),
             'ownerId': entry.userId,
           },
         );
-        
+
         final uploadTask = await ref.putData(data, metadata);
         final downloadUrl = await uploadTask.ref.getDownloadURL();
-        
+
         processedUrls.add(downloadUrl);
-        print('✅ MEDIA UPLOAD: Stored at $storagePath (${(data.length / 1024).toStringAsFixed(2)}KB)');
+        print(
+          '✅ MEDIA UPLOAD: Stored at $storagePath (${(data.length / 1024).toStringAsFixed(2)}KB)',
+        );
       } catch (e) {
         print('❌ MEDIA UPLOAD ERROR: Failed to process media - $e');
       }
@@ -1349,8 +1413,9 @@ class CringeEntryService {
     final payload = <String, dynamic>{
       // === ALLOWED UPDATE FIELDS ===
       'text': (entry.baslik.isNotEmpty ? entry.baslik : entry.aciklama).trim(),
-      'media': mediaPaths.isNotEmpty ? mediaPaths : entry.media, // Use new uploads or keep existing
-      
+      'media': mediaPaths.isNotEmpty
+          ? mediaPaths
+          : entry.media, // Use new uploads or keep existing
       // Legacy fields
       'authorName': entry.authorName.trim(),
       'authorHandle': entry.authorHandle.trim(),
@@ -1365,10 +1430,10 @@ class CringeEntryService {
       'borsaDegeri': entry.borsaDegeri,
       'authorAvatarUrl': entry.authorAvatarUrl,
       'imageUrls': processedImages,
-      
+
       // === SECURITY CONTRACT: updatedAt is auto-set ===
       'updatedAt': FieldValue.serverTimestamp(),
-      
+
       'transactionId': transactionId,
       'qualityScore': _calculateQualityScore(entry, processedImages),
       'imageCount': processedImages.length,
@@ -1493,24 +1558,6 @@ class CringeEntryService {
     print(
       '📱 PUSH: High cringe level detected (${entry.krepSeviyesi}/10) - triggering viral alerts',
     );
-  }
-
-  // Entry'yi beğen
-  Future<bool> likeEntry(String entryId) async {
-    try {
-      if (_auth.currentUser == null) return false;
-
-      await _firestore.collection('cringe_entries').doc(entryId).update({
-        'likes': FieldValue.increment(1),
-      });
-
-      unawaited(CompetitionService.incrementEntryLikeCount(entryId, delta: 1));
-
-      return true;
-    } catch (e) {
-      print('Like entry error: $e');
-      return false;
-    }
   }
 
   // Entry yorumu akışı
@@ -1660,11 +1707,6 @@ class CringeEntryService {
         });
       });
 
-      unawaited(
-        CompetitionService.incrementEntryCommentCount(entryId, delta: 1),
-      );
-      CompetitionService.invalidateCommentWinnerForEntry(entryId);
-
       return true;
     } catch (e) {
       print('Add comment error: $e');
@@ -1715,7 +1757,6 @@ class CringeEntryService {
 
         return !hasLiked;
       });
-      CompetitionService.invalidateCommentWinnerForEntry(entryId);
       return didLike;
     } catch (e) {
       print('Toggle comment like error: $e');
@@ -1735,15 +1776,23 @@ class CringeEntryService {
       return false;
     }
 
-    final ownerId = snapshot.data()?['userId'] as String? ?? '';
-    if (ownerId != currentUserId) {
+    // Firestore rules expect 'ownerId', but some old docs might only have 'userId'
+    final ownerId =
+        snapshot.data()?['ownerId'] as String? ??
+        snapshot.data()?['userId'] as String? ??
+        '';
+    final isModerator = await UserService.instance.isModerator();
+    if (ownerId != currentUserId && !isModerator) {
       throw StateError('NOT_AUTHORIZED: Bu krepi düzenleme yetkin yok');
     }
 
     final transactionId =
         'upd_${DateTime.now().millisecondsSinceEpoch.toString()}';
+    final normalizedEntry = _normalizeEntry(
+      entry.copyWith(userId: ownerId.isNotEmpty ? ownerId : currentUserId),
+    );
     final updateData = await _prepareEnterpriseUpdateData(
-      entry.copyWith(userId: currentUserId),
+      normalizedEntry,
       transactionId,
     );
 
@@ -1770,8 +1819,17 @@ class CringeEntryService {
       return false;
     }
 
-    final ownerId = snapshot.data()?['userId'] as String? ?? '';
-    if (ownerId != currentUserId) {
+    // Firestore rules expect 'ownerId', but some old docs might only have 'userId'
+    var ownerId =
+        snapshot.data()?['ownerId'] as String? ??
+        snapshot.data()?['userId'] as String? ??
+        '';
+    if (ownerId.isEmpty) {
+      ownerId = currentUserId;
+    }
+
+    final isModerator = await UserService.instance.isModerator();
+    if (ownerId != currentUserId && !isModerator) {
       throw StateError('NOT_AUTHORIZED: Bu krepi silme yetkin yok');
     }
 
@@ -1779,7 +1837,8 @@ class CringeEntryService {
         'del_${DateTime.now().millisecondsSinceEpoch.toString()}';
 
     await docRef.delete();
-    await _decrementUserStats(currentUserId, transactionId);
+    final targetUserId = ownerId.isNotEmpty ? ownerId : currentUserId;
+    await _decrementUserStats(targetUserId, transactionId);
     await _logAuditTrailDelete(entryId, currentUserId, transactionId);
 
     return true;
@@ -1944,19 +2003,18 @@ class CringeEntryService {
     }
 
     try {
-      final query = _firestore.collection('posts')
+      final query = _firestore
+          .collection('posts')
           .where('status', isEqualTo: ModerationStatus.pending.name)
           .orderBy('createdAt', descending: true)
           .limit(limit);
 
       final snapshot = await query.get();
-      final entries = snapshot.docs
-          .map((doc) {
-            final data = doc.data();
-            data['id'] = doc.id;
-            return CringeEntry.fromFirestore(data);
-          })
-          .toList();
+      final entries = snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return CringeEntry.fromFirestore(data);
+      }).toList();
 
       print('✅ FOUND ${entries.length} PENDING POSTS');
       return entries;
@@ -1970,28 +2028,29 @@ class CringeEntryService {
   Stream<List<CringeEntry>> getPendingPostsStream({int limit = 50}) {
     print('🛡️ PENDING POSTS STREAM STARTED');
 
-    return Stream.fromFuture(UserService.instance.isModerator()).asyncExpand((isMod) {
+    return Stream.fromFuture(UserService.instance.isModerator()).asyncExpand((
+      isMod,
+    ) {
       if (!isMod) {
         print('❌ STREAM DENIED: User is not a moderator');
         return Stream.value(<CringeEntry>[]);
       }
 
-      return _firestore.collection('posts')
+      return _firestore
+          .collection('posts')
           .where('status', isEqualTo: ModerationStatus.pending.name)
           .orderBy('createdAt', descending: true)
           .limit(limit)
           .snapshots()
           .map((snapshot) {
-        final entries = snapshot.docs
-            .map((doc) {
+            final entries = snapshot.docs.map((doc) {
               final data = doc.data();
               data['id'] = doc.id;
               return CringeEntry.fromFirestore(data);
-            })
-            .toList();
-        print('📊 PENDING POSTS: ${entries.length}');
-        return entries;
-      });
+            }).toList();
+            print('📊 PENDING POSTS: ${entries.length}');
+            return entries;
+          });
     });
   }
 
@@ -2010,28 +2069,32 @@ class CringeEntryService {
       final stats = <String, int>{};
 
       // Count pending
-      final pendingSnapshot = await _firestore.collection('posts')
+      final pendingSnapshot = await _firestore
+          .collection('posts')
           .where('status', isEqualTo: ModerationStatus.pending.name)
           .count()
           .get();
       stats['pending'] = pendingSnapshot.count ?? 0;
 
       // Count approved
-      final approvedSnapshot = await _firestore.collection('posts')
+      final approvedSnapshot = await _firestore
+          .collection('posts')
           .where('status', isEqualTo: ModerationStatus.approved.name)
           .count()
           .get();
       stats['approved'] = approvedSnapshot.count ?? 0;
 
       // Count rejected
-      final rejectedSnapshot = await _firestore.collection('posts')
+      final rejectedSnapshot = await _firestore
+          .collection('posts')
           .where('status', isEqualTo: ModerationStatus.rejected.name)
           .count()
           .get();
       stats['rejected'] = rejectedSnapshot.count ?? 0;
 
       // Count blocked
-      final blockedSnapshot = await _firestore.collection('posts')
+      final blockedSnapshot = await _firestore
+          .collection('posts')
           .where('status', isEqualTo: ModerationStatus.blocked.name)
           .count()
           .get();
@@ -2042,6 +2105,200 @@ class CringeEntryService {
     } catch (e) {
       print('❌ GET STATS ERROR: $e');
       rethrow;
+    }
+  }
+
+  // ====================================================================
+  // ENGAGEMENT: LIKES
+  // ====================================================================
+
+  /// Beğeni ekle
+  Future<void> likeEntry(String entryId) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      print('❌ LIKE DENIED: User not authenticated');
+      throw Exception('User must be authenticated to like');
+    }
+
+    print('❤️ LIKE: User $userId liking entry $entryId');
+
+    try {
+      final entryRef = _firestore.collection('cringe_entries').doc(entryId);
+
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(entryRef);
+
+        if (!snapshot.exists) {
+          throw Exception('Entry not found');
+        }
+
+        final data = snapshot.data()!;
+        final likedBy = List<String>.from(data['likedBy'] ?? []);
+
+        // Zaten beğenmiş mi kontrol et
+        if (likedBy.contains(userId)) {
+          print('⚠️ ALREADY LIKED: User already liked this entry');
+          return;
+        }
+
+        // Beğeniyi ekle
+        likedBy.add(userId);
+        final likeCount = (data['likeCount'] ?? 0) + 1;
+
+        transaction.update(entryRef, {
+          'likedBy': likedBy,
+          'likeCount': likeCount,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        print(
+          '✅ LIKE SUCCESS: Entry $entryId liked by $userId (total: $likeCount)',
+        );
+      });
+
+      // Cache'i invalidate et
+      await _clearEnterpriseCache();
+
+      // Analytics
+      await _logAnalyticsEvent('like_entry', parameters: {'entry_id': entryId});
+    } catch (e) {
+      print('❌ LIKE ERROR: $e');
+      rethrow;
+    }
+  }
+
+  /// Beğeniyi kaldır
+  Future<void> unlikeEntry(String entryId) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      print('❌ UNLIKE DENIED: User not authenticated');
+      throw Exception('User must be authenticated to unlike');
+    }
+
+    print('💔 UNLIKE: User $userId unliking entry $entryId');
+
+    try {
+      final entryRef = _firestore.collection('cringe_entries').doc(entryId);
+
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(entryRef);
+
+        if (!snapshot.exists) {
+          throw Exception('Entry not found');
+        }
+
+        final data = snapshot.data()!;
+        final likedBy = List<String>.from(data['likedBy'] ?? []);
+
+        // Beğenmemiş mi kontrol et
+        if (!likedBy.contains(userId)) {
+          print('⚠️ NOT LIKED: User has not liked this entry');
+          return;
+        }
+
+        // Beğeniyi kaldır
+        likedBy.remove(userId);
+        final likeCount = ((data['likeCount'] ?? 1) - 1)
+            .clamp(0, double.infinity)
+            .toInt();
+
+        transaction.update(entryRef, {
+          'likedBy': likedBy,
+          'likeCount': likeCount,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        print(
+          '✅ UNLIKE SUCCESS: Entry $entryId unliked by $userId (total: $likeCount)',
+        );
+      });
+
+      // Cache'i invalidate et
+      await _clearEnterpriseCache();
+
+      // Analytics
+      await _logAnalyticsEvent(
+        'unlike_entry',
+        parameters: {'entry_id': entryId},
+      );
+    } catch (e) {
+      print('❌ UNLIKE ERROR: $e');
+      rethrow;
+    }
+  }
+
+  /// Kullanıcının bu entry'yi beğenip beğenmediğini kontrol et
+  Future<bool> isLikedByUser(String entryId) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return false;
+
+    try {
+      final doc = await _firestore
+          .collection('cringe_entries')
+          .doc(entryId)
+          .get();
+      if (!doc.exists) return false;
+
+      final likedBy = List<String>.from(doc.data()?['likedBy'] ?? []);
+      return likedBy.contains(userId);
+    } catch (e) {
+      print('❌ IS_LIKED CHECK ERROR: $e');
+      return false;
+    }
+  }
+
+  // ====================================================================
+  // ENGAGEMENT: VIEW COUNT
+  // ====================================================================
+
+  /// Görüntülenme sayısını artır
+  Future<void> incrementViewCount(String entryId) async {
+    print('👁️ VIEW: Incrementing view count for entry $entryId');
+
+    try {
+      final entryRef = _firestore.collection('cringe_entries').doc(entryId);
+
+      await entryRef.update({
+        'viewCount': FieldValue.increment(1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      print('✅ VIEW SUCCESS: View count incremented for $entryId');
+
+      // Analytics
+      await _logAnalyticsEvent('view_entry', parameters: {'entry_id': entryId});
+    } catch (e) {
+      print('❌ VIEW ERROR: $e');
+      // View count hatalarını sessizce yut (kritik değil)
+    }
+  }
+
+  // ====================================================================
+  // ENGAGEMENT: SHARE COUNT
+  // ====================================================================
+
+  /// Paylaşım sayısını artır
+  Future<void> incrementShareCount(String entryId) async {
+    print('📤 SHARE: Incrementing share count for entry $entryId');
+
+    try {
+      final entryRef = _firestore.collection('cringe_entries').doc(entryId);
+
+      await entryRef.update({
+        'shareCount': FieldValue.increment(1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      print('✅ SHARE SUCCESS: Share count incremented for $entryId');
+
+      // Analytics
+      await _logAnalyticsEvent(
+        'share_entry',
+        parameters: {'entry_id': entryId},
+      );
+    } catch (e) {
+      print('❌ SHARE ERROR: $e');
+      // Share count hatalarını sessizce yut (kritik değil)
     }
   }
 }

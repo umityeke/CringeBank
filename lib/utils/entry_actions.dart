@@ -10,11 +10,68 @@ class EntryActionHelper {
   const EntryActionHelper._();
 
   static bool canManageEntry(CringeEntry entry) {
-    final currentUserId = UserService.instance.firebaseUser?.uid;
-    if (currentUserId == null || currentUserId.isEmpty) {
+    final userService = UserService.instance;
+    final firebaseUser = userService.firebaseUser;
+    final firebaseUserId = firebaseUser?.uid.trim();
+    final currentUser = userService.currentUser;
+    final cachedUserId = currentUser?.id.trim();
+
+    final candidateIds = <String>{
+      if (firebaseUserId != null && firebaseUserId.isNotEmpty) firebaseUserId,
+      if (cachedUserId != null && cachedUserId.isNotEmpty) cachedUserId,
+    }..removeWhere((id) => id.isEmpty);
+
+    final entryOwnerId = entry.userId.trim();
+    if (entryOwnerId.isNotEmpty && candidateIds.contains(entryOwnerId)) {
+      return true;
+    }
+
+    if (currentUser != null) {
+      final normalizedAuthorHandle = entry.authorHandle.trim().toLowerCase();
+      if (normalizedAuthorHandle.isNotEmpty) {
+        final handleCandidates = <String>{};
+
+        final username = currentUser.username.trim().toLowerCase();
+        if (username.isNotEmpty) {
+          handleCandidates
+            ..add(username)
+            ..add('@$username');
+        }
+
+        final emailLocalPart = firebaseUser?.email
+            ?.split('@')
+            .first
+            .trim()
+            .toLowerCase();
+        if (emailLocalPart != null && emailLocalPart.isNotEmpty) {
+          handleCandidates
+            ..add(emailLocalPart)
+            ..add('@$emailLocalPart');
+        }
+
+        if (handleCandidates.contains(normalizedAuthorHandle)) {
+          return true;
+        }
+      }
+
+      final normalizedAuthorName = entry.authorName.trim().toLowerCase();
+      if (normalizedAuthorName.isNotEmpty) {
+        final nameCandidates = <String>{
+          currentUser.displayName.trim().toLowerCase(),
+          currentUser.fullName.trim().toLowerCase(),
+        }..removeWhere((name) => name.isEmpty);
+
+        if (nameCandidates.contains(normalizedAuthorName)) {
+          return true;
+        }
+      }
+    }
+
+    if (candidateIds.isEmpty && currentUser == null) {
       return false;
     }
-    return entry.userId == currentUserId;
+
+    return userService.isModeratorSync;
   }
 
   static Future<bool> editEntry(BuildContext context, CringeEntry entry) async {

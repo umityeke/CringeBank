@@ -21,8 +21,7 @@ class _MainNavigationState extends State<MainNavigation> {
   int _previousIndex = 0;
 
   List<Widget> get _screens => [
-    const ModernHomeScreen(), // Twitter tarzı ana akış
-    const ModernSearchScreen(), // Arama/Keşfet
+    const ModernHomeScreen(), // 0: Ana akış
     ModernCringeDepositScreen(
       onCringeSubmitted: () {
         // Krep paylaşıldıktan sonra ana sayfaya geç
@@ -36,9 +35,10 @@ class _MainNavigationState extends State<MainNavigation> {
           _selectedIndex = _previousIndex;
         });
       },
-    ), // Yeni krep ekle
-    const ModernCompetitionsScreen(), // Yarışmalar (Aktivite)
-    const SimpleProfileScreen(), // Profil
+    ), // 1: Yeni krep ekle
+    const ModernSearchScreen(), // 2: Arama
+    const ModernCompetitionsScreen(), // 3: Yarışmalar
+    const SimpleProfileScreen(), // 4: Profil
   ];
 
   void _onItemTapped(int index) {

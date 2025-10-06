@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/store_product.dart';
 import '../models/store_wallet.dart';
 import '../models/user_model.dart';
+import '../data/cringestore_repository.dart';
 import '../services/cringe_store_service.dart';
 import '../services/user_service.dart';
 import '../widgets/animated_bubble_background.dart';
@@ -17,7 +18,7 @@ class CringeStoreScreen extends StatefulWidget {
 }
 
 class _CringeStoreScreenState extends State<CringeStoreScreen> {
-  final _storeService = CringeStoreService();
+  final _storeRepository = CringeStoreRepository.instance;
   final _userService = UserService.instance;
 
   late Stream<StoreWallet?> _walletStream;
@@ -29,7 +30,7 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
   @override
   void initState() {
     super.initState();
-    _walletStream = _storeService.getCurrentWallet();
+    _walletStream = _storeRepository.watchCurrentWallet();
     _productsStream = _resolveProductsStream();
   }
 
@@ -337,7 +338,10 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
 
   Stream<List<StoreProduct>> _resolveProductsStream() {
     final category = _categoryFilter == 'all' ? null : _categoryFilter;
-    return _storeService.getProducts(filter: _sellerFilter, category: category);
+    return _storeRepository.watchProducts(
+      filter: _sellerFilter,
+      category: category,
+    );
   }
 
   void _openProductDetail(StoreProduct product) {

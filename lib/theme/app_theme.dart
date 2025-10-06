@@ -3,16 +3,16 @@ import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // Core Palette
-  static const Color backgroundColor = Color(0xFF100720);
-  static const Color surfaceColor = Color(0xFF161228);
-  static const Color cardColor = Color(0xFF1F1636);
-  static const Color glassSurface = Color(0x661F1636);
-  static const Color dividerColor = Color(0xFF2E2446);
+  static const Color backgroundColor = Color(0xFF0B0B10);
+  static const Color surfaceColor = Color(0xFF12131D);
+  static const Color cardColor = Color(0xFF151521);
+  static const Color glassSurface = Color(0x33151521);
+  static const Color dividerColor = Color(0xFF26263A);
 
   // Accent Palette
-  static const Color primaryColor = Color(0xFF8A2BE2); // Neon mor
-  static const Color secondaryColor = Color(0xFF2EE6D6); // Neon turkuaz
-  static const Color accentPink = Color(0xFFFF4DA6);
+  static const Color primaryColor = Color(0xFFFF3D8A);
+  static const Color secondaryColor = Color(0xFF7A5CFF);
+  static const Color accentPink = Color(0xFFFF3D8A);
   static const Color accentBlue = Color(0xFF5C5CFF);
 
   // Legacy aliases for backwards compatibility
@@ -25,54 +25,54 @@ class AppTheme {
   static const Color cringeRed = Color(0xFFFF4D79);
 
   // Status Chips
-  static const Color statusHealthy = Color(0xFF4ADE80);
-  static const Color statusSlow = Color(0xFFF97316);
-  static const Color statusError = Color(0xFFF43F5E);
+  static const Color statusHealthy = Color(0xFF22C55E);
+  static const Color statusSlow = Color(0xFFF59E0B);
+  static const Color statusError = Color(0xFFEF4444);
   static const Color cacheBadge = Color(0xFFFDE68A);
 
   // Text Colors
-  static const Color textPrimary = Color(0xFFF7F7FF);
-  static const Color textSecondary = Color(0xFFC7C2E8);
-  static const Color textMuted = Color(0xFF8E88B9);
+  static const Color textPrimary = Color(0xFFF5F6F8);
+  static const Color textSecondary = Color(0xFFC4C6D0);
+  static const Color textMuted = Color(0xFFA7A9B0);
 
   // Gradients
   static const LinearGradient heroGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF2EE6D6), Color(0xFF8A2BE2), Color(0xFFFF4DA6)],
+    colors: [Color(0xFF7A5CFF), Color(0xFFFF3D8A)],
   );
 
   static const LinearGradient cardGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0x332EE6D6), Color(0x338A2BE2)],
+    colors: [Color(0x1A7A5CFF), Color(0x1AFF3D8A)],
   );
 
   // Shadows
   static List<BoxShadow> cardShadow = [
     BoxShadow(
-      color: const Color(0xFF0D0420).withValues(alpha: 0.6),
-      blurRadius: 18,
-      spreadRadius: -8,
-      offset: const Offset(0, 18),
+      color: const Color(0xFF05050A).withValues(alpha: 0.7),
+      blurRadius: 28,
+      spreadRadius: -12,
+      offset: const Offset(0, 22),
     ),
   ];
 
   static List<BoxShadow> glowShadow(Color color) => [
     BoxShadow(
-      color: color.withValues(alpha: 0.45),
-      blurRadius: 16,
-      spreadRadius: 1,
-      offset: const Offset(0, 6),
+      color: color.withValues(alpha: 0.38),
+      blurRadius: 20,
+      spreadRadius: 3,
+      offset: const Offset(0, 8),
     ),
   ];
 
   // Border Radius
   static const BorderRadius cardRadius = BorderRadius.all(Radius.circular(24));
   static const BorderRadius buttonRadius = BorderRadius.all(
-    Radius.circular(18),
+    Radius.circular(16),
   );
-  static const BorderRadius inputRadius = BorderRadius.all(Radius.circular(18));
+  static const BorderRadius inputRadius = BorderRadius.all(Radius.circular(12));
 
   // Spacing
   static const double spacingXS = 4.0;
@@ -104,35 +104,35 @@ class AppTheme {
     );
 
     final textTheme = GoogleFonts.interTextTheme(base.textTheme).copyWith(
-      displayLarge: GoogleFonts.manrope(
+      displayLarge: GoogleFonts.dmSans(
         fontSize: 34,
         fontWeight: FontWeight.w700,
         height: 1.18,
         color: textPrimary,
       ),
-      displayMedium: GoogleFonts.manrope(
+      displayMedium: GoogleFonts.dmSans(
         fontSize: 30,
         fontWeight: FontWeight.w600,
         height: 1.2,
         color: textPrimary,
       ),
-      displaySmall: GoogleFonts.manrope(
+      displaySmall: GoogleFonts.dmSans(
         fontSize: 26,
         fontWeight: FontWeight.w600,
         height: 1.25,
         color: textPrimary,
       ),
-      headlineLarge: GoogleFonts.manrope(
+      headlineLarge: GoogleFonts.inter(
         fontSize: 24,
         fontWeight: FontWeight.w600,
         color: textPrimary,
       ),
-      headlineMedium: GoogleFonts.manrope(
+      headlineMedium: GoogleFonts.inter(
         fontSize: 22,
         fontWeight: FontWeight.w600,
         color: textPrimary,
       ),
-      headlineSmall: GoogleFonts.manrope(
+      headlineSmall: GoogleFonts.inter(
         fontSize: 20,
         fontWeight: FontWeight.w600,
         color: textPrimary,
@@ -265,7 +265,7 @@ class AppTheme {
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: surfaceColor,
-        selectedItemColor: secondaryColor,
+        selectedItemColor: primaryColor,
         unselectedItemColor: textMuted,
         elevation: 12,
         showSelectedLabels: false,
@@ -275,14 +275,14 @@ class AppTheme {
       dividerColor: dividerColor,
       snackBarTheme: SnackBarThemeData(
         backgroundColor: cardColor,
-        actionTextColor: secondaryColor,
+        actionTextColor: primaryColor,
         contentTextStyle: GoogleFonts.inter(color: textPrimary, fontSize: 14),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: buttonRadius),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: glassSurface,
-        selectedColor: secondaryColor.withValues(alpha: 0.22),
+        selectedColor: primaryColor.withValues(alpha: 0.24),
         labelStyle: GoogleFonts.inter(
           fontWeight: FontWeight.w600,
           fontSize: 13,
@@ -295,7 +295,7 @@ class AppTheme {
   }
 
   static LinearGradient get linearGradientPrimary => const LinearGradient(
-    colors: [Color(0xFF8A2BE2), Color(0xFF2EE6D6)],
+    colors: [Color(0xFF7A5CFF), Color(0xFFFF3D8A)],
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
   );

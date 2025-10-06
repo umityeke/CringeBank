@@ -1,0 +1,13 @@
+C:\dev\cringebank\backend\src\CringeBank.Common\obj\Debug\net9.0\CringeBank.Common.csproj.AssemblyReference.cache
+C:\dev\cringebank\backend\src\CringeBank.Common\obj\Debug\net9.0\CringeBank.Common.GeneratedMSBuildEditorConfig.editorconfig
+C:\dev\cringebank\backend\src\CringeBank.Common\obj\Debug\net9.0\CringeBank.Common.AssemblyInfoInputs.cache
+C:\dev\cringebank\backend\src\CringeBank.Common\obj\Debug\net9.0\CringeBank.Common.AssemblyInfo.cs
+C:\dev\cringebank\backend\src\CringeBank.Common\obj\Debug\net9.0\CringeBank.Common.csproj.CoreCompileInputs.cache
+C:\dev\cringebank\backend\src\CringeBank.Common\obj\Debug\net9.0\CringeBank.Common.sourcelink.json
+C:\dev\cringebank\backend\src\CringeBank.Common\bin\Debug\net9.0\CringeBank.Common.deps.json
+C:\dev\cringebank\backend\src\CringeBank.Common\bin\Debug\net9.0\CringeBank.Common.dll
+C:\dev\cringebank\backend\src\CringeBank.Common\bin\Debug\net9.0\CringeBank.Common.pdb
+C:\dev\cringebank\backend\src\CringeBank.Common\obj\Debug\net9.0\CringeBank.Common.dll
+C:\dev\cringebank\backend\src\CringeBank.Common\obj\Debug\net9.0\refint\CringeBank.Common.dll
+C:\dev\cringebank\backend\src\CringeBank.Common\obj\Debug\net9.0\CringeBank.Common.pdb
+C:\dev\cringebank\backend\src\CringeBank.Common\obj\Debug\net9.0\ref\CringeBank.Common.dll

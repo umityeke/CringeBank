@@ -10,6 +10,7 @@ import '../widgets/entry_comments_sheet.dart';
 import '../widgets/modern_cringe_card.dart';
 import '../widgets/modern_components.dart';
 import '../utils/entry_actions.dart';
+import 'direct_message_thread_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final User user;
@@ -25,8 +26,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   late Stream<List<CringeEntry>> _entriesStream;
   bool _isLoadingUser = false;
   bool _isRefreshing = false;
-  final Set<String> _locallyLikedEntryIds = <String>{};
+  bool _isMessaging = false;
   final Set<String> _deletingEntryIds = <String>{};
+
+  bool get _isViewingOwnProfile {
+    final current = UserService.instance.currentUser;
+    if (current == null) {
+      return false;
+    }
+
+    final currentId = current.id.trim();
+    final targetId = _user.id.trim();
+    return currentId.isNotEmpty && currentId == targetId;
+  }
 
   @override
   void initState() {
@@ -267,8 +279,46 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   .toList(),
             ),
           ],
+          if (!_isViewingOwnProfile) ...[
+            const SizedBox(height: AppTheme.spacingL),
+            _buildProfileActions(context),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildProfileActions(BuildContext context) {
+    final borderColor = Colors.white.withValues(alpha: 0.4);
+
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: _isMessaging ? null : _messageUser,
+            icon: _isMessaging
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.mail_outline),
+            label: const Text(
+              'Mesaj Gönder',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingM),
+              foregroundColor: Colors.white,
+              side: BorderSide(color: borderColor),
+              backgroundColor: Colors.white.withValues(alpha: 0.06),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -505,6 +555,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               onTap: () => _openEntryDetail(entry),
               onLike: () => _likeEntry(entry),
               onComment: () => _commentOnEntry(entry),
+              onMessage: () => _messageEntryAuthor(entry),
               onShare: () => _shareEntry(entry),
               onEdit: canManageEntry ? () => _handleEditEntry(entry) : null,
               onDelete: canManageEntry ? () => _handleDeleteEntry(entry) : null,
@@ -521,34 +572,40 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  void _openEntryDetail(CringeEntry entry) {
+  void _openEntryDetail(CringeEntry entry) async {
     HapticFeedback.selectionClick();
-    // TODO: Implement navigation to cringe detail screen
+
+    // Görüntülenme sayısını artır
+    await CringeEntryService.instance.incrementViewCount(entry.id);
+
+    if (!mounted) return;
+
+    // Detail ekranına git
+    await Navigator.pushNamed(context, '/entry-detail', arguments: entry);
   }
 
   void _likeEntry(CringeEntry entry) async {
-    if (_locallyLikedEntryIds.contains(entry.id)) {
-      return;
-    }
-
     HapticFeedback.lightImpact();
 
     try {
-      final success = await CringeEntryService.instance.likeEntry(entry.id);
-      if (!mounted) return;
+      // Backend'de like durumunu kontrol et
+      final isLiked = await CringeEntryService.instance.isLikedByUser(entry.id);
 
-      if (!success) {
-        throw Exception('like-failed');
+      if (isLiked) {
+        await CringeEntryService.instance.unlikeEntry(entry.id);
+      } else {
+        await CringeEntryService.instance.likeEntry(entry.id);
       }
 
-      setState(() {
-        _locallyLikedEntryIds.add(entry.id);
-      });
-    } catch (_) {
+      if (!mounted) return;
+
+      // Stream otomatik güncellenecek
+      setState(() {});
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Beğeni kaydedilemedi. Tekrar deneyin.'),
+          content: Text('Beğeni işlemi başarısız. Tekrar deneyin.'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -571,9 +628,217 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  void _shareEntry(CringeEntry entry) {
+  void _shareEntry(CringeEntry entry) async {
     HapticFeedback.mediumImpact();
-    // TODO: Implement share action
+
+    // Share count'u artır
+    await CringeEntryService.instance.incrementShareCount(entry.id);
+
+    if (!mounted) return;
+
+    // Share sheet göster
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1F2E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Paylaş',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ListTile(
+              leading: const Icon(Icons.message, color: Color(0xFFFFA726)),
+              title: const Text(
+                'Mesaj Gönder',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/direct-messages');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.link, color: Color(0xFFFFA726)),
+              title: const Text(
+                'Linki Kopyala',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Link kopyalandı!'),
+                    backgroundColor: Color(0xFFFFA726),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _messageEntryAuthor(CringeEntry entry) async {
+    HapticFeedback.mediumImpact();
+
+    final targetId = entry.userId.trim();
+    if (targetId.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kullanıcı bilgisi bulunamadı.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    final firebaseUser = UserService.instance.firebaseUser;
+    if (firebaseUser == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mesaj göndermek için giriş yapmalısın.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    final currentId = firebaseUser.uid.trim();
+    if (currentId == targetId) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kendine mesaj gönderemezsin.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      if (UserService.instance.currentUser == null ||
+          UserService.instance.currentUser?.id != currentId) {
+        await UserService.instance.loadUserData(currentId);
+        if (!mounted) return;
+      }
+
+      // Entry sahibinin user bilgisini al
+      final targetUser = await UserService.instance.getUserById(targetId);
+      if (targetUser == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Kullanıcı bulunamadı.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+
+      if (!mounted) return;
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DirectMessageThreadScreen(
+            otherUserId: targetId,
+            initialUser: targetUser,
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Mesaj kutusu açılamadı: $error'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  Future<void> _messageUser() async {
+    HapticFeedback.mediumImpact();
+
+    final targetId = _user.id.trim();
+    if (targetId.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bu kullanıcı bilgileri yüklenemedi.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    final firebaseUser = UserService.instance.firebaseUser;
+    if (firebaseUser == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mesaj göndermek için giriş yapmalısın.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    final currentId = firebaseUser.uid.trim();
+    if (currentId == targetId) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kendine mesaj gönderemezsin.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isMessaging = true);
+
+    try {
+      if (UserService.instance.currentUser == null ||
+          UserService.instance.currentUser?.id != currentId) {
+        await UserService.instance.loadUserData(currentId);
+        if (!mounted) return;
+      }
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DirectMessageThreadScreen(
+            otherUserId: targetId,
+            initialUser: _user,
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Mesaj kutusu açılamadı: $error'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isMessaging = false);
+      }
+    }
   }
 
   Future<void> _handleEditEntry(CringeEntry entry) async {

@@ -34,6 +34,9 @@ class UserService {
   final Set<String> _followingIds = <String>{};
   DateTime? _followingCacheUpdatedAt;
   bool _isFollowingCacheLoaded = false;
+  bool? _cachedIsModerator;
+  DateTime? _moderatorStatusCheckedAt;
+  static const Duration _moderatorCacheTtl = Duration(minutes: 5);
 
   // Enterprise getters with monitoring
   User? get currentUser {
@@ -101,6 +104,7 @@ class UserService {
       await _loadEnterpriseUserData(user.uid);
       await _updateUserActivity(user.uid);
       await _persistUserIdentity(user);
+      unawaited(isModerator());
     } else {
       print('🚪 USER SIGNED OUT: Clearing enterprise cache');
       _currentUser = null;
@@ -238,6 +242,8 @@ class UserService {
     _userCache.clear();
     _lastCacheUpdate = null;
     _clearFollowingCache();
+    _cachedIsModerator = null;
+    _moderatorStatusCheckedAt = null;
   }
 
   // 🏢 ENTERPRISE REAL-TIME USER DATA STREAM WITH ADVANCED MONITORING
@@ -1314,6 +1320,7 @@ class UserService {
     final currentFirebaseUser = _auth.currentUser;
     if (currentFirebaseUser != null) {
       await loadUserData(currentFirebaseUser.uid);
+      unawaited(isModerator());
     }
 
     // Auth state changes'i dinle
@@ -1321,9 +1328,12 @@ class UserService {
       if (user != null) {
         // Kullanıcı giriş yaptı
         await loadUserData(user.uid);
+        unawaited(isModerator());
       } else {
         // Kullanıcı çıkış yaptı
         _currentUser = null;
+        _cachedIsModerator = null;
+        _moderatorStatusCheckedAt = null;
       }
     });
 
@@ -1390,29 +1400,37 @@ class UserService {
   Future<bool> isModerator() async {
     final user = _auth.currentUser;
     if (user == null) {
+      _cachedIsModerator = false;
+      _moderatorStatusCheckedAt = DateTime.now();
       return false;
+    }
+
+    final now = DateTime.now();
+    if (_cachedIsModerator != null &&
+        _moderatorStatusCheckedAt != null &&
+        now.difference(_moderatorStatusCheckedAt!) < _moderatorCacheTtl) {
+      return _cachedIsModerator!;
     }
 
     try {
       final idTokenResult = await user.getIdTokenResult();
       final isMod = idTokenResult.claims?['moderator'] == true;
+      _cachedIsModerator = isMod;
+      _moderatorStatusCheckedAt = now;
       print('🛡️ MODERATOR CHECK: ${user.uid} - $isMod');
       return isMod;
     } catch (e) {
       print('❌ MODERATOR CHECK ERROR: $e');
-      return false;
+      _cachedIsModerator ??= false;
+      _moderatorStatusCheckedAt ??= now;
+      return _cachedIsModerator!;
     }
   }
 
   /// Get moderator status synchronously (cached in token)
   /// Note: Requires user to have refreshed their token recently
   bool get isModeratorSync {
-    final user = _auth.currentUser;
-    if (user == null) return false;
-    
-    // This is less reliable as token might be stale
-    // Prefer using isModerator() future method
-    return false; // Default to false for sync check
+    return _cachedIsModerator ?? false;
   }
 
   /// Force token refresh to get latest custom claims

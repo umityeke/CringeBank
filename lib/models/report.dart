@@ -65,16 +65,10 @@ class ReportTarget {
   final ReportTargetType type;
   final String id;
 
-  const ReportTarget({
-    required this.type,
-    required this.id,
-  });
+  const ReportTarget({required this.type, required this.id});
 
   Map<String, dynamic> toJson() {
-    return {
-      'type': type.value,
-      'id': id,
-    };
+    return {'type': type.value, 'id': id};
   }
 
   factory ReportTarget.fromJson(Map<String, dynamic> json) {
@@ -142,8 +136,9 @@ class Report {
     DateTime? parsedReviewedAt;
     if (json['reviewedAt'] != null) {
       if (json['reviewedAt'] is int) {
-        parsedReviewedAt =
-            DateTime.fromMillisecondsSinceEpoch(json['reviewedAt']);
+        parsedReviewedAt = DateTime.fromMillisecondsSinceEpoch(
+          json['reviewedAt'],
+        );
       } else if (json['reviewedAt'] is String) {
         parsedReviewedAt = DateTime.parse(json['reviewedAt']);
       }

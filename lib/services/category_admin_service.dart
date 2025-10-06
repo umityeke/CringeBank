@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'admin_panel_service.dart';
 
 /// 🏢 CATEGORY ADMIN SERVICE
-/// 
+///
 /// Her kategoride maksimum 3 admin yönetimi
 /// Süper admin (umityeke@gmail.com) tüm kategorilere tam erişim
 class CategoryAdminService {
@@ -21,7 +21,8 @@ class CategoryAdminService {
   /// Mevcut kullanıcının süper admin olup olmadığını kontrol et
   bool get isSuperAdmin {
     final email = _auth.currentUser?.email;
-    return email != null && email.toLowerCase() == _superAdminEmail.toLowerCase();
+    return email != null &&
+        email.toLowerCase() == _superAdminEmail.toLowerCase();
   }
 
   /// Kullanıcının süper admin olup olmadığını kontrol et
@@ -30,12 +31,12 @@ class CategoryAdminService {
   }
 
   /// Kategoriye admin ata
-  /// 
+  ///
   /// [category] - Kategori adı (CringeCategory enum'dan gelmeli)
   /// [userId] - Atanacak kullanıcının ID'si
   /// [username] - Atanacak kullanıcının username'i
   /// [permissions] - Verilecek yetkiler ["approve", "reject", "delete"]
-  /// 
+  ///
   /// Throws: Exception - Süper admin değilse veya 3 admin limitine ulaşıldıysa
   Future<void> assignCategoryAdmin({
     required String category,
@@ -49,10 +50,14 @@ class CategoryAdminService {
     }
 
     final existingAdmins = await getCategoryAdmins(category);
-    final activeCount = existingAdmins.where((a) => a['isActive'] ?? true).length;
+    final activeCount = existingAdmins
+        .where((a) => a['isActive'] ?? true)
+        .length;
 
     if (activeCount >= _maxAdminsPerCategory) {
-      throw Exception('⚠️ $category kategorisi için izin verilen maksimum admin sayısına ( $_maxAdminsPerCategory ) ulaşıldı.');
+      throw Exception(
+        '⚠️ $category kategorisi için izin verilen maksimum admin sayısına ( $_maxAdminsPerCategory ) ulaşıldı.',
+      );
     }
 
     final result = await AdminPanelService.instance.assignCategoryAdmin(
@@ -71,7 +76,10 @@ class CategoryAdminService {
   Future<List<Map<String, dynamic>>> getCategoryAdmins(String category) async {
     debugPrint('📥 Kategori adminleri getiriliyor: $category');
 
-    final doc = await _firestore.collection('category_admins').doc(category).get();
+    final doc = await _firestore
+        .collection('category_admins')
+        .doc(category)
+        .get();
 
     if (!doc.exists) {
       debugPrint('⚠️ Kategori dokümanı bulunamadı: $category');
@@ -92,8 +100,10 @@ class CategoryAdminService {
     final categories = <String>[];
 
     for (final doc in snapshot.docs) {
-      final admins = List<Map<String, dynamic>>.from(doc.data()['admins'] ?? []);
-      
+      final admins = List<Map<String, dynamic>>.from(
+        doc.data()['admins'] ?? [],
+      );
+
       final isAdmin = admins.any(
         (a) => a['userId'] == userId && (a['isActive'] ?? true),
       );
@@ -160,7 +170,9 @@ class CategoryAdminService {
     final result = <String, int>{};
 
     for (final doc in snapshot.docs) {
-      final admins = List<Map<String, dynamic>>.from(doc.data()['admins'] ?? []);
+      final admins = List<Map<String, dynamic>>.from(
+        doc.data()['admins'] ?? [],
+      );
       final activeAdmins = admins.where((a) => a['isActive'] ?? true).length;
       result[doc.id] = activeAdmins;
     }

@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:ui';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/cringe_entry_service.dart';
 import '../services/cringe_search_service.dart';
 import '../services/style_search_service.dart';
+import '../services/user_search_service.dart';
+import '../services/user_service.dart';
 import '../models/cringe_entry.dart';
 import '../models/user_model.dart';
 import '../widgets/entry_comments_sheet.dart';
@@ -12,6 +15,7 @@ import '../widgets/modern_cringe_card.dart';
 import '../widgets/animated_bubble_background.dart';
 import '../widgets/search/user_search_tile.dart';
 import 'simple_profile_screen.dart';
+import 'direct_message_thread_screen.dart';
 import '../utils/entry_actions.dart';
 
 enum SearchResultView { entries, users, all }
@@ -38,9 +42,14 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
   bool _showFilters = false;
   bool _showSearchSuggestions = false;
   List<String> _currentSuggestions = [];
-  final Set<String> _locallyLikedEntryIds = <String>{};
   final Set<String> _deletingEntryIds = <String>{};
   Timer? _suggestionDebounce;
+  List<User> _popularUsers = const [];
+  List<User> _followingPreview = const [];
+  DocumentSnapshot<Map<String, dynamic>>? _userSearchCursor;
+  bool _userHasMoreUsers = false;
+  bool _isLoadingMoreUsers = false;
+  String _lastQuery = '';
 
   late AnimationController _backgroundController;
   late AnimationController _searchBarController;
@@ -59,13 +68,29 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
   void _initializeSearch() async {
     setState(() => _isLoading = true);
     try {
-      final response = await StyleSearchService.search(
+      final styleFuture = StyleSearchService.search(
         query: '',
         filter: _currentFilter,
         sortBy: _currentSort,
         limitPerSection: 12,
         postsLimit: 20,
       );
+      final popularFuture = UserSearchService.instance.fetchPopularUsers(
+        limit: 12,
+      );
+      final followingFuture = UserSearchService.instance.fetchFollowingPreview(
+        limit: 12,
+      );
+
+      final response = await styleFuture;
+      final popularUsers = await popularFuture;
+      final followingUsers = await followingFuture;
+      final suggestionUsers = _mergeUsersById([
+        ...followingUsers,
+        ...popularUsers,
+        ...response.accounts.items,
+      ]);
+
       setState(() {
         _styleSearchResponse = response;
         _searchResult = SearchResult(
@@ -73,10 +98,16 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
           totalCount: response.posts.totalCount,
           searchDuration: response.posts.fetchDuration,
         );
+        _popularUsers = popularUsers;
+        _followingPreview = followingUsers;
+        _userSearchCursor = null;
+        _userHasMoreUsers = false;
+        _isLoadingMoreUsers = false;
+        _lastQuery = '';
         _userSearchResult = UserSearchResult(
-          users: response.accounts.items,
-          totalCount: response.accounts.totalCount,
-          searchDuration: response.accounts.fetchDuration,
+          users: suggestionUsers,
+          totalCount: suggestionUsers.length,
+          searchDuration: Duration.zero,
         );
         _currentView = SearchResultView.entries;
         _isLoading = false;
@@ -121,6 +152,23 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
         setState(() => _showSearchSuggestions = false);
       }
     });
+  }
+
+  List<User> _mergeUsersById(List<User> users) {
+    final seen = <String>{};
+    final result = <User>[];
+    for (final user in users) {
+      final id = user.id.trim();
+      if (id.isEmpty) continue;
+      if (seen.add(id)) {
+        result.add(user);
+      }
+    }
+    return result;
+  }
+
+  List<User> _buildSuggestionUsers({List<User> extra = const []}) {
+    return _mergeUsersById([..._followingPreview, ..._popularUsers, ...extra]);
   }
 
   @override
@@ -612,6 +660,7 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
       onTap: () => _openCringeDetail(entry),
       onLike: () => _likeCringe(entry),
       onComment: () => _commentCringe(entry),
+      onMessage: () => _handleMessageEntry(entry),
       onShare: () => _shareCringe(entry),
       onEdit: canManage ? () => _handleEditEntry(entry) : null,
       onDelete: canManage ? () => _handleDeleteEntry(entry) : null,
@@ -636,12 +685,27 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
   }
 
   Widget _buildUsersList() {
+    if (_lastQuery.isEmpty) {
+      return _buildUserSuggestionsView();
+    }
+
     final users = _userSearchResult?.users ?? const <User>[];
+
+    if (users.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    final itemCount = users.length + (_userHasMoreUsers ? 1 : 0);
+
     return ListView.builder(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      itemCount: users.length,
+      itemCount: itemCount,
       itemBuilder: (context, index) {
+        if (index >= users.length) {
+          return _buildLoadMoreUsersTile();
+        }
+
         final user = users[index];
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
@@ -652,6 +716,98 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildUserSuggestionsView() {
+    final sections = _buildUserSuggestionSections();
+    if (sections.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      children: sections,
+    );
+  }
+
+  List<Widget> _buildUserSuggestionSections() {
+    final sections = <Widget>[];
+    final seenIds = <String>{};
+
+    void appendSection(String title, List<User> source) {
+      final filtered = <User>[];
+      for (final user in source) {
+        final id = user.id.trim();
+        if (id.isEmpty) continue;
+        if (seenIds.add(id)) {
+          filtered.add(user);
+        }
+      }
+
+      if (filtered.isEmpty) return;
+
+      sections
+        ..add(
+          _buildSectionHeader(
+            title: title,
+            count: filtered.length,
+            totalCount: filtered.length,
+          ),
+        )
+        ..add(const SizedBox(height: 12))
+        ..addAll(
+          filtered.map(
+            (user) => Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: UserSearchTile(
+                user: user,
+                onTap: () => _openUserProfile(user),
+                onFollow: () => _openUserProfile(user),
+              ),
+            ),
+          ),
+        )
+        ..add(const SizedBox(height: 24));
+    }
+
+    appendSection('Takip Ettiklerin', _followingPreview);
+    appendSection('Şu An Popüler', _popularUsers);
+
+    final suggestionPool = _userSearchResult?.users ?? const <User>[];
+    appendSection('Diğer Öneriler', suggestionPool);
+
+    if (sections.isNotEmpty && sections.last is SizedBox) {
+      sections.removeLast();
+    }
+
+    return sections;
+  }
+
+  Widget _buildLoadMoreUsersTile() {
+    if (_isLoadingMoreUsers) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: OutlinedButton.icon(
+        onPressed: _loadMoreUsers,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.white,
+          side: BorderSide(color: Colors.white.withOpacity(0.5)),
+        ),
+        icon: const Icon(Icons.expand_more),
+        label: const Text('Daha fazla yükle'),
+      ),
     );
   }
 
@@ -710,36 +866,46 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
         ..add(const SizedBox(height: 24));
     }
 
-    if (showUsers && userPreview.isNotEmpty) {
-      children
-        ..add(
-          _buildSectionHeader(
-            title: 'Kullanıcılar',
-            count: userPreview.length,
-            totalCount: _userSearchResult?.totalCount,
-          ),
-        )
-        ..add(const SizedBox(height: 12))
-        ..addAll(
-          userPreview.map(
-            (user) => Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: UserSearchTile(
-                user: user,
-                onTap: () => _openUserProfile(user),
-                onFollow: () => _openUserProfile(user),
+    if (showUsers) {
+      if (_lastQuery.isEmpty) {
+        final suggestionSections = _buildUserSuggestionSections();
+        if (suggestionSections.isNotEmpty) {
+          children.addAll(suggestionSections);
+          if (showEntries && entryPreview.isNotEmpty) {
+            children.add(const SizedBox(height: 24));
+          }
+        }
+      } else if (userPreview.isNotEmpty) {
+        children
+          ..add(
+            _buildSectionHeader(
+              title: 'Kullanıcılar',
+              count: userPreview.length,
+              totalCount: _userSearchResult?.totalCount,
+            ),
+          )
+          ..add(const SizedBox(height: 12))
+          ..addAll(
+            userPreview.map(
+              (user) => Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: UserSearchTile(
+                  user: user,
+                  onTap: () => _openUserProfile(user),
+                  onFollow: () => _openUserProfile(user),
+                ),
               ),
             ),
-          ),
-        );
+          );
 
-      if (_userSearchResult != null &&
-          _userSearchResult!.totalCount > userPreview.length) {
-        children.add(_buildSeeAllButton(SearchResultView.users));
-      }
+        if (_userSearchResult != null &&
+            _userSearchResult!.totalCount > userPreview.length) {
+          children.add(_buildSeeAllButton(SearchResultView.users));
+        }
 
-      if (showEntries && entryPreview.isNotEmpty) {
-        children.add(const SizedBox(height: 24));
+        if (showEntries && entryPreview.isNotEmpty) {
+          children.add(const SizedBox(height: 24));
+        }
       }
     }
 
@@ -1025,10 +1191,20 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
   void _clearSearch() {
     _searchController.clear();
     _searchFocusNode.unfocus();
+    final suggestionUsers = _buildSuggestionUsers();
     setState(() {
       _showSearchSuggestions = false;
-      _userSearchResult = null;
       _searchResult = null;
+      _styleSearchResponse = null;
+      _userSearchResult = UserSearchResult(
+        users: suggestionUsers,
+        totalCount: suggestionUsers.length,
+        searchDuration: Duration.zero,
+      );
+      _lastQuery = '';
+      _userSearchCursor = null;
+      _userHasMoreUsers = false;
+      _isLoadingMoreUsers = false;
       _currentView = SearchResultView.entries;
     });
     _initializeSearch();
@@ -1046,7 +1222,10 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
 
   Future<void> _performSearch(String query) async {
     final formattedQuery = query.trim();
-    if (formattedQuery.isEmpty) return;
+    if (formattedQuery.isEmpty) {
+      _clearSearch();
+      return;
+    }
 
     HapticFeedback.selectionClick();
     _searchFocusNode.unfocus();
@@ -1055,14 +1234,26 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
       _showSearchSuggestions = false;
     });
 
+    final queryLength = formattedQuery.length;
+
     try {
-      final styleResponse = await StyleSearchService.search(
+      final styleFuture = StyleSearchService.search(
         query: formattedQuery,
         filter: _currentFilter,
         sortBy: _currentSort,
         limitPerSection: 12,
         postsLimit: 20,
+        fetchAllAccounts: true,
       );
+      final userFuture = queryLength >= 2
+          ? UserSearchService.instance.searchByUsernamePrefix(
+              query: formattedQuery,
+              limit: 30,
+            )
+          : Future.value(UserSearchPage.empty());
+
+      final styleResponse = await styleFuture;
+      final userPage = await userFuture;
 
       if (!mounted) return;
 
@@ -1071,31 +1262,47 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
         totalCount: styleResponse.posts.totalCount,
         searchDuration: styleResponse.posts.fetchDuration,
       );
-      final userResult = UserSearchResult(
-        users: styleResponse.accounts.items,
-        totalCount: styleResponse.accounts.totalCount,
-        searchDuration: styleResponse.accounts.fetchDuration,
-        matchedTokens: [],
-      );
+
+      final userList = queryLength >= 2
+          ? _mergeUsersById([
+              ...userPage.users,
+              ...styleResponse.accounts.items,
+            ])
+          : _buildSuggestionUsers(extra: styleResponse.accounts.items);
 
       final hasEntries = styleResponse.posts.items.isNotEmpty;
-      final hasUsers = styleResponse.accounts.items.isNotEmpty;
-      final nextView = hasEntries && hasUsers
-          ? SearchResultView.all
+      final hasUsers = userList.isNotEmpty;
+
+      final nextView = queryLength < 2
+          ? SearchResultView.entries
           : hasUsers
           ? SearchResultView.users
-          : SearchResultView.entries;
+          : hasEntries
+          ? SearchResultView.entries
+          : SearchResultView.all;
 
       setState(() {
         _searchResult = entryResult;
-        _userSearchResult = userResult;
         _styleSearchResponse = styleResponse;
+        _userSearchResult = UserSearchResult(
+          users: userList,
+          totalCount: userList.length,
+          searchDuration: Duration.zero,
+          matchedTokens: queryLength >= 2 ? [formattedQuery] : const [],
+        );
+        _lastQuery = queryLength >= 2 ? formattedQuery : '';
+        _userSearchCursor = queryLength >= 2 ? userPage.lastDocument : null;
+        _userHasMoreUsers = queryLength >= 2 && userPage.hasMore;
+        _isLoadingMoreUsers = false;
         _currentView = nextView;
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _isLoadingMoreUsers = false;
+      });
     }
   }
 
@@ -1185,6 +1392,42 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
     });
   }
 
+  Future<void> _loadMoreUsers() async {
+    if (_isLoadingMoreUsers || !_userHasMoreUsers || _lastQuery.isEmpty) {
+      return;
+    }
+
+    setState(() => _isLoadingMoreUsers = true);
+
+    try {
+      final page = await UserSearchService.instance.searchByUsernamePrefix(
+        query: _lastQuery,
+        limit: 30,
+        startAfter: _userSearchCursor,
+      );
+
+      if (!mounted) return;
+
+      final currentUsers = _userSearchResult?.users ?? const <User>[];
+      final mergedUsers = _mergeUsersById([...currentUsers, ...page.users]);
+
+      setState(() {
+        _userSearchResult = UserSearchResult(
+          users: mergedUsers,
+          totalCount: mergedUsers.length,
+          searchDuration: _userSearchResult?.searchDuration ?? Duration.zero,
+          matchedTokens: _userSearchResult?.matchedTokens ?? const [],
+        );
+        _userSearchCursor = page.lastDocument;
+        _userHasMoreUsers = page.hasMore;
+        _isLoadingMoreUsers = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoadingMoreUsers = false);
+    }
+  }
+
   Future<void> _refreshAfterEntryChange() async {
     final query = _searchController.text.trim();
     if (query.isNotEmpty) {
@@ -1221,7 +1464,6 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
 
     setState(() {
       _deletingEntryIds.remove(entry.id);
-      _locallyLikedEntryIds.remove(entry.id);
     });
 
     if (deleted) {
@@ -1235,34 +1477,27 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
   }
 
   void _likeCringe(CringeEntry entry) async {
-    if (_locallyLikedEntryIds.contains(entry.id)) {
-      return;
-    }
-
     HapticFeedback.lightImpact();
 
     try {
-      final success = await CringeEntryService.instance.likeEntry(entry.id);
+      // Backend'de like durumunu kontrol et
+      final isLiked = await CringeEntryService.instance.isLikedByUser(entry.id);
+
+      if (isLiked) {
+        await CringeEntryService.instance.unlikeEntry(entry.id);
+      } else {
+        await CringeEntryService.instance.likeEntry(entry.id);
+      }
 
       if (!mounted) return;
 
-      if (!success) {
-        throw Exception('like-failed');
-      }
-
-      setState(() {
-        _locallyLikedEntryIds.add(entry.id);
-        _searchResult = _mapSearchResultEntry(
-          entryId: entry.id,
-          mapper: (current) =>
-              current.copyWith(begeniSayisi: current.begeniSayisi + 1),
-        );
-      });
-    } catch (_) {
+      // Stream otomatik güncellenecek
+      setState(() {});
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Beğeni kaydedilemedi. Tekrar deneyin.'),
+          content: Text('Beğeni işlemi başarısız. Tekrar deneyin.'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -1295,6 +1530,79 @@ class _ModernSearchScreenState extends State<ModernSearchScreen>
   void _shareCringe(CringeEntry entry) {
     HapticFeedback.mediumImpact();
     // Handle share
+  }
+
+  Future<void> _handleMessageEntry(CringeEntry entry) async {
+    HapticFeedback.mediumImpact();
+
+    final targetUserId = entry.userId.trim();
+    if (targetUserId.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kullanıcı bilgisi bulunamadı.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    final firebaseUser = UserService.instance.firebaseUser;
+    if (firebaseUser == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mesaj göndermek için giriş yapmalısınız.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    final currentUserId = firebaseUser.uid.trim();
+    if (currentUserId == targetUserId) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kendinize mesaj gönderemezsiniz.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final targetUser = await UserService.instance.getUserById(targetUserId);
+      if (targetUser == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Kullanıcı bulunamadı.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+
+      if (!mounted) return;
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => DirectMessageThreadScreen(
+            otherUserId: targetUserId,
+            initialUser: targetUser,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mesaj ekranı açılamadı.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
 
   SearchResult? _mapSearchResultEntry({

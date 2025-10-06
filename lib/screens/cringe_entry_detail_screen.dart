@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/cringe_entry.dart';
+import '../screens/direct_message_thread_screen.dart';
 import '../services/cringe_entry_service.dart';
 import '../services/user_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/entry_actions.dart';
 import '../utils/safe_haptics.dart';
 import '../widgets/entry_comments_sheet.dart';
 import '../widgets/modern_cringe_card.dart';
@@ -56,9 +58,12 @@ class _CringeEntryDetailScreenState extends State<CringeEntryDetailScreen> {
   bool _isProcessingLike = false;
   bool _isDeleting = false;
 
-  bool get _isOwnEntry =>
-      widget.isOwnedByCurrentUser ||
-      UserService.instance.firebaseUser?.uid == _entry.userId;
+  bool get _canManageEntry {
+    if (widget.isOwnedByCurrentUser) {
+      return true;
+    }
+    return EntryActionHelper.canManageEntry(_entry);
+  }
 
   @override
   void initState() {
@@ -72,18 +77,24 @@ class _CringeEntryDetailScreenState extends State<CringeEntryDetailScreen> {
     setState(() => _isProcessingLike = true);
 
     try {
-      final success = await CringeEntryService.instance.likeEntry(_entry.id);
-      if (!mounted) return;
-      if (success) {
-        setState(() {
-          _entry = _entry.copyWith(begeniSayisi: _entry.begeniSayisi + 1);
-        });
+      // Backend'de like durumunu kontrol et
+      final isLiked = await CringeEntryService.instance.isLikedByUser(
+        _entry.id,
+      );
+
+      if (isLiked) {
+        await CringeEntryService.instance.unlikeEntry(_entry.id);
       } else {
-        _showSnack('Beğeni kaydedilemedi. Tekrar deneyin.');
+        await CringeEntryService.instance.likeEntry(_entry.id);
       }
-    } catch (_) {
+
+      // Stream otomatik güncellenecek, UI refresh için setState yeterli
       if (mounted) {
-        _showSnack('Beğeni kaydedilemedi. Tekrar deneyin.');
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnack('Beğeni işlemi başarısız. Tekrar deneyin.');
       }
     } finally {
       if (mounted) {
@@ -110,16 +121,64 @@ class _CringeEntryDetailScreenState extends State<CringeEntryDetailScreen> {
     );
   }
 
+  Future<void> _handleMessage() async {
+    SafeHaptics.medium();
+
+    final targetUserId = _entry.userId.trim();
+    if (targetUserId.isEmpty) {
+      _showSnack('Kullanıcı bilgisi bulunamadı.');
+      return;
+    }
+
+    final firebaseUser = UserService.instance.firebaseUser;
+    if (firebaseUser == null) {
+      _showSnack('Mesaj göndermek için giriş yapmalısınız.');
+      return;
+    }
+
+    final currentUserId = firebaseUser.uid.trim();
+    if (currentUserId == targetUserId) {
+      _showSnack('Kendinize mesaj gönderemezsiniz.');
+      return;
+    }
+
+    try {
+      final targetUser = await UserService.instance.getUserById(targetUserId);
+      if (targetUser == null) {
+        if (mounted) _showSnack('Kullanıcı bulunamadı.');
+        return;
+      }
+
+      if (!mounted) return;
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => DirectMessageThreadScreen(
+            otherUserId: targetUserId,
+            initialUser: targetUser,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        _showSnack('Mesaj ekranı açılamadı.');
+      }
+    }
+  }
+
   Future<void> _handleShare() async {
     SafeHaptics.medium();
+
+    // Share count'u artır
+    await CringeEntryService.instance.incrementShareCount(_entry.id);
+
     final shareText = _buildShareText(_entry);
+    final headline = _entry.headline.isNotEmpty
+        ? _entry.headline
+        : 'Yeni Cringe Paylaşımı';
     try {
       await SharePlus.instance.share(
-        ShareParams(
-          text: shareText,
-          subject: _entry.baslik,
-          title: _entry.baslik,
-        ),
+        ShareParams(text: shareText, subject: headline, title: headline),
       );
     } catch (_) {
       if (mounted) {
@@ -197,7 +256,7 @@ class _CringeEntryDetailScreenState extends State<CringeEntryDetailScreen> {
 
   String _buildShareText(CringeEntry entry) {
     final buffer = StringBuffer()
-      ..writeln(entry.baslik)
+      ..writeln(entry.headline)
       ..writeln()
       ..writeln(entry.aciklama)
       ..writeln()
@@ -278,12 +337,13 @@ class _CringeEntryDetailScreenState extends State<CringeEntryDetailScreen> {
               onTap: null,
               onLike: _isProcessingLike ? null : () => _handleLike(),
               onComment: _openComments,
+              onMessage: () => _handleMessage(),
               onShare: _handleShare,
-              onEdit: _isOwnEntry ? () => _handleEdit() : null,
-              onDelete: _isOwnEntry ? () => _handleDelete() : null,
+              onEdit: _canManageEntry ? () => _handleEdit() : null,
+              onDelete: _canManageEntry ? () => _handleDelete() : null,
               isDeleteInProgress: _isDeleting,
             ),
-            if (_isOwnEntry) ...[
+            if (_canManageEntry) ...[
               const SizedBox(height: AppTheme.spacingL),
               _buildActionButtons(),
             ],

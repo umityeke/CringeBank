@@ -1,7 +1,6 @@
 {
   "projects": {
-    "default": "cringe-bank",
-    "cringebank": "cringe-bank"
+    "default": "cringe-bank"
   },
   "targets": {},
   "etags": {}

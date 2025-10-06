@@ -30,10 +30,19 @@ Flutter ile geliştirilmiş bu proje, paylaşımları Firestore üzerinde payla�
 
 ## Güvenlik ve Kimlik Doğrulama
 
-- Firebase ID token’ları backend’de `FirebaseUserProfileFactory` ile doğrulanır, revocation ve email doğrulama kontrolleri zorunludur.
-- `UserSynchronizationService`, token’dan üretilen profil bilgilerini SQL SSOT tablosuyla eşler, claim sürümü uyumsuzluklarını loglar.
-- Cloud Functions `syncUserClaimsOnUserWrite` tetikleyicisi, Firestore değişikliklerini custom claim’lere yansıtır; callable `refreshUserClaims` manuel yenileme sağlar.
-- Firestore ve Storage güvenlik kuralları `ensureActiveAndFreshClaims()` helper’ı ile `status == active` ve güncel `claimsVersion` koşullarını zorunlu kılar.
+
+### RBAC Policy Evaluator
+
+- `functions/rbac/policyEvaluator.js` SQL tabanlı RBAC değerlendirmesini ve iki imza (two-man rule) süper admin akışını yönetir.
+- Cloud Functions çalıştırmadan önce aşağıdaki ortam değişkenini tanımlayın:
+
+```powershell
+# functions klasöründe .env veya Firebase runtime config ile
+$env:RBAC_DATABASE_URL = "postgres://user:pass@host:5432/cringebank"
+```
+
+- RBAC şemasını veritabanına uygulamak için `docs/rbac_policy_schema.sql` dosyasını çalıştırın.
+- Manuel izin kontrolü için yeni callable `rbacCheckPermission` fonksiyonunu kullanın: `resource` ve `action` alanlarını iletin, gerekirse `scopeContext` ekleyin.
 
 ## Responsive Master Rulebook
 

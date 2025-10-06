@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { google } = require('googleapis');
 const twilio = require('twilio');
 const userSync = require('./user_sync');
+const { PolicyEvaluator } = require('./rbac');
 
 admin.initializeApp();
 
@@ -35,6 +36,37 @@ const ensureAuthenticatedContext = (context) => {
     );
   }
   return context.auth.uid;
+};
+
+let policyEvaluatorInstance = null;
+
+const getPolicyEvaluator = () => {
+  if (!policyEvaluatorInstance) {
+    try {
+      policyEvaluatorInstance = PolicyEvaluator.fromEnv();
+    } catch (error) {
+      console.error('Policy evaluator initialization failed:', error);
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'RBAC policy evaluator cannot be initialized. Check RBAC_DATABASE_URL and database connectivity.',
+      );
+    }
+  }
+  return policyEvaluatorInstance;
+};
+
+const enforcePolicy = async (context, resource, action, scopeContext = {}) => {
+  const uid = ensureAuthenticatedContext(context);
+  const evaluator = getPolicyEvaluator();
+
+  await evaluator.assertAllowed({
+    uid,
+    resource,
+    action,
+    scopeContext,
+  });
+
+  return uid;
 };
 
 const parsePositiveInt = (value, fallback, options = {}) => {
@@ -96,6 +128,29 @@ const hashOtpKey = (identifier, code) => {
 };
 
 const shouldExposeDebugOtp = () => functions.config().environment?.expose_debug_otp === 'true';
+
+exports.rbacCheckPermission = functions.https.onCall(async (data, context) => {
+  const payload = data || {};
+  const resource = payload.resource;
+  const action = payload.action;
+
+  if (!resource || !action) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'resource ve action alanları zorunludur.'
+    );
+  }
+
+  const scopeContext = payload.scopeContext ?? {};
+  const uid = await enforcePolicy(context, resource, action, scopeContext);
+
+  return {
+    ok: true,
+    uid,
+    resource,
+    action,
+  };
+});
 
 const validateOtpCode = (code) => {
   const normalized = (code ?? '').toString().trim();

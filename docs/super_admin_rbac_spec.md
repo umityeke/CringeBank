@@ -238,3 +238,5 @@ Demotion or banning of a super admin uses the same approval flow: a nomination-l
 - Firebase Admin SDK custom claims documentation.
 - OWASP Access Control Cheat Sheet (for least privilege best practices).
 - CringeBank existing services (`UserService`, `CringeEntryService`) for integration guidance.
+- `docs/rbac_policy_schema.sql` for the executable DDL bootstrap script.
+- `functions/rbac/policyEvaluator.js` for the backend evaluator skeleton and nomination workflow helpers.

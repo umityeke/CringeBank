@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
+import '../utils/platform_info.dart';
+
 import 'telemetry/callable_latency_tracker.dart';
 
 enum EmailOtpFailureReason {
@@ -21,6 +23,8 @@ class EmailOtpVerificationResult {
     required this.success,
     this.reason,
     this.remainingAttempts,
+    this.sessionId,
+    this.sessionExpiresAt,
   });
 
   factory EmailOtpVerificationResult.fromResponse(dynamic response) {
@@ -31,10 +35,18 @@ class EmailOtpVerificationResult {
           ? null
           : _failureReasonFromString(map['reason']?.toString());
       final remaining = map['remainingAttempts'];
+      final sessionId = map['sessionId']?.toString();
+      final expiresRaw = map['expiresAt'] ?? map['sessionExpiresAt'];
+      DateTime? sessionExpiresAt;
+      if (expiresRaw is String && expiresRaw.isNotEmpty) {
+        sessionExpiresAt = DateTime.tryParse(expiresRaw);
+      }
       return EmailOtpVerificationResult(
         success: success,
         reason: reason,
         remainingAttempts: remaining is num ? remaining.toInt() : null,
+        sessionId: sessionId?.isEmpty == true ? null : sessionId,
+        sessionExpiresAt: sessionExpiresAt,
       );
     }
 
@@ -56,6 +68,8 @@ class EmailOtpVerificationResult {
   final bool success;
   final EmailOtpFailureReason? reason;
   final int? remainingAttempts;
+  final String? sessionId;
+  final DateTime? sessionExpiresAt;
 
   bool get isInvalidCode => reason == EmailOtpFailureReason.invalidCode;
   bool get isExpired => reason == EmailOtpFailureReason.expired;
@@ -87,25 +101,46 @@ class EmailOtpService {
     region: 'europe-west1',
   );
 
-  static const _sendOtpHttpEndpoint =
-      'https://europe-west1-cringe-bank.cloudfunctions.net/sendEmailOtpHttp';
-  static const _verifyOtpHttpEndpoint =
-      'https://europe-west1-cringe-bank.cloudfunctions.net/verifyEmailOtpHttp';
+  // Emulator mode: use localhost URLs when kDebugMode
+  static String get _sendOtpHttpEndpoint => kDebugMode
+      ? 'http://127.0.0.1:5001/cringe-bank/europe-west1/sendEmailOtpHttp'
+      : 'https://europe-west1-cringe-bank.cloudfunctions.net/sendEmailOtpHttp';
+  
+  static String get _registrationVerifyOtpHttpEndpoint => kDebugMode
+      ? 'http://127.0.0.1:5001/cringe-bank/europe-west1/registrationVerifyOtpHttp'
+      : 'https://europe-west1-cringe-bank.cloudfunctions.net/registrationVerifyOtpHttp';
 
   static Future<String?> sendOtp(String email) async {
     final normalizedEmail = _normalizeEmail(email);
 
     try {
-      if (!_supportsCallableFunctions) {
-        return await _sendOtpViaHttp(normalizedEmail);
+      if (_supportsCallableFunctions) {
+        try {
+          return await _sendOtpViaCallable(normalizedEmail);
+        } on MissingPluginException catch (error, stack) {
+          _logMissingPluginFallback('sendEmailOtp', error, stack);
+        } on PlatformException catch (error, stack) {
+          if (_shouldFallbackFromPlatformException(error)) {
+            debugPrint(
+              'Callable sendEmailOtp platform hatası, HTTP fallback deneniyor: '
+              '$error\n$stack',
+            );
+          } else {
+            rethrow;
+          }
+        } on FirebaseFunctionsException catch (error, stack) {
+          if (_shouldFallbackFromFunctionsException(error)) {
+            debugPrint(
+              'Callable sendEmailOtp beklenmedik hata döndürdü, HTTP fallback '
+              'deneniyor: $error\n$stack',
+            );
+          } else {
+            rethrow;
+          }
+        }
       }
 
-      try {
-        return await _sendOtpViaCallable(normalizedEmail);
-      } on MissingPluginException catch (error, stack) {
-        _logMissingPluginFallback('sendEmailOtp', error, stack);
-        return await _sendOtpViaHttp(normalizedEmail);
-      }
+      return await _sendOtpViaHttp(normalizedEmail);
     } on FirebaseFunctionsException catch (e, stack) {
       Object? encodedDetails;
       try {
@@ -157,15 +192,25 @@ class EmailOtpService {
     }
 
     Map<String, dynamic>? payload;
+    Map<String, dynamic>? nonJsonDetails;
     if (response.body.isNotEmpty) {
       try {
         payload = jsonDecode(response.body) as Map<String, dynamic>;
       } catch (error, stack) {
-        final logMsg = 'OTP HTTP yanıtı JSON değil: $error\n$stack';
+        final snippet = response.body.length > 512
+            ? '${response.body.substring(0, 512)}…'
+            : response.body;
+        final logMsg =
+            'OTP HTTP yanıtı JSON değil: $error\n--- BODY (${response.body.length} bytes) ---\n$snippet\n------------------------------\n$stack';
         developer.log(logMsg, name: 'EmailOtpService');
         debugPrint(logMsg);
         // ignore: avoid_print
         print(logMsg);
+        nonJsonDetails = {
+          'contentType': response.headers['content-type'] ?? 'unknown',
+          'status': response.statusCode,
+          'bodyPreview': snippet,
+        };
       }
     }
 
@@ -190,11 +235,13 @@ class EmailOtpService {
       final message = payload != null
           ? payload['message']?.toString() ??
                 'Doğrulama e-postası gönderilemedi.'
-          : 'Doğrulama e-postası gönderilemedi.';
+          : nonJsonDetails != null
+              ? 'Doğrulama e-postası gönderilemedi. Sunucu JSON dışı içerik döndürdü.'
+              : 'Doğrulama e-postası gönderilemedi.';
       throw FirebaseFunctionsException(
         code: code,
         message: message,
-        details: payload,
+        details: payload ?? nonJsonDetails,
       );
     }
 
@@ -219,25 +266,33 @@ class EmailOtpService {
     try {
       dynamic response;
       if (!_supportsCallableFunctions) {
-        response = await _verifyOtpViaHttp(normalizedEmail, sanitizedCode);
+        response = await _registrationVerifyOtpViaHttp(
+          normalizedEmail,
+          sanitizedCode,
+        );
       } else {
         try {
-          response = await _verifyOtpViaCallable(
+          response = await _registrationVerifyOtpViaCallable(
             normalizedEmail,
             sanitizedCode,
           );
         } on MissingPluginException catch (error, stack) {
-          _logMissingPluginFallback('verifyEmailOtp', error, stack);
-          response = await _verifyOtpViaHttp(normalizedEmail, sanitizedCode);
+          _logMissingPluginFallback('registrationVerifyOtp', error, stack);
+          response = await _registrationVerifyOtpViaHttp(
+            normalizedEmail,
+            sanitizedCode,
+          );
         }
       }
 
       return EmailOtpVerificationResult.fromResponse(response);
     } on FirebaseFunctionsException catch (e, stack) {
-      debugPrint('Cloud Function verifyEmailOtp failed: ${e.message}\n$stack');
+      debugPrint(
+        'Cloud Function registrationVerifyOtp failed: ${e.message}\n$stack',
+      );
       rethrow;
     } catch (e, stack) {
-      debugPrint('Unexpected error calling verifyEmailOtp: $e\n$stack');
+      debugPrint('Unexpected error calling registrationVerifyOtp: $e\n$stack');
       rethrow;
     }
   }
@@ -274,21 +329,24 @@ class EmailOtpService {
     }
   }
 
-  static Future<dynamic> _verifyOtpViaCallable(
+  static Future<dynamic> _registrationVerifyOtpViaCallable(
     String email,
     String code,
   ) async {
     final result = await _functions.callWithLatency<dynamic>(
-      'verifyEmailOtp',
+      'registrationVerifyOtp',
       payload: {'email': email, 'code': code},
       category: 'emailOtp',
     );
     return result.data;
   }
 
-  static Future<dynamic> _verifyOtpViaHttp(String email, String code) async {
+  static Future<dynamic> _registrationVerifyOtpViaHttp(
+    String email,
+    String code,
+  ) async {
     final response = await http.post(
-      Uri.parse(_verifyOtpHttpEndpoint),
+      Uri.parse(_registrationVerifyOtpHttpEndpoint),
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'code': code}),
     );
@@ -321,18 +379,31 @@ class EmailOtpService {
 
   static String _normalizeEmail(String email) => email.trim().toLowerCase();
 
-  static bool get _supportsCallableFunctions {
-    if (kIsWeb) {
-      return false;
+  static bool get _supportsCallableFunctions => PlatformInfo.isMobile;
+
+  static bool _shouldFallbackFromPlatformException(PlatformException error) {
+  if (error.code == 'MissingPluginException' ||
+    error.code == 'unimplemented') {
+      return true;
     }
 
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-      case TargetPlatform.iOS:
-        return true;
-      default:
-        return false;
+    final message = error.message?.toLowerCase() ?? '';
+    return message.contains('missingpluginexception') ||
+    message.contains('unimplemented') ||
+    message.contains('unable to establish connection on channel');
+  }
+
+  static bool _shouldFallbackFromFunctionsException(
+    FirebaseFunctionsException error,
+  ) {
+    if (error.code == 'unimplemented') {
+      return true;
     }
+
+    final message = error.message?.toLowerCase() ?? '';
+    return message.contains('unable to establish connection on channel') ||
+        message.contains('missing plugin') ||
+        message.contains('unimplemented');
   }
 
   static void _logMissingPluginFallback(

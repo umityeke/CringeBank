@@ -1,7 +1,7 @@
 // Deploy this function once, call it once, then delete it
 // Usage: Call via Firebase Console > Functions > grantSuperAdminOnce
 
-const functions = require('firebase-functions');
+const functions = require('./regional_functions');
 const admin = require('firebase-admin');
 
 exports.grantSuperAdminOnce = functions.https.onRequest(async (req, res) => {

@@ -1,5 +1,5 @@
 // Test allowlist loading (works with emulator or production)
-const functions = require('firebase-functions');
+const functions = require('./regional_functions');
 const admin = require('firebase-admin');
 
 if (!admin.apps.length) {

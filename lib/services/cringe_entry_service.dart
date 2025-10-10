@@ -103,6 +103,19 @@ class CringeEntryService {
       'enterprise_cringe_entries_cache_timestamp_v1';
   static const Duration _cacheTTL = Duration(minutes: 5);
   Future<void>? _ongoingWarmUp;
+  bool get _isFirestoreSupported {
+    if (kIsWeb) {
+      return true;
+    }
+
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+      case TargetPlatform.iOS:
+        return true;
+      default:
+        return false;
+    }
+  }
 
   CringeEntry _normalizeEntry(CringeEntry entry) {
     final normalizedDescription = entry.aciklama.trim();
@@ -137,6 +150,14 @@ class CringeEntryService {
   }
 
   Future<void> warmUp() async {
+    if (!_isFirestoreSupported) {
+      print(
+        '⏭️ ENTERPRISE CringeEntryService: Warm-up skipped, platform yetkilendirilmedi '
+        '(${defaultTargetPlatform.name}).',
+      );
+      return;
+    }
+
     if (_auth.currentUser == null) {
       print(
         '⏭️ ENTERPRISE CringeEntryService: Warm-up skipped, user not signed in',
@@ -200,6 +221,14 @@ class CringeEntryService {
 
   // Initialize enterprise stream with performance monitoring
   Future<List<CringeEntry>> _initializeEnterpriseStream() async {
+    if (!_isFirestoreSupported) {
+      print(
+        '⚠️ ENTERPRISE CringeEntryService: Platform ${defaultTargetPlatform.name} '
+        'için Firestore akışı devre dışı.',
+      );
+      return <CringeEntry>[];
+    }
+
     final stopwatch = Stopwatch()..start();
     print('⚡ PERFORMANCE: Starting enterprise stream initialization');
 

@@ -9,7 +9,7 @@
  * (Firestore is source of truth for real-time)
  */
 
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 const admin = require('firebase-admin');
 const sql = require('mssql');
 const { getSqlPool } = require('../utils/sql_pool');

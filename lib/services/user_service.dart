@@ -1,12 +1,15 @@
 // ignore_for_file: avoid_print
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 import '../models/user_model.dart';
 import '../utils/search_normalizer.dart';
 import '../utils/username_policies.dart';
@@ -86,6 +89,8 @@ class UserService {
   static const String _lastUserIdKey = 'cb_last_user_id';
   static const String _lastUserEmailKey = 'cb_last_user_email';
   static const bool _firestoreLoggingEnabled = false;
+  static const String _registrationFinalizeHttpEndpoint =
+      'https://europe-west1-cringe-bank.cloudfunctions.net/registrationFinalizeHttp';
 
   final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -1045,111 +1050,156 @@ class UserService {
     required String email,
     required String username,
     required String password,
+    required String sessionId,
     String fullName = '',
+    bool marketingOptIn = false,
   }) async {
-    try {
-      final rawEmail = email.trim();
-      final normalizedEmail = rawEmail.toLowerCase();
-      final normalizedUsername = username.trim();
+    final normalizedEmail = email.trim().toLowerCase();
+    final normalizedUsername = username.trim();
+    final sanitizedFullName = fullName.trim();
 
-      print(
-        'Starting registration for: $normalizedEmail with username $normalizedUsername',
+    print(
+      'registrationFinalize starting for: $normalizedEmail with username $normalizedUsername',
+    );
+
+    final payload = <String, dynamic>{
+      'sessionId': sessionId,
+      'username': normalizedUsername,
+      'password': password,
+      'marketingOptIn': marketingOptIn,
+    };
+
+    if (sanitizedFullName.isNotEmpty) {
+      payload['fullName'] = sanitizedFullName;
+    }
+
+    Map<String, dynamic> result;
+    try {
+      result = await _registrationFinalize(payload);
+    } on FirebaseFunctionsException {
+      rethrow;
+    } catch (error, stack) {
+      print('registrationFinalize unexpected error: $error');
+      debugPrint('registrationFinalize stack: $stack');
+      throw FirebaseFunctionsException(
+        code: 'internal',
+        message: 'Kayıt işlemi tamamlanamadı. Lütfen tekrar deneyin.',
+        details: error.toString(),
+      );
+    }
+
+    if (result['success'] != true) {
+      final errorCode = result['error']?.toString() ?? 'internal';
+      final message = result['message']?.toString() ??
+          'Kayıt işlemi tamamlanamadı. Lütfen tekrar deneyin.';
+      throw FirebaseFunctionsException(
+        code: errorCode,
+        message: message,
+        details: result,
+      );
+    }
+
+    final customToken = result['customToken']?.toString();
+    if (customToken == null || customToken.isEmpty) {
+      throw FirebaseFunctionsException(
+        code: 'internal',
+        message: 'Kayıt işlemi tamamlandı ancak oturum açılamadı.',
+        details: result,
+      );
+    }
+
+    firebase_auth.UserCredential credential;
+    try {
+      credential = await _auth.signInWithCustomToken(customToken);
+    } on firebase_auth.FirebaseAuthException catch (error) {
+      print('signInWithCustomToken failed: ${error.code} ${error.message}');
+      throw FirebaseFunctionsException(
+        code: 'auth-error',
+        message: 'Kayıt tamamlandı ancak oturum açılamadı. Lütfen tekrar deneyin.',
+        details: {'firebaseCode': error.code, 'message': error.message},
+      );
+    }
+
+    final firebase_auth.User? firebaseUser = credential.user;
+    final uid = firebaseUser?.uid;
+    if (uid == null || uid.trim().isEmpty) {
+      throw FirebaseFunctionsException(
+        code: 'auth-error',
+        message: 'Kayıt tamamlandı ancak kullanıcı oturum bilgisi alınamadı.',
+        details: result,
+      );
+    }
+
+    await loadUserData(uid);
+    await _logAuthActivity(firebaseUser, 'REGISTER');
+    print('registrationFinalize completed successfully for $uid');
+    return true;
+  }
+
+  Future<Map<String, dynamic>> _registrationFinalize(
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final callableResult = await _functions.callWithLatency<dynamic>(
+        'registrationFinalize',
+        category: 'registration',
+        payload: payload,
       );
 
-      const emailPattern = r'^[^@\s]+@[^@\s]+\.[^@\s]+$';
-      if (!RegExp(emailPattern).hasMatch(rawEmail)) {
-        print('Registration failed: invalid email format -> $rawEmail');
-        return false;
+      final normalized = _normalizeCallableResponse(callableResult.data);
+      if (normalized.isNotEmpty) {
+        return normalized;
       }
 
-      // E-posta benzersizliği kontrolü
-      if (await _isEmailRegistered(normalizedEmail)) {
-        print('Email already registered: $normalizedEmail');
-        return false;
+      if (callableResult.data is Map) {
+        return Map<String, dynamic>.from(callableResult.data as Map);
       }
 
-      // Kullanıcı adı kontrolü (Firebase'e bağlanmazsa skip et)
-      try {
-        final usernameCheck = await checkUsername(normalizedUsername);
-        if (!usernameCheck.isAvailable || !usernameCheck.isValid) {
-          print(
-            'Username is not available: ${usernameCheck.reasons.join(', ')}',
-          );
-          return false;
-        }
-      } catch (e) {
-        print('Username check failed, continuing: $e');
-      }
-
-      // Firebase Authentication ile kayıt
-      try {
-        final credential = await _auth
-            .createUserWithEmailAndPassword(
-              email: normalizedEmail,
-              password: password,
-            )
-            .timeout(const Duration(seconds: 10));
-
-        if (credential.user != null) {
-          // Kullanıcı profilini güncelle
-          try {
-            await credential.user!.updateDisplayName(
-              fullName.isEmpty ? normalizedUsername : fullName,
-            );
-          } catch (e) {
-            print('Failed to update display name: $e');
-          }
-
-          // Firestore'a kullanıcı verilerini kaydet
-          final newUser = User(
-            id: credential.user!.uid,
-            username: normalizedUsername,
-            email: normalizedEmail,
-            fullName: fullName.isEmpty ? normalizedUsername : fullName,
-            krepScore: 0,
-            joinDate: DateTime.now(),
-            lastActive: DateTime.now(),
-            rozetler: ['Yeni Üye'],
-            isPremium: false,
-            avatar: '👤',
-            isVerified: true,
-          );
-
-          try {
-            final ensuredUser = await _ensureServerUser(newUser);
-            if (ensuredUser != null) {
-              _currentUser = ensuredUser;
-            } else {
-              _currentUser = newUser;
-            }
-          } on FirebaseFunctionsException catch (error) {
-            print(
-              'Firebase callable ensureSqlUser failed: ${error.code} ${error.message}',
-            );
-            return false;
-          } catch (e) {
-            print('Failed to synchronize user data via ensureSqlUser: $e');
-            return false;
-          }
-
-          if (_currentUser != null) {
-            _userCache[_currentUser!.id] = _currentUser!;
-            _lastCacheUpdate = DateTime.now();
-          }
-          await _logAuthActivity(credential.user, 'REGISTER');
-          print('Registration successful');
-          return true;
-        }
-      } catch (firebaseError) {
-        print('Firebase registration failed: $firebaseError');
-        return false;
-      }
-
-      return false;
-    } catch (e) {
-      print('Register error: $e');
-      return false;
+      return const <String, dynamic>{};
+    } on MissingPluginException catch (error, stack) {
+      debugPrint(
+        'Firebase callable registrationFinalize missing plugin, falling back to HTTP: $error\n$stack',
+      );
+      return _registrationFinalizeViaHttp(payload);
     }
+  }
+
+  Future<Map<String, dynamic>> _registrationFinalizeViaHttp(
+    Map<String, dynamic> payload,
+  ) async {
+    http.Response response;
+    try {
+      response = await http.post(
+        Uri.parse(_registrationFinalizeHttpEndpoint),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      );
+    } catch (error) {
+      print('registrationFinalizeHttp request failed: $error');
+      rethrow;
+    }
+
+    Map<String, dynamic>? decoded;
+    if (response.body.isNotEmpty) {
+      try {
+        decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      } catch (error) {
+        print('registrationFinalizeHttp invalid JSON: $error');
+      }
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final errorCode = decoded?['error']?.toString() ?? 'internal';
+      final message = decoded?['message']?.toString() ??
+          'Kayıt işlemi tamamlanamadı. Lütfen tekrar deneyin.';
+      throw FirebaseFunctionsException(
+        code: errorCode,
+        message: message,
+        details: decoded,
+      );
+    }
+
+    return decoded ?? const <String, dynamic>{};
   }
 
   Future<void> logout() async {

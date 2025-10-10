@@ -14,14 +14,15 @@
   },
   "dependencies": {
     "@azure/service-bus": "^7.9.5",
-    "firebase-admin": "^12.5.0",
-    "firebase-functions": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "firebase-admin": "^13.5.0",
+    "firebase-functions": "^6.5.0",
     "googleapis": "^140.0.0",
     "mssql": "^10.0.1",
-    "nodemailer": "^6.9.15",
+    "nodemailer": "^6.10.1",
     "pg": "^8.13.0",
-    "twilio": "^4.23.0",
-    "dotenv": "^16.4.5"
+    "twilio": "^4.23.0"
   },
   "devDependencies": {
     "firebase-functions-test": "^3.2.0",

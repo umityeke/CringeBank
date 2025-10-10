@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 const { serializeDocument } = require('./serializer');
 
 function documentsEqual(a, b) {

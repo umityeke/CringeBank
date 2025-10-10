@@ -3,20 +3,20 @@
     "platforms": {
       "android": {
         "default": {
-          "projectId": "cringe-bank",
-          "appId": "1:688167942712:android:a6594e59ad424324a5c4cd",
+          "projectId": "cringebank",
+          "appId": "1:127594268731:android:229855fd3c141f43e8b41e",
           "fileOutput": "android/app/google-services.json"
         }
       },
       "dart": {
         "lib/firebase_options.dart": {
-          "projectId": "cringe-bank",
+          "projectId": "cringebank",
           "configurations": {
-            "android": "1:688167942712:android:a6594e59ad424324a5c4cd",
-            "ios": "1:688167942712:ios:59c7041cbfe447a1a5c4cd",
-            "macos": "1:688167942712:ios:59c7041cbfe447a1a5c4cd",
-            "web": "1:688167942712:web:8947c9f0c89844aea5c4cd",
-            "windows": "1:688167942712:web:480a21871f48adbea5c4cd"
+            "android": "1:127594268731:android:229855fd3c141f43e8b41e",
+            "ios": "1:127594268731:ios:e3f4dd2f21238c71e8b41e",
+            "macos": "1:127594268731:ios:e3f4dd2f21238c71e8b41e",
+            "web": "1:127594268731:web:0e80e1a01665d3d7e8b41e",
+            "windows": "1:127594268731:web:0e80e1a01665d3d7e8b41e"
           }
         }
       }

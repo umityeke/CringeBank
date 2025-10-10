@@ -1,7 +1,7 @@
 'use strict';
 
 const { ServiceBusClient } = require('@azure/service-bus');
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 const { readRealtimeMirrorConfig } = require('./config');
 const { resolveProcedureForEvent, executeProcedure } = require('./processor');
 const { getPool } = require('../sql_gateway/pool');

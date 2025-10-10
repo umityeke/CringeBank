@@ -5,7 +5,7 @@
  * Strategy: SQL for fast pagination, Firestore for reliability
  */
 
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 const admin = require('firebase-admin');
 const { getSqlPool } = require('../utils/sql_pool');
 

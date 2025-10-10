@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 const { createSqlWriterProcessor, readRealtimeMirrorConfig } = require('./index');
 
 function resolvePath(filePath) {

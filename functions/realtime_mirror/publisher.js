@@ -1,4 +1,4 @@
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 const { buildDmMessageEvent, buildDmConversationEvent, buildFollowEdgeEvent } = require('./event_builder');
 const { publishEvent } = require('./service_bus');
 

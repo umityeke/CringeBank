@@ -5,7 +5,7 @@
  * and trending content detection
  */
 
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 const { getSqlPool } = require('../utils/sql');
 const { sendAlert } = require('../utils/alerts');
 

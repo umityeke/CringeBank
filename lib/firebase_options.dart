@@ -41,46 +41,49 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyCLd4GiCnyk-1UfFF8hKUSc0prNQ5ERWoM',
-    appId: '1:688167942712:web:8947c9f0c89844aea5c4cd',
-    messagingSenderId: '688167942712',
-    projectId: 'cringe-bank',
-    authDomain: 'cringe-bank.firebaseapp.com',
-    storageBucket: 'cringe-bank.firebasestorage.app',
+    apiKey: 'AIzaSyDQWl1VSXesJlEdu04JsRWzleql-TEGke0',
+    appId: '1:127594268731:web:0e80e1a01665d3d7e8b41e',
+    messagingSenderId: '127594268731',
+    projectId: 'cringebank',
+    authDomain: 'cringebank.firebaseapp.com',
+    storageBucket: 'cringebank.firebasestorage.app',
+    measurementId: 'G-ZZ57ZVGP3D',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDvWjdZOZ2IQojrHKkexy6RDHzQVtuKB8I',
-    appId: '1:688167942712:android:a6594e59ad424324a5c4cd',
-    messagingSenderId: '688167942712',
-    projectId: 'cringe-bank',
-    storageBucket: 'cringe-bank.firebasestorage.app',
+    apiKey: 'AIzaSyCJ3x_nXxrzjTGyAytVsJwAZ2ebpIzb31Q',
+    appId: '1:127594268731:android:229855fd3c141f43e8b41e',
+    messagingSenderId: '127594268731',
+    projectId: 'cringebank',
+    storageBucket: 'cringebank.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyApVdk8H0Ow6HbC_4WxKI5rO5L9wcsX8BM',
-    appId: '1:688167942712:ios:59c7041cbfe447a1a5c4cd',
-    messagingSenderId: '688167942712',
-    projectId: 'cringe-bank',
-    storageBucket: 'cringe-bank.firebasestorage.app',
+    apiKey: 'AIzaSyC2SmlFyvetrOjWfSiKKIHYYpaK4W8N2pU',
+    appId: '1:127594268731:ios:e3f4dd2f21238c71e8b41e',
+    messagingSenderId: '127594268731',
+    projectId: 'cringebank',
+    storageBucket: 'cringebank.firebasestorage.app',
     iosBundleId: 'com.example.cringeBankasi',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyApVdk8H0Ow6HbC_4WxKI5rO5L9wcsX8BM',
-    appId: '1:688167942712:ios:59c7041cbfe447a1a5c4cd',
-    messagingSenderId: '688167942712',
-    projectId: 'cringe-bank',
-    storageBucket: 'cringe-bank.firebasestorage.app',
+    apiKey: 'AIzaSyC2SmlFyvetrOjWfSiKKIHYYpaK4W8N2pU',
+    appId: '1:127594268731:ios:e3f4dd2f21238c71e8b41e',
+    messagingSenderId: '127594268731',
+    projectId: 'cringebank',
+    storageBucket: 'cringebank.firebasestorage.app',
     iosBundleId: 'com.example.cringeBankasi',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyCLd4GiCnyk-1UfFF8hKUSc0prNQ5ERWoM',
-    appId: '1:688167942712:web:480a21871f48adbea5c4cd',
-    messagingSenderId: '688167942712',
-    projectId: 'cringe-bank',
-    authDomain: 'cringe-bank.firebaseapp.com',
-    storageBucket: 'cringe-bank.firebasestorage.app',
+    apiKey: 'AIzaSyDQWl1VSXesJlEdu04JsRWzleql-TEGke0',
+    appId: '1:127594268731:web:0e80e1a01665d3d7e8b41e',
+    messagingSenderId: '127594268731',
+    projectId: 'cringebank',
+    authDomain: 'cringebank.firebaseapp.com',
+    storageBucket: 'cringebank.firebasestorage.app',
+    measurementId: 'G-ZZ57ZVGP3D',
   );
+
 }

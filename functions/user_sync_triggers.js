@@ -1,4 +1,4 @@
-const functions = require('firebase-functions');
+const functions = require('./regional_functions');
 const admin = require('firebase-admin');
 const { executeProcedure } = require('./sql_gateway');
 

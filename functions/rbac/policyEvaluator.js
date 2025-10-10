@@ -1,5 +1,5 @@
 const { Pool } = require('pg');
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 
 const DEFAULT_TWO_MAN_ACTIONS = new Set([
   'cashbox.cash_out',

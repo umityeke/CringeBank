@@ -4,7 +4,7 @@
  * Purpose: Follow user and backfill their recent events (SQL + Firestore dual-write)
  */
 
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 const admin = require('firebase-admin');
 const { getSqlPool } = require('../utils/sql_pool');
 const { sendAlert } = require('../utils/alert_service');

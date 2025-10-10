@@ -1,5 +1,5 @@
 const { ServiceBusClient } = require('@azure/service-bus');
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 const { readRealtimeMirrorConfig } = require('./config');
 
 let sender = null;

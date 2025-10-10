@@ -151,6 +151,14 @@ class MessagingFeatureService {
     }
     _initialized = true;
 
+    if (!_isPlatformSupported) {
+      debugPrint(
+        'MessagingFeatureService masaüstünde devre dışı bırakıldı; varsayılan '
+        'ayarlar kullanılacak.',
+      );
+      return;
+    }
+
     await _refreshConfig(const GetOptions(source: Source.serverAndCache));
 
     if (!listenForUpdates) {
@@ -166,9 +174,17 @@ class MessagingFeatureService {
             _applySnapshot(snapshot);
           },
           onError: (Object error, StackTrace stackTrace) {
-            debugPrint(
-              'MessagingFeatureService snapshot error: $error\n$stackTrace',
-            );
+            if (_isPermissionDenied(error)) {
+              debugPrint(
+                'MessagingFeatureService yetkisiz erişim nedeniyle dinlemeyi '
+                'durdurdu. Varsayılan ayarlar kullanılmaya devam edecek.',
+              );
+              _subscription?.cancel();
+              _subscription = null;
+              return;
+            }
+
+            debugPrint('MessagingFeatureService snapshot error: $error\n$stackTrace');
           },
         );
   }
@@ -182,6 +198,14 @@ class MessagingFeatureService {
 
       _applySnapshot(docSnapshot);
     } catch (e, stack) {
+      if (_isPermissionDenied(e)) {
+        debugPrint(
+          'MessagingFeatureService Firestore yetkisi yok; varsayılan yapılandırma '
+          'kullanılıyor.',
+        );
+        return;
+      }
+
       debugPrint('Failed to refresh messaging feature config: $e\n$stack');
     }
   }
@@ -216,5 +240,26 @@ class MessagingFeatureService {
     _subscription = null;
     _notifier?.dispose();
     _notifier = null;
+  }
+
+  bool get _isPlatformSupported {
+    if (kIsWeb) {
+      return true;
+    }
+
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+      case TargetPlatform.iOS:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  bool _isPermissionDenied(Object error) {
+    if (error is FirebaseException) {
+      return error.code == 'permission-denied';
+    }
+    return false;
   }
 }

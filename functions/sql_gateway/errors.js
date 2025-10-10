@@ -1,4 +1,4 @@
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 
 function compactObject(target = {}) {
   const result = {};

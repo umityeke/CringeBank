@@ -1,4 +1,4 @@
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 const { PolicyEvaluator } = require('../rbac');
 const { getPool } = require('./pool');
 const { mapSqlErrorToHttps } = require('./errors');

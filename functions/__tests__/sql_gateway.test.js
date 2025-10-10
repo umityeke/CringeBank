@@ -1,4 +1,4 @@
-jest.mock('firebase-functions', () => {
+jest.mock('../regional_functions', () => {
   class HttpsError extends Error {
     constructor(code, message) {
       super(message);
@@ -51,7 +51,7 @@ jest.mock(
 );
 
 describe('sql_gateway callable', () => {
-  const functions = require('firebase-functions');
+  const functions = require('../regional_functions');
   const { createCallableProcedure, executeProcedure } = require('../sql_gateway/callable');
   const { mapSqlErrorToHttps } = require('../sql_gateway/errors');
   const { PolicyEvaluator } = require('../rbac');

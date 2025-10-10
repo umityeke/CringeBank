@@ -5,7 +5,7 @@
  * Strategy: Firestore critical path (real-time), SQL non-critical (analytics + fan-out)
  */
 
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 const admin = require('firebase-admin');
 const { getSqlPool } = require('../utils/sql_pool');
 const { sendAlert } = require('../utils/alert_service');

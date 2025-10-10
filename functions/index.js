@@ -1,4 +1,4 @@
-const functions = require('firebase-functions');
+const functions = require('./regional_functions');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
@@ -9,23 +9,27 @@ const { PolicyEvaluator } = require('./rbac');
 const { createSearchUsersHandler } = require('./search_users');
 const { createFollowPreviewHandler } = require('./follow_preview');
 const { createEnsureSqlUserHandler } = require('./ensure_user');
-const { createCallableProcedure, listProcedureKeys } = require('./sql_gateway');
+const { createCallableProcedure, listProcedureKeys, executeProcedure } = require('./sql_gateway');
 const realtimeMirror = require('./realtime_mirror');
 const { createOnUserCreatedHandler, createOnUserDeletedHandler } = require('./user_sync_triggers');
 const { dailyWalletConsistencyCheck } = require('./scheduled/wallet_consistency_check');
 const { hourlyMetricsCollection } = require('./scheduled/metrics_collection');
 
-admin.initializeApp();
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 
 const isFunctionsEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
 const isHostedRuntime = Boolean(process.env.K_SERVICE || process.env.FUNCTION_TARGET);
 const allowProdFlag = process.env.ALLOW_PROD === 'true';
+const isDeployAgent = Boolean(process.env.FIREBASE_DEPLOY_AGENT);
+const isControlApi = Boolean(process.env.FUNCTIONS_CONTROL_API);
 // Jest loads this module directly during unit tests; treat that runtime as safe to bypass the
 // hosted/emulator guard so tests can execute without requiring ALLOW_PROD.
 const isUnitTestRuntime =
   process.env.NODE_ENV === 'test' || typeof process.env.JEST_WORKER_ID !== 'undefined';
 
-if (!isFunctionsEmulator && !isHostedRuntime && !isUnitTestRuntime && !allowProdFlag) {
+if (!isFunctionsEmulator && !isHostedRuntime && !isUnitTestRuntime && !allowProdFlag && !isDeployAgent && !isControlApi) {
   throw new Error(
     'Prod kapalı: Emülatör dışında çalıştırma engellendi. ALLOW_PROD=true ile bilinçli olarak onaylayın.',
   );
@@ -33,6 +37,11 @@ if (!isFunctionsEmulator && !isHostedRuntime && !isUnitTestRuntime && !allowProd
 
 const OTP_EXPIRY_MINUTES = 10;
 const MAX_ATTEMPTS = 5;
+const REGISTRATION_SESSION_TTL_MINUTES = 30;
+const REGISTRATION_MIN_PASSWORD_LENGTH = 8;
+const USERNAME_MIN_LENGTH = 3;
+const USERNAME_MAX_LENGTH = 20;
+const USERNAME_PATTERN = /^[a-z0-9._]+$/;
 
 const TRY_ON_CONSTANTS = Object.freeze({
   COLLECTION: 'try_on_sessions',
@@ -74,6 +83,231 @@ const parseBoolean = (value, defaultValue = false) => {
   }
 
   return defaultValue;
+};
+
+const registrationSessionsCollection = () =>
+  admin.firestore().collection('registration_sessions');
+
+const usernameIndexCollection = () =>
+  admin.firestore().collection('username_index');
+
+const TURKISH_CHAR_REPLACEMENTS = Object.freeze({
+  ğ: 'g',
+  Ğ: 'g',
+  ü: 'u',
+  Ü: 'u',
+  ş: 's',
+  Ş: 's',
+  ı: 'i',
+  I: 'i',
+  İ: 'i',
+  ö: 'o',
+  Ö: 'o',
+  ç: 'c',
+  Ç: 'c',
+});
+
+const generateRegistrationSessionId = () => crypto.randomBytes(32).toString('hex');
+
+const toTurkishLowercase = (value) => {
+  if (!value) {
+    return '';
+  }
+  let result = '';
+  const input = value.toString();
+  for (let i = 0; i < input.length; i += 1) {
+    const char = input[i];
+    if (char === 'I') {
+      result += 'ı';
+    } else if (char === 'İ') {
+      result += 'i';
+    } else {
+      result += char.toLowerCase();
+    }
+  }
+  return result;
+};
+
+const foldToAscii = (value) => {
+  if (!value) {
+    return '';
+  }
+  let result = '';
+  const input = value.toString();
+  for (let i = 0; i < input.length; i += 1) {
+    const char = input[i];
+    result += TURKISH_CHAR_REPLACEMENTS[char] ?? char;
+  }
+  return result;
+};
+
+const sanitizeForIndex = (value) => {
+  if (!value) {
+    return '';
+  }
+  return value.replace(/[^a-z0-9@._\s-]/gi, ' ').replace(/\s+/g, ' ').trim();
+};
+
+const normalizeUsernameValue = (rawUsername) => {
+  if (!rawUsername) {
+    return '';
+  }
+  const lowered = toTurkishLowercase(rawUsername);
+  const ascii = foldToAscii(lowered);
+  const sanitized = sanitizeForIndex(ascii);
+  return sanitized.replace(/[@\s]+/g, '');
+};
+
+const normalizeFullNameValue = (rawFullName) => {
+  if (!rawFullName) {
+    return '';
+  }
+  const lowered = toTurkishLowercase(rawFullName);
+  const ascii = foldToAscii(lowered);
+  return sanitizeForIndex(ascii);
+};
+
+const generateRegistrationSearchKeywords = ({ username, fullName, email }) => {
+  const keywords = new Set();
+
+  const normalizedFullName = normalizeFullNameValue(fullName);
+  if (normalizedFullName) {
+    keywords.add(normalizedFullName);
+    const tokens = normalizedFullName.split(' ').filter(Boolean);
+    tokens.forEach((token) => keywords.add(token));
+    if (tokens.length >= 2) {
+      const first = tokens[0];
+      const last = tokens[tokens.length - 1];
+      keywords.add(`${first} ${last}`);
+      keywords.add(`${first}${last}`);
+    }
+  }
+
+  const normalizedUsername = normalizeUsernameValue(username);
+  if (normalizedUsername) {
+    keywords.add(normalizedUsername);
+    keywords.add(`@${normalizedUsername}`);
+  }
+
+  const emailLocalPart = (email || '').split('@')[0] ?? '';
+  const normalizedEmail = normalizeUsernameValue(emailLocalPart);
+  if (normalizedEmail) {
+    keywords.add(normalizedEmail);
+  }
+
+  return Array.from(keywords)
+    .map((keyword) => keyword.trim())
+    .filter((keyword) => keyword.length > 0)
+    .slice(0, 50);
+};
+
+const validateRegistrationUsername = (rawUsername) => {
+  const input = (rawUsername ?? '').toString().trim();
+  const normalized = input.toLowerCase();
+  const reasons = [];
+  let valid = true;
+
+  if (normalized.length < USERNAME_MIN_LENGTH) {
+    valid = false;
+    reasons.push(`Kullanıcı adı en az ${USERNAME_MIN_LENGTH} karakter olmalı.`);
+  }
+
+  if (normalized.length > USERNAME_MAX_LENGTH) {
+    valid = false;
+    reasons.push(`Kullanıcı adı en fazla ${USERNAME_MAX_LENGTH} karakter olabilir.`);
+  }
+
+  if (!USERNAME_PATTERN.test(normalized)) {
+    valid = false;
+    reasons.push('Kullanıcı adı sadece küçük harf, rakam, nokta ve alt çizgi içerebilir.');
+  }
+
+  if (normalized.startsWith('.') || normalized.endsWith('.')) {
+    valid = false;
+    reasons.push('Kullanıcı adı nokta ile başlayamaz veya bitemez.');
+  }
+
+  if (normalized.includes('..')) {
+    valid = false;
+    reasons.push('Kullanıcı adında ardışık nokta kullanılamaz.');
+  }
+
+  return {
+    input,
+    normalized,
+    valid,
+    reasons,
+  };
+};
+
+const validateRegistrationPassword = (rawPassword) => {
+  const password = (rawPassword ?? '').toString();
+  const reasons = [];
+
+  if (password.length < REGISTRATION_MIN_PASSWORD_LENGTH) {
+    reasons.push(`Şifre en az ${REGISTRATION_MIN_PASSWORD_LENGTH} karakter olmalı.`);
+  }
+
+  if (!/[a-zA-ZçğıöşüÇĞİÖŞÜ]/.test(password)) {
+    reasons.push('Şifre en az bir harf içermelidir.');
+  }
+
+  if (!/\d/.test(password)) {
+    reasons.push('Şifre en az bir rakam içermelidir.');
+  }
+
+  if (/\s/.test(password)) {
+    reasons.push('Şifre boşluk karakteri içeremez.');
+  }
+
+  return {
+    password,
+    valid: reasons.length === 0,
+    reasons,
+  };
+};
+
+const mapFirebaseAuthCreateUserError = (error) => {
+  const code = error?.code ?? error?.errorInfo?.code ?? '';
+  switch (code) {
+    case 'auth/email-already-exists':
+      return new functions.https.HttpsError(
+        'already-exists',
+        'Bu e-posta adresi zaten bir hesap tarafından kullanılıyor.',
+      );
+    case 'auth/invalid-password':
+      return new functions.https.HttpsError(
+        'invalid-argument',
+        'Şifre güvenlik kriterlerini karşılamıyor.',
+      );
+    case 'auth/invalid-email':
+      return new functions.https.HttpsError('invalid-argument', 'E-posta adresi geçersiz.');
+    default:
+      return new functions.https.HttpsError(
+        'internal',
+        'Hesap oluşturulurken bir sorun oluştu. Lütfen tekrar deneyin.',
+        error?.message ?? error,
+      );
+  }
+};
+
+const toServerTimestamp = () => admin.firestore.FieldValue.serverTimestamp();
+
+const createCorsHeaders = (req) => {
+  const origin = req.headers.origin ?? '*';
+  return {
+    'Access-Control-Allow-Origin': origin,
+    Vary: 'Origin',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers':
+      'Content-Type, Authorization, X-Firebase-AppCheck, X-Firebase-Client, X-Firebase-Functions-Client, X-Firebase-GMPID, X-Firebase-Installations-Auth',
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Max-Age': '3600',
+  };
+};
+
+const applyCorsHeaders = (res, headers) => {
+  Object.entries(headers).forEach(([key, value]) => res.set(key, value));
 };
 
 const ensureAuthenticatedContext = (context) => {
@@ -591,6 +825,457 @@ const verifyOtpCore = async (rawEmail, rawCode) => {
   };
 };
 
+const createRegistrationSessionRecord = async (normalizedEmail, context) => {
+  const sessionId = generateRegistrationSessionId();
+  const expiresAtDate = new Date(Date.now() + REGISTRATION_SESSION_TTL_MINUTES * 60 * 1000);
+  const sessionRef = registrationSessionsCollection().doc(sessionId);
+  const expiresAt = admin.firestore.Timestamp.fromDate(expiresAtDate);
+
+  const record = {
+    email: normalizedEmail,
+    status: 'otp_verified',
+    createdAt: toServerTimestamp(),
+    verifiedAt: toServerTimestamp(),
+    expiresAt,
+    ip: context?.rawRequest?.ip ?? null,
+    userAgent: context?.rawRequest?.headers?.['user-agent'] ?? null,
+    appId: context?.app?.appId ?? null,
+    locale: context?.rawRequest?.headers?.['accept-language'] ?? null,
+  };
+
+  await sessionRef.set(record);
+
+  return {
+    sessionId,
+    expiresAt: expiresAtDate,
+    ref: sessionRef,
+  };
+};
+
+const lockRegistrationSession = async (sessionId) => {
+  const trimmedId = (sessionId ?? '').toString().trim();
+  if (!trimmedId) {
+    throw new functions.https.HttpsError('invalid-argument', 'registration_session_required');
+  }
+
+  const sessionRef = registrationSessionsCollection().doc(trimmedId);
+  let sessionData = null;
+
+  await admin.firestore().runTransaction(async (tx) => {
+    const snapshot = await tx.get(sessionRef);
+    if (!snapshot.exists) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Doğrulama oturumu bulunamadı. Lütfen tekrar kod isteyin.',
+      );
+    }
+
+    const data = snapshot.data() || {};
+    const status = data.status ?? 'otp_verified';
+    const expiresAtTimestamp = data.expiresAt;
+    const expiresAt =
+      expiresAtTimestamp && typeof expiresAtTimestamp.toDate === 'function'
+        ? expiresAtTimestamp.toDate()
+        : null;
+
+    if (!expiresAt || expiresAt.getTime() <= Date.now()) {
+      tx.update(sessionRef, {
+        status: 'expired',
+        expiredAt: toServerTimestamp(),
+      });
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Doğrulama oturumunun süresi dolmuş. Lütfen yeni bir kod isteyin.',
+      );
+    }
+
+    if (status !== 'otp_verified') {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Bu doğrulama oturumu kullanılamaz. Lütfen yeni bir kod isteyin.',
+      );
+    }
+
+    tx.update(sessionRef, {
+      status: 'finalizing',
+      finalizingAt: toServerTimestamp(),
+    });
+
+    sessionData = {
+      ...data,
+      expiresAt,
+    };
+  });
+
+  return { sessionRef, sessionData };
+};
+
+const cleanupFailedRegistration = async ({
+  uid,
+  userDocRef,
+  usernameDocRef,
+  sessionRef,
+  errorCode,
+  errorMessage,
+}) => {
+  try {
+    const batch = admin.firestore().batch();
+
+    if (userDocRef) {
+      batch.delete(userDocRef);
+    }
+
+    if (usernameDocRef) {
+      batch.delete(usernameDocRef);
+    }
+
+    if (sessionRef) {
+      batch.set(
+        sessionRef,
+        {
+          status: 'failed',
+          failedAt: toServerTimestamp(),
+          errorCode: errorCode ?? 'unknown',
+          errorMessage: errorMessage ?? null,
+        },
+        { merge: true },
+      );
+    }
+
+    await batch.commit();
+  } catch (batchError) {
+    functions.logger.error('registrationFinalize.cleanup.batch_failed', {
+      uid: uid ?? null,
+      error: batchError?.message ?? batchError,
+    });
+  }
+
+  if (uid) {
+    await admin
+      .auth()
+      .deleteUser(uid)
+      .catch((deleteError) => {
+        functions.logger.error('registrationFinalize.cleanup.deleteUser_failed', {
+          uid,
+          error: deleteError?.message ?? deleteError,
+        });
+      });
+  }
+};
+
+const registrationVerifyOtpCore = async (rawEmail, rawCode, context) => {
+  const verification = await verifyOtpCore(rawEmail, rawCode);
+  if (!verification.success) {
+    return verification;
+  }
+
+  const normalizedEmail = normalizeEmail(rawEmail);
+  const session = await createRegistrationSessionRecord(normalizedEmail, context);
+
+  return {
+    success: true,
+    sessionId: session.sessionId,
+    expiresAt: session.expiresAt.toISOString(),
+  };
+};
+
+const registrationFinalizeCore = async (payload, context) => {
+  const sessionId = (payload?.sessionId ?? '').toString().trim();
+  const usernameValidation = validateRegistrationUsername(payload?.username);
+  const passwordValidation = validateRegistrationPassword(payload?.password);
+  const fullNameInput = (payload?.fullName ?? '').toString().trim();
+  const marketingOptIn = Boolean(payload?.marketingOptIn);
+
+  if (!sessionId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Kayıt oturumu bulunamadı.');
+  }
+
+  if (!usernameValidation.valid) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Kullanıcı adı kriterlerini karşılamıyor.',
+      {
+        field: 'username',
+        reasons: usernameValidation.reasons,
+      },
+    );
+  }
+
+  if (!passwordValidation.valid) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Şifre kriterlerini karşılamıyor.',
+      {
+        field: 'password',
+        reasons: passwordValidation.reasons,
+      },
+    );
+  }
+
+  const { sessionRef, sessionData } = await lockRegistrationSession(sessionId);
+  const normalizedEmail = sessionData?.email;
+
+  if (!normalizedEmail) {
+    await cleanupFailedRegistration({
+      uid: null,
+      userDocRef: null,
+      usernameDocRef: null,
+      sessionRef,
+      errorCode: 'session-missing-email',
+      errorMessage: 'Registration session does not include an email address.',
+    });
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Doğrulama oturumu geçersiz. Lütfen yeniden deneyin.',
+    );
+  }
+
+  try {
+    const existingUser = await admin.auth().getUserByEmail(normalizedEmail);
+    if (existingUser) {
+      throw new functions.https.HttpsError(
+        'already-exists',
+        'Bu e-posta adresi zaten bir hesap tarafından kullanılıyor.',
+      );
+    }
+  } catch (error) {
+    if (error?.code !== 'auth/user-not-found') {
+      if (error instanceof functions.https.HttpsError) {
+        throw error;
+      }
+      throw new functions.https.HttpsError(
+        'internal',
+        'E-posta doğrulaması tamamlanamadı. Lütfen tekrar deneyin.',
+        error?.message ?? error,
+      );
+    }
+  }
+
+  const normalizedUsername = usernameValidation.normalized;
+  const usernameLower = normalizeUsernameValue(usernameValidation.input || normalizedUsername);
+
+  const usernameDocRef = usernameIndexCollection().doc(usernameLower);
+
+  try {
+    const snapshot = await admin
+      .firestore()
+      .collection('users')
+      .where('usernameLower', '==', usernameLower)
+      .limit(1)
+      .get();
+
+    if (!snapshot.empty) {
+      throw new functions.https.HttpsError(
+        'already-exists',
+        'Bu kullanıcı adı zaten alınmış.',
+        { field: 'username' },
+      );
+    }
+
+    const usernameSnapshot = await usernameDocRef.get();
+    if (usernameSnapshot.exists) {
+      throw new functions.https.HttpsError(
+        'already-exists',
+        'Bu kullanıcı adı zaten alınmış.',
+        { field: 'username' },
+      );
+    }
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError(
+      'internal',
+      'Kullanıcı adı doğrulaması sırasında hata oluştu.',
+      error?.message ?? error,
+    );
+  }
+
+  const fullName = fullNameInput || usernameValidation.input;
+  const normalizedFullName = normalizeFullNameValue(fullName);
+  const fullNameTokens = normalizedFullName
+    ? normalizedFullName.split(' ').filter((token) => token.length > 0)
+    : [];
+  const searchKeywords = generateRegistrationSearchKeywords({
+    username: normalizedUsername,
+    fullName,
+    email: normalizedEmail,
+  });
+
+  let userRecord;
+
+  try {
+    userRecord = await admin.auth().createUser({
+      email: normalizedEmail,
+      password: passwordValidation.password,
+      displayName: fullName,
+      emailVerified: true,
+    });
+  } catch (error) {
+    throw mapFirebaseAuthCreateUserError(error);
+  }
+
+  const definitiveUserDocRef = admin.firestore().collection('users').doc(userRecord.uid);
+
+  try {
+    await admin.firestore().runTransaction(async (tx) => {
+      const sessionSnapshot = await tx.get(sessionRef);
+      if (!sessionSnapshot.exists) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'Doğrulama oturumu bulunamadı. Lütfen yeniden başlayın.',
+        );
+      }
+
+      const currentStatus = sessionSnapshot.data()?.status ?? 'otp_verified';
+      if (currentStatus !== 'finalizing') {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'Doğrulama oturumu kullanılamaz durumda.',
+        );
+      }
+
+      const usernameSnapshot = await tx.get(usernameDocRef);
+      if (usernameSnapshot.exists) {
+        throw new functions.https.HttpsError(
+          'already-exists',
+          'Bu kullanıcı adı zaten alınmış.',
+        );
+      }
+
+      const userSnapshot = await tx.get(definitiveUserDocRef);
+      if (userSnapshot.exists) {
+        throw new functions.https.HttpsError(
+          'already-exists',
+          'Bu e-posta adresi ile bir profil zaten oluşturulmuş.',
+        );
+      }
+
+      tx.set(definitiveUserDocRef, {
+        uid: userRecord.uid,
+        authUid: userRecord.uid,
+        email: normalizedEmail,
+        emailLower: normalizedEmail,
+        username: normalizedUsername,
+        usernameLower,
+        displayName: fullName,
+        fullName,
+        fullNameLower: normalizedFullName,
+        fullNameTokens,
+        searchKeywords,
+        avatar: '👤',
+        isVerified: true,
+        rozetler: ['Yeni Üye'],
+        isPremium: false,
+        joinDate: toServerTimestamp(),
+        createdAt: toServerTimestamp(),
+        lastActive: toServerTimestamp(),
+        krepScore: 0,
+        followersCount: 0,
+        followingCount: 0,
+        marketingOptIn,
+      });
+
+      tx.set(usernameDocRef, {
+        uid: userRecord.uid,
+        username: normalizedUsername,
+        usernameLower,
+        email: normalizedEmail,
+        reservedAt: toServerTimestamp(),
+      });
+
+      tx.update(sessionRef, {
+        status: 'provisioned',
+        provisionedAt: toServerTimestamp(),
+        uid: userRecord.uid,
+        username: normalizedUsername,
+      });
+    });
+  } catch (error) {
+    await cleanupFailedRegistration({
+      uid: userRecord.uid,
+      userDocRef: definitiveUserDocRef,
+      usernameDocRef,
+      sessionRef,
+      errorCode: 'firestore-tx-failed',
+      errorMessage: error?.message ?? error,
+    });
+
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    throw new functions.https.HttpsError(
+      'internal',
+      'Kayıt işlemi tamamlanamadı. Lütfen tekrar deneyin.',
+      error?.message ?? error,
+    );
+  }
+
+  let sqlUserId = null;
+
+  try {
+    const ensureResult = await executeProcedure(
+      'ensureUser',
+      {
+        authUid: userRecord.uid,
+        email: normalizedEmail,
+        username: normalizedUsername,
+        displayName: fullName,
+      },
+      { auth: { uid: userRecord.uid, token: { email: normalizedEmail } } },
+    );
+
+    sqlUserId = ensureResult?.userId ?? ensureResult?.sqlUserId ?? null;
+
+    await definitiveUserDocRef.set(
+      {
+        sqlUserId,
+        updatedAtUtc: toServerTimestamp(),
+      },
+      { merge: true },
+    );
+
+    await sessionRef.set(
+      {
+        status: 'completed',
+        completedAt: toServerTimestamp(),
+        sqlUserId,
+      },
+      { merge: true },
+    );
+  } catch (error) {
+    await cleanupFailedRegistration({
+      uid: userRecord.uid,
+      userDocRef: definitiveUserDocRef,
+      usernameDocRef,
+      sessionRef,
+      errorCode: 'sql-sync-failed',
+      errorMessage: error?.message ?? error,
+    });
+
+    throw new functions.https.HttpsError(
+      'internal',
+      'Kayıt işlemi sırasında beklenmedik bir hata oluştu. Lütfen tekrar deneyin.',
+      error?.message ?? error,
+    );
+  }
+
+  const customToken = await admin.auth().createCustomToken(userRecord.uid, {
+    registrationCompleted: true,
+  });
+
+  return {
+    success: true,
+    uid: userRecord.uid,
+    email: normalizedEmail,
+    username: normalizedUsername,
+    sessionId,
+    customToken,
+    sqlUserId,
+  };
+};
+
 const sendPhoneOtpCore = async (rawPhone, uid) => {
   const normalizedPhone = normalizePhoneNumber(rawPhone);
 
@@ -754,6 +1439,7 @@ exports.sendEmailOtpHttp = functions.region('europe-west1').https.onRequest(asyn
   );
   res.set('Access-Control-Allow-Credentials', 'true');
   res.set('Access-Control-Max-Age', '3600');
+  res.set('Content-Type', 'application/json; charset=utf-8');
 
   if (req.method === 'OPTIONS') {
     res.status(204).send('');
@@ -762,6 +1448,7 @@ exports.sendEmailOtpHttp = functions.region('europe-west1').https.onRequest(asyn
 
   if (req.method !== 'POST') {
     res.status(405).json({
+      ok: false,
       error: 'method-not-allowed',
       message: 'Bu uç noktaya yalnızca POST isteği yapılabilir.',
     });
@@ -779,6 +1466,7 @@ exports.sendEmailOtpHttp = functions.region('europe-west1').https.onRequest(asyn
   } catch (parseError) {
     functions.logger.error('İstek gövdesi çözümlenemedi', { error: parseError });
     res.status(400).json({
+      ok: false,
       error: 'invalid-json',
       message: 'Geçersiz JSON gövdesi.',
     });
@@ -787,6 +1475,7 @@ exports.sendEmailOtpHttp = functions.region('europe-west1').https.onRequest(asyn
 
   if (!rawEmail) {
     res.status(400).json({
+      ok: false,
       error: 'invalid-argument',
       message: 'E-posta adresi gerekli.',
     });
@@ -799,10 +1488,11 @@ exports.sendEmailOtpHttp = functions.region('europe-west1').https.onRequest(asyn
     if (shouldExposeDebugOtp()) {
       response.debugCode = code;
     }
-    res.status(200).json(response);
+    res.status(200).json({ ok: true, ...response });
   } catch (error) {
     if (error instanceof functions.https.HttpsError) {
       res.status(mapHttpsErrorToStatus(error.code)).json({
+        ok: false,
         error: error.code,
         message: error.message,
         details: error.details ?? null,
@@ -812,11 +1502,14 @@ exports.sendEmailOtpHttp = functions.region('europe-west1').https.onRequest(asyn
 
     functions.logger.error('HTTP OTP isteği başarısız oldu', {
       error: error?.message ?? error,
+      stack: error?.stack ?? null,
     });
 
     res.status(500).json({
+      ok: false,
       error: 'internal',
       message: 'Doğrulama e-postası gönderilemedi.',
+      debug: error?.message ?? String(error),
     });
   }
 });
@@ -836,6 +1529,32 @@ exports.verifyEmailOtp = functions.region('europe-west1').https.onCall(async (da
       'internal',
       'Doğrulama işlemi tamamlanamadı.',
       error?.message ?? error
+    );
+  }
+});
+
+exports.registrationVerifyOtp = functions.region('europe-west1').https.onCall(async (data, context) => {
+  if (!context.app) {
+    throw new functions.https.HttpsError('failed-precondition', 'app_check_required');
+  }
+
+  try {
+    const rawEmail = data?.email ?? '';
+    const rawCode = data?.code ?? '';
+    return await registrationVerifyOtpCore(rawEmail, rawCode, context);
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    functions.logger.error('registrationVerifyOtp failed', {
+      error: error?.message ?? error,
+    });
+
+    throw new functions.https.HttpsError(
+      'internal',
+      'Doğrulama işlemi tamamlanamadı.',
+      error?.message ?? error,
     );
   }
 });
@@ -889,6 +1608,30 @@ exports.confirmEmailUpdate = functions.region('europe-west1').https.onCall(async
   );
 
   return { success: true };
+});
+
+exports.registrationFinalize = functions.region('europe-west1').https.onCall(async (data, context) => {
+  if (!context.app) {
+    throw new functions.https.HttpsError('failed-precondition', 'app_check_required');
+  }
+
+  try {
+    return await registrationFinalizeCore(data, context);
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    functions.logger.error('registrationFinalize failed', {
+      error: error?.message ?? error,
+    });
+
+    throw new functions.https.HttpsError(
+      'internal',
+      'Kayıt işlemi tamamlanamadı. Lütfen tekrar deneyin.',
+      error?.message ?? error,
+    );
+  }
 });
 
 exports.sendPhoneOtp = functions.region('europe-west1').https.onCall(async (data, context) => {
@@ -1070,6 +1813,131 @@ exports.verifyEmailOtpHttp = functions.region('europe-west1').https.onRequest(as
     });
   }
 });
+
+exports.registrationVerifyOtpHttp = functions
+  .region('europe-west1')
+  .https.onRequest(async (req, res) => {
+    const headers = createCorsHeaders(req);
+    applyCorsHeaders(res, headers);
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+
+    if (req.method !== 'POST') {
+      res.status(405).json({
+        error: 'method-not-allowed',
+        message: 'Bu uç noktaya yalnızca POST isteği yapılabilir.',
+      });
+      return;
+    }
+
+    let body;
+    try {
+      body = typeof req.body === 'string' && req.body ? JSON.parse(req.body) : req.body || {};
+    } catch (error) {
+      res.status(400).json({
+        error: 'invalid-json',
+        message: 'Geçersiz JSON gövdesi.',
+      });
+      return;
+    }
+
+    const rawEmail = body?.email ?? body?.data?.email ?? '';
+    const rawCode = body?.code ?? body?.data?.code ?? '';
+
+    if (!rawEmail || !rawCode) {
+      res.status(400).json({
+        error: 'invalid-argument',
+        message: 'E-posta ve doğrulama kodu gereklidir.',
+      });
+      return;
+    }
+
+    try {
+      const result = await registrationVerifyOtpCore(rawEmail, rawCode, {
+        rawRequest: req,
+        app: { appId: null },
+      });
+      res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof functions.https.HttpsError) {
+        res.status(mapHttpsErrorToStatus(error.code)).json({
+          error: error.code,
+          message: error.message,
+          details: error.details ?? null,
+        });
+        return;
+      }
+
+      functions.logger.error('registrationVerifyOtpHttp failed', {
+        error: error?.message ?? error,
+      });
+
+      res.status(500).json({
+        error: 'internal',
+        message: 'Doğrulama işlemi tamamlanamadı.',
+      });
+    }
+  });
+
+exports.registrationFinalizeHttp = functions
+  .region('europe-west1')
+  .https.onRequest(async (req, res) => {
+    const headers = createCorsHeaders(req);
+    applyCorsHeaders(res, headers);
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+
+    if (req.method !== 'POST') {
+      res.status(405).json({
+        error: 'method-not-allowed',
+        message: 'Bu uç noktaya yalnızca POST isteği yapılabilir.',
+      });
+      return;
+    }
+
+    let body;
+    try {
+      body = typeof req.body === 'string' && req.body ? JSON.parse(req.body) : req.body || {};
+    } catch (error) {
+      res.status(400).json({
+        error: 'invalid-json',
+        message: 'Geçersiz JSON gövdesi.',
+      });
+      return;
+    }
+
+    try {
+      const result = await registrationFinalizeCore(body, {
+        rawRequest: req,
+        app: { appId: null },
+      });
+      res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof functions.https.HttpsError) {
+        res.status(mapHttpsErrorToStatus(error.code)).json({
+          error: error.code,
+          message: error.message,
+          details: error.details ?? null,
+        });
+        return;
+      }
+
+      functions.logger.error('registrationFinalizeHttp failed', {
+        error: error?.message ?? error,
+      });
+
+      res.status(500).json({
+        error: 'internal',
+        message: 'Kayıt işlemi tamamlanamadı. Lütfen tekrar deneyin.',
+      });
+    }
+  });
 
 // ---------------------------------------------------------------------------
 // 💳 CringeCoin In-App Purchase Verification & Wallet Ledger Helpers

@@ -6,7 +6,7 @@
  * Tutarsızlık bulunursa Slack/email alert gönderir.
  */
 
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 const admin = require('firebase-admin');
 const sql = require('mssql');
 const { sendSlackAlert, logStructured } = require('../utils/alerts');

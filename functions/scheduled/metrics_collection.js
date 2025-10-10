@@ -6,7 +6,7 @@
  * Anomali tespit edilirse alert gönderir.
  */
 
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 const sql = require('mssql');
 const { sendSlackAlert, logStructured } = require('../utils/alerts');
 

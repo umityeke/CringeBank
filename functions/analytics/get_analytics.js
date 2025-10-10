@@ -5,7 +5,7 @@
  * user stats, trending content, and recommendations
  */
 
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 const { getSqlPool } = require('../utils/sql');
 
 /**

@@ -1,4 +1,4 @@
-jest.mock('firebase-functions', () => ({
+jest.mock('../../regional_functions', () => ({
   logger: {
     info: jest.fn(),
     warn: jest.fn(),

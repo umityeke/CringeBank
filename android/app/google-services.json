@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "688167942712",
-    "project_id": "cringe-bank",
-    "storage_bucket": "cringe-bank.firebasestorage.app"
+    "project_number": "127594268731",
+    "project_id": "cringebank",
+    "storage_bucket": "cringebank.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:688167942712:android:a6594e59ad424324a5c4cd",
+        "mobilesdk_app_id": "1:127594268731:android:229855fd3c141f43e8b41e",
         "android_client_info": {
           "package_name": "com.cringebank.app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDvWjdZOZ2IQojrHKkexy6RDHzQVtuKB8I"
+          "current_key": "AIzaSyCJ3x_nXxrzjTGyAytVsJwAZ2ebpIzb31Q"
         }
       ],
       "services": {

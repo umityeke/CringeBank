@@ -1,5 +1,5 @@
 const mssql = require('mssql');
-const functions = require('firebase-functions');
+const functions = require('../regional_functions');
 const { readSqlConfig } = require('./config');
 
 let poolPromise = null;

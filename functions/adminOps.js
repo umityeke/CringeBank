@@ -5,7 +5,7 @@
 // 2. App Check: Verified app only
 // 3. Re-auth: Recent authentication required (5 min)
 
-const functions = require('firebase-functions');
+const functions = require('./regional_functions');
 const admin = require('firebase-admin');
 
 // Constants

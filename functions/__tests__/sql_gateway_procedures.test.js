@@ -1,4 +1,4 @@
-jest.mock('firebase-functions', () => {
+jest.mock('../regional_functions', () => {
   class HttpsError extends Error {
     constructor(code, message) {
       super(message);

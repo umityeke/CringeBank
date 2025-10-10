@@ -1,4 +1,4 @@
-const functions = require('firebase-functions');
+const functions = require('./regional_functions');
 const mssql = require('mssql');
 
 const DEFAULT_REGION = process.env.FOLLOW_PREVIEW_REGION || 'europe-west1';

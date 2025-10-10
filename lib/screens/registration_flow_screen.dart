@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -34,6 +35,8 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
 
   String? _pendingEmail;
   String? _pendingPassword;
+  String? _registrationSessionId;
+  DateTime? _registrationSessionExpiresAt;
 
   @override
   void initState() {
@@ -366,7 +369,7 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
         _buildTextField(
           controller: _passwordController,
           label: 'Şifre',
-          hint: 'En az 6 karakter',
+          hint: 'En az 8 karakter, harf ve rakam içermeli',
           obscureText: true,
           icon: Icons.lock_outline,
           textInputAction: TextInputAction.next,
@@ -543,8 +546,9 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
       return;
     }
 
-    if (password.length < 6) {
-      _showMessage('Şifre en az 6 karakter olmalıdır');
+    final passwordError = _validatePassword(password);
+    if (passwordError != null) {
+      _showMessage(passwordError);
       return;
     }
 
@@ -566,6 +570,8 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
 
       _pendingEmail = email;
       _pendingPassword = password;
+      _registrationSessionId = null;
+      _registrationSessionExpiresAt = null;
       _otpController.clear();
 
       setState(() {
@@ -586,6 +592,9 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
 
   Future<void> _resendOtp() async {
     if (_pendingEmail == null) return;
+
+    _registrationSessionId = null;
+    _registrationSessionExpiresAt = null;
 
     setState(() => _isLoading = true);
     try {
@@ -626,11 +635,33 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
         }
 
         _showMessage(message);
+        _registrationSessionId = null;
+        _registrationSessionExpiresAt = null;
+        return;
+      }
+
+      final sessionId = result.sessionId;
+      if (sessionId == null || sessionId.isEmpty) {
+        _showMessage(
+          'Doğrulama oturumu oluşturulamadı. Lütfen kodu yeniden talep et.',
+        );
+        return;
+      }
+
+      final sessionExpiresAt = result.sessionExpiresAt;
+      if (sessionExpiresAt != null && sessionExpiresAt.isBefore(DateTime.now())) {
+        _showMessage(
+          'Doğrulama oturumu süresi doldu. Lütfen yeni bir kod iste.',
+        );
+        _registrationSessionId = null;
+        _registrationSessionExpiresAt = null;
         return;
       }
 
       setState(() {
         _step = RegistrationStep.profile;
+        _registrationSessionId = sessionId;
+        _registrationSessionExpiresAt = sessionExpiresAt;
       });
 
       _showMessage(
@@ -646,6 +677,8 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
   Future<void> _finalizeRegistration() async {
     final username = _usernameController.text.trim();
     final fullName = _fullNameController.text.trim();
+    final sessionId = _registrationSessionId;
+    final sessionExpiresAt = _registrationSessionExpiresAt;
 
     if (username.length < 3) {
       _showMessage('Kullanıcı adı en az 3 karakter olmalıdır');
@@ -659,6 +692,24 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
 
     if (_pendingEmail == null || _pendingPassword == null) {
       _showMessage('Kayıt adımlarını yeniden başlatın');
+      return;
+    }
+
+    if (sessionId == null || sessionId.isEmpty) {
+      _showMessage('Doğrulama oturumu bulunamadı. Lütfen e-postanı yeniden doğrula.');
+      setState(() {
+        _step = RegistrationStep.otp;
+      });
+      return;
+    }
+
+    if (sessionExpiresAt != null && sessionExpiresAt.isBefore(DateTime.now())) {
+      _showMessage('Doğrulama oturumunun süresi dolmuş. Lütfen kodu yeniden iste.');
+      setState(() {
+        _step = RegistrationStep.otp;
+      });
+      _registrationSessionId = null;
+      _registrationSessionExpiresAt = null;
       return;
     }
 
@@ -678,6 +729,8 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
         username: username,
         password: _pendingPassword!,
         fullName: fullName,
+        sessionId: sessionId,
+        marketingOptIn: false,
       );
 
       if (!success) {
@@ -687,14 +740,49 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
 
       if (!mounted) return;
 
+      _registrationSessionId = null;
+      _registrationSessionExpiresAt = null;
+      _pendingEmail = null;
+      _pendingPassword = null;
       _showMessage('Hesabınız başarıyla oluşturuldu');
 
       Navigator.of(context).pushNamedAndRemoveUntil('/main', (route) => false);
+    } on FirebaseFunctionsException catch (error) {
+      final message = _mapRegistrationFinalizeError(error);
+      if (error.code == 'failed-precondition') {
+        setState(() {
+          _step = RegistrationStep.otp;
+        });
+        _registrationSessionId = null;
+        _registrationSessionExpiresAt = null;
+        _otpController.clear();
+      }
+      _showMessage(message);
     } catch (e) {
       _showMessage('Hesap oluşturulamadı: $e');
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  String? _validatePassword(String password) {
+    if (password.length < 8) {
+      return 'Şifre en az 8 karakter olmalıdır';
+    }
+
+    if (!RegExp(r'[A-Za-zçğıöşüÇĞİÖŞÜ]').hasMatch(password)) {
+      return 'Şifre en az bir harf içermelidir';
+    }
+
+    if (!RegExp(r'\d').hasMatch(password)) {
+      return 'Şifre en az bir rakam içermelidir';
+    }
+
+    if (RegExp(r'\s').hasMatch(password)) {
+      return 'Şifre boşluk karakteri içeremez';
+    }
+
+    return null;
   }
 
   bool _isValidUsername(String username) {
@@ -731,6 +819,43 @@ class _RegistrationFlowScreenState extends State<RegistrationFlowScreen>
     }
 
     return 'Kod doğrulanamadı. Lütfen tekrar dene.';
+  }
+
+  String _mapRegistrationFinalizeError(FirebaseFunctionsException error) {
+    final details = error.details;
+    String? field;
+    List<String> reasons = const [];
+
+    if (details is Map) {
+      field = details['field']?.toString();
+      final detailReasons = details['reasons'];
+      if (detailReasons is List) {
+        reasons = detailReasons
+            .whereType<String>()
+            .map((reason) => reason.trim())
+            .where((reason) => reason.isNotEmpty)
+            .toList(growable: false);
+      }
+    }
+
+    if (reasons.isNotEmpty) {
+      return reasons.first;
+    }
+
+    switch (error.code) {
+      case 'already-exists':
+        if (field == 'username') {
+          return 'Bu kullanıcı adı zaten alınmış.';
+        }
+        return 'Bu e-posta adresi zaten kullanılıyor.';
+      case 'failed-precondition':
+        return 'Doğrulama oturumu geçersiz veya süresi doldu. Lütfen e-postanı yeniden doğrula.';
+      case 'invalid-argument':
+        return error.message ?? 'Girilen bilgiler doğrulanamadı.';
+      default:
+        return error.message ??
+            'Kayıt işlemi tamamlanamadı. Lütfen tekrar dene.';
+    }
   }
 }
 

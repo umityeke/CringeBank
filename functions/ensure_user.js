@@ -1,4 +1,4 @@
-const functions = require('firebase-functions');
+const functions = require('./regional_functions');
 const { executeProcedure } = require('./sql_gateway');
 
 const REGION = process.env.ENSURE_SQL_USER_REGION || 'europe-west1';

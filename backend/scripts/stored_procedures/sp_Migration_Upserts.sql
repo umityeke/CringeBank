@@ -220,58 +220,88 @@ CREATE PROCEDURE dbo.sp_Migration_UpsertEscrow
   @OrderPublicId NVARCHAR(64),
   @BuyerAuthUid NVARCHAR(64),
   @SellerAuthUid NVARCHAR(64) = NULL,
-  @State NVARCHAR(32) = 'LOCKED',
+  @EscrowState NVARCHAR(32) = 'LOCKED',
   @LockedAmountGold INT,
   @ReleasedAmountGold INT = 0,
   @RefundedAmountGold INT = 0,
+  @LockRequestedAt DATETIME2 = NULL,
   @LockedAt DATETIME2 = NULL,
   @ReleasedAt DATETIME2 = NULL,
-  @RefundedAt DATETIME2 = NULL
+  @RefundedAt DATETIME2 = NULL,
+  @DisputedAt DATETIME2 = NULL,
+  @ResolvedAt DATETIME2 = NULL,
+  @NotesJson NVARCHAR(MAX) = NULL,
+  @CreatedAt DATETIME2 = NULL,
+  @UpdatedAt DATETIME2 = NULL
 AS
 BEGIN
   SET NOCOUNT ON;
   SET XACT_ABORT ON;
 
   DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+  DECLARE @OrderId UNIQUEIDENTIFIER = NULL;
+
+  SELECT @OrderId = OrderId
+  FROM StoreOrders
+  WHERE OrderPublicId = @OrderPublicId;
+
+  IF @OrderId IS NULL
+  BEGIN
+    RAISERROR('OrderPublicId not found in StoreOrders.', 16, 1);
+    RETURN;
+  END;
 
   MERGE INTO StoreEscrows AS target
   USING (
     SELECT 
       @EscrowPublicId AS EscrowPublicId,
-      @OrderPublicId AS OrderPublicId,
+      @OrderId AS OrderId,
       @BuyerAuthUid AS BuyerAuthUid,
       @SellerAuthUid AS SellerAuthUid,
-      @State AS State,
+      @EscrowState AS EscrowState,
       @LockedAmountGold AS LockedAmountGold,
       @ReleasedAmountGold AS ReleasedAmountGold,
       @RefundedAmountGold AS RefundedAmountGold,
+      @LockRequestedAt AS LockRequestedAt,
       ISNULL(@LockedAt, @Now) AS LockedAt,
       @ReleasedAt AS ReleasedAt,
-      @RefundedAt AS RefundedAt
+      @RefundedAt AS RefundedAt,
+      @DisputedAt AS DisputedAt,
+      @ResolvedAt AS ResolvedAt,
+      @NotesJson AS NotesJson,
+      ISNULL(@CreatedAt, @Now) AS CreatedAt,
+      ISNULL(@UpdatedAt, @Now) AS UpdatedAt
   ) AS source
   ON target.EscrowPublicId = source.EscrowPublicId
   WHEN MATCHED THEN
     UPDATE SET
-      OrderPublicId = source.OrderPublicId,
+      OrderId = source.OrderId,
       BuyerAuthUid = source.BuyerAuthUid,
       SellerAuthUid = source.SellerAuthUid,
-      State = source.State,
+      EscrowState = source.EscrowState,
       LockedAmountGold = source.LockedAmountGold,
       ReleasedAmountGold = source.ReleasedAmountGold,
       RefundedAmountGold = source.RefundedAmountGold,
+      LockRequestedAt = source.LockRequestedAt,
       LockedAt = source.LockedAt,
       ReleasedAt = source.ReleasedAt,
-      RefundedAt = source.RefundedAt
+      RefundedAt = source.RefundedAt,
+      DisputedAt = source.DisputedAt,
+      ResolvedAt = source.ResolvedAt,
+      NotesJson = source.NotesJson,
+      UpdatedAt = source.UpdatedAt
   WHEN NOT MATCHED THEN
     INSERT (
-      EscrowPublicId, OrderPublicId, BuyerAuthUid, SellerAuthUid,
-      State, LockedAmountGold, ReleasedAmountGold, RefundedAmountGold,
-      LockedAt, ReleasedAt, RefundedAt
+      EscrowPublicId, OrderId, BuyerAuthUid, SellerAuthUid,
+      EscrowState, LockedAmountGold, ReleasedAmountGold, RefundedAmountGold,
+      LockRequestedAt, LockedAt, ReleasedAt, RefundedAt, DisputedAt, ResolvedAt,
+      NotesJson, CreatedAt, UpdatedAt
     )
     VALUES (
-      source.EscrowPublicId, source.OrderPublicId, source.BuyerAuthUid, source.SellerAuthUid,
-      source.State, source.LockedAmountGold, source.ReleasedAmountGold, source.RefundedAmountGold,
-      source.LockedAt, source.ReleasedAt, source.RefundedAt
+      source.EscrowPublicId, source.OrderId, source.BuyerAuthUid, source.SellerAuthUid,
+      source.EscrowState, source.LockedAmountGold, source.ReleasedAmountGold, source.RefundedAmountGold,
+      source.LockRequestedAt, source.LockedAt, source.ReleasedAt, source.RefundedAt, source.DisputedAt, source.ResolvedAt,
+      source.NotesJson, source.CreatedAt, source.UpdatedAt
     );
 
   RETURN 0;

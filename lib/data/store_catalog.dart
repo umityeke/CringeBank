@@ -265,6 +265,33 @@ class StorePackage {
 }
 
 class StoreCatalog {
+  static final Map<int, IconData> _materialIconRegistry = {
+    Icons.auto_awesome.codePoint: Icons.auto_awesome,
+    Icons.auto_awesome_outlined.codePoint: Icons.auto_awesome_outlined,
+    Icons.auto_awesome_rounded.codePoint: Icons.auto_awesome_rounded,
+    Icons.auto_fix_high.codePoint: Icons.auto_fix_high,
+    Icons.all_inclusive_rounded.codePoint: Icons.all_inclusive_rounded,
+    Icons.blur_circular_rounded.codePoint: Icons.blur_circular_rounded,
+    Icons.bolt_rounded.codePoint: Icons.bolt_rounded,
+    Icons.color_lens_outlined.codePoint: Icons.color_lens_outlined,
+    Icons.crop_square_rounded.codePoint: Icons.crop_square_rounded,
+    Icons.diamond_rounded.codePoint: Icons.diamond_rounded,
+    Icons.emoji_emotions_outlined.codePoint: Icons.emoji_emotions_outlined,
+    Icons.emoji_events_outlined.codePoint: Icons.emoji_events_outlined,
+    Icons.filter_vintage_rounded.codePoint: Icons.filter_vintage_rounded,
+    Icons.format_color_text_rounded.codePoint: Icons.format_color_text_rounded,
+    Icons.gradient_rounded.codePoint: Icons.gradient_rounded,
+    Icons.hexagon_outlined.codePoint: Icons.hexagon_outlined,
+    Icons.high_quality_outlined.codePoint: Icons.high_quality_outlined,
+    Icons.shield_moon_outlined.codePoint: Icons.shield_moon_outlined,
+    Icons.start_rounded.codePoint: Icons.start_rounded,
+    Icons.style_rounded.codePoint: Icons.style_rounded,
+    Icons.verified_outlined.codePoint: Icons.verified_outlined,
+    Icons.water_drop_outlined.codePoint: Icons.water_drop_outlined,
+    Icons.workspace_premium.codePoint: Icons.workspace_premium,
+    Icons.workspace_premium_outlined.codePoint: Icons.workspace_premium_outlined,
+  };
+
   static final List<StoreItem> _allItems = [
     // Mor Tik abonelikleri
     StoreItem(
@@ -863,7 +890,7 @@ class StoreCatalog {
 
   static IconData? _iconFromAny(dynamic value) {
     if (value is int) {
-      return IconData(value, fontFamily: 'MaterialIcons');
+      return _materialIconRegistry[value];
     }
     return null;
   }

@@ -116,7 +116,7 @@ class EntryActionHelper {
         backgroundColor: const Color(0xFF1A1A2E),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          side: BorderSide(color: Colors.white.withOpacity(0.1)),
         ),
         title: const Text('Krepi Sil', style: TextStyle(color: Colors.white)),
         content: const Text(

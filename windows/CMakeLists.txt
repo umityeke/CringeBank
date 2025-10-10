@@ -35,6 +35,18 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
 
+if(MSVC)
+  add_compile_options(/FS)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /FS")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /FS")
+  set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded)
+  if(DEFINED ENV{CL})
+    set(ENV{CL} "$ENV{CL} /FS")
+  else()
+    set(ENV{CL} "/FS")
+  endif()
+endif()
+
 # Compilation settings that should be applied to most targets.
 #
 # Be cautious about adding new options here, as plugins use this function by
@@ -46,6 +58,9 @@ function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_options(${TARGET} PRIVATE /EHsc)
   target_compile_definitions(${TARGET} PRIVATE "_HAS_EXCEPTIONS=0")
   target_compile_definitions(${TARGET} PRIVATE "$<$<CONFIG:Debug>:_DEBUG>")
+  if(MSVC)
+    target_compile_options(${TARGET} PRIVATE /FS)
+  endif()
 endfunction()
 
 # Flutter library and tool build rules.
@@ -59,6 +74,8 @@ add_subdirectory("runner")
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
 include(flutter/generated_plugins.cmake)
+
+
 
 
 # === Installation ===

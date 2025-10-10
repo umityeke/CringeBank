@@ -15,6 +15,75 @@ const ALLOWLIST_LOG_PREFIX = '[Allowlist]';
 let allowlistCache = null;
 let allowlistCacheFetchedAt = 0;
 
+const SQL_MIRROR_DM_SOURCE = 'cloudfunction://messaging/sendMessage';
+let cachedClientSqlMirrorFlag = null;
+
+function normalizeBooleanFlag(value, defaultValue = false) {
+  if (value === undefined || value === null) {
+    return defaultValue;
+  }
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(normalized)) {
+      return true;
+    }
+    if (['false', '0', 'no', 'off'].includes(normalized)) {
+      return false;
+    }
+  }
+  return defaultValue;
+}
+
+function resolveClientSqlMirrorFlag() {
+  const envCandidates = [
+    process.env.ENABLE_CLIENT_DM_SQL_DOUBLEWRITE,
+    process.env.ENABLE_CLIENT_SQL_DOUBLEWRITE,
+    process.env.ENABLE_CLIENT_SQL_MIRROR,
+    process.env.ENABLE_SQL_MIRROR_DOUBLEWRITE,
+  ];
+
+  for (const candidate of envCandidates) {
+    if (candidate !== undefined) {
+      return normalizeBooleanFlag(candidate, false);
+    }
+  }
+
+  try {
+    const messagingConfig = functions.config()?.messaging || {};
+    const configCandidates = [
+      messagingConfig.enable_client_dm_sql_doublewrite,
+      messagingConfig.enable_client_sql_doublewrite,
+      messagingConfig.enable_client_sql_mirror,
+      messagingConfig.enable_sql_mirror_doublewrite,
+    ];
+
+    for (const candidate of configCandidates) {
+      if (candidate !== undefined) {
+        return normalizeBooleanFlag(candidate, false);
+      }
+    }
+  } catch (error) {
+    // Ignore when functions config is not available (e.g. local tests)
+  }
+
+  return false;
+}
+
+function isClientSqlMirrorEnabled({ forceRefresh = false } = {}) {
+  if (!forceRefresh && typeof cachedClientSqlMirrorFlag === 'boolean') {
+    return cachedClientSqlMirrorFlag;
+  }
+
+  cachedClientSqlMirrorFlag = resolveClientSqlMirrorFlag();
+  return cachedClientSqlMirrorFlag;
+}
+
 function logAllowlistFallback(message, error) {
   if (!error) {
     console.warn(`${ALLOWLIST_LOG_PREFIX} ${message}`);
@@ -100,6 +169,34 @@ function buildParticipantMetaUpdates(meta) {
     });
   });
   return updates;
+}
+
+function mergeParticipantMeta(existingMeta, updates) {
+  const merged = {};
+
+  if (existingMeta && typeof existingMeta === 'object') {
+    Object.entries(existingMeta).forEach(([uid, fields]) => {
+      if (!fields || typeof fields !== 'object') {
+        return;
+      }
+      merged[uid] = { ...fields };
+    });
+  }
+
+  if (updates && typeof updates === 'object') {
+    Object.entries(updates).forEach(([uid, fields]) => {
+      if (!fields || typeof fields !== 'object') {
+        return;
+      }
+      const current = merged[uid] && typeof merged[uid] === 'object' ? { ...merged[uid] } : {};
+      Object.entries(fields).forEach(([field, value]) => {
+        current[field] = value;
+      });
+      merged[uid] = current;
+    });
+  }
+
+  return merged;
 }
 
 function sanitizeClientMessageId(value) {
@@ -314,6 +411,75 @@ async function validateExternalMedia(mediaExternal, allowlist) {
   return { valid: true };
 }
 
+function buildDmSqlMirrorEnvelope({
+  conversationId,
+  messageId,
+  clientMessageId,
+  senderId,
+  recipientId,
+  text,
+  media,
+  mediaExternal,
+  participantMeta,
+  timestampIso,
+}) {
+  const iso = timestampIso || new Date().toISOString();
+  const normalizedMedia = Array.isArray(media)
+    ? media
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter((item) => item.length > 0)
+    : [];
+
+  const document = {
+    senderId,
+    conversationId,
+    clientMessageId,
+    createdAt: iso,
+    updatedAt: iso,
+  };
+
+  if (text && typeof text === 'string' && text.trim().length > 0) {
+    document.text = text.trim();
+  }
+
+  if (normalizedMedia.length > 0) {
+    document.media = normalizedMedia;
+  }
+
+  if (mediaExternal && typeof mediaExternal === 'object') {
+    document.mediaExternal = mediaExternal;
+  }
+
+  const attachments = normalizedMedia.map((path) => ({ path }));
+  const eventId = `dm.message.create:${conversationId}:${messageId}:${Date.now()}:${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
+
+  const participantMetaPayload = participantMeta && typeof participantMeta === 'object' ? participantMeta : null;
+
+  return {
+    id: eventId,
+    type: 'dm.message.create',
+    specversion: '1.0',
+    source: SQL_MIRROR_DM_SOURCE,
+    time: iso,
+    data: {
+      operation: 'create',
+      conversationId,
+      messageId,
+      clientMessageId,
+      senderId,
+      recipientId: recipientId || null,
+      timestamp: iso,
+      participantMeta: participantMetaPayload,
+      document,
+      previousDocument: null,
+      attachments,
+      source: SQL_MIRROR_DM_SOURCE,
+    },
+  };
+}
+
 // ====================================================================
 // CLOUD FUNCTIONS
 // ====================================================================
@@ -448,7 +614,8 @@ exports.sendMessage = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError('permission-denied', 'Bu conversation\'a üye değilsiniz.');
     }
 
-    const participantMetaUpdates = sanitizeParticipantMeta(data?.participantMeta, members);
+  const participantMetaUpdates = sanitizeParticipantMeta(data?.participantMeta, members);
+  const mergedParticipantMeta = mergeParticipantMeta(conversationData.participantMeta, participantMetaUpdates);
 
     // Check if blocked
     const otherUserId = members.find((m) => m !== userId);
@@ -492,6 +659,12 @@ exports.sendMessage = functions.https.onCall(async (data, context) => {
     }
     const now = admin.firestore.FieldValue.serverTimestamp();
     const editAllowedUntil = admin.firestore.Timestamp.fromMillis(Date.now() + 15 * 60 * 1000); // 15 minutes
+    const eventTimestampIso = new Date().toISOString();
+    const normalizedMedia = Array.isArray(media)
+      ? media
+          .map((item) => (typeof item === 'string' ? item.trim() : ''))
+          .filter((item) => item.length > 0)
+      : [];
 
     const messageData = {
       senderId: userId,
@@ -503,7 +676,7 @@ exports.sendMessage = functions.https.onCall(async (data, context) => {
     };
 
     if (text) messageData.text = text;
-    if (media && media.length > 0) messageData.media = media;
+    if (normalizedMedia.length > 0) messageData.media = normalizedMedia;
     if (validatedMediaExternal) messageData.mediaExternal = validatedMediaExternal;
 
     await messageRef.set(messageData);
@@ -525,9 +698,33 @@ exports.sendMessage = functions.https.onCall(async (data, context) => {
 
     await conversationRef.update(conversationUpdate);
 
+    const shouldMirrorSql = isClientSqlMirrorEnabled();
+    const effectiveClientMessageId = clientMessageId || messageRef.id;
+    const sqlMirrorEnvelope = shouldMirrorSql
+      ? buildDmSqlMirrorEnvelope({
+          conversationId,
+          messageId: messageRef.id,
+          clientMessageId: effectiveClientMessageId,
+          senderId: userId,
+          recipientId: otherUserId,
+          text,
+          media: normalizedMedia,
+          mediaExternal: validatedMediaExternal,
+          participantMeta: mergedParticipantMeta,
+          timestampIso: eventTimestampIso,
+        })
+      : null;
+
     return {
       success: true,
       messageId: messageRef.id,
+      clientMessageId: effectiveClientMessageId,
+      shouldMirrorSql,
+      sqlMirrorEnvelope,
+      timestamp: eventTimestampIso,
+      createdAt: eventTimestampIso,
+      updatedAt: eventTimestampIso,
+      previousDocument: null,
     };
   } catch (error) {
     console.error('Error sending message:', error);

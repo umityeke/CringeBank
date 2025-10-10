@@ -78,10 +78,10 @@ class AvatarUploadService {
           ),
           WebUiSettings(
             context: context,
-            enableZoom: true,
-            enableResize: true,
-            enforceBoundary: true,
-            mouseWheelZoom: true,
+            viewwMode: WebViewMode.mode_1,
+            zoomable: true,
+            cropBoxResizable: true,
+            zoomOnWheel: true,
           ),
         ],
       );

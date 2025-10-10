@@ -59,7 +59,7 @@ class StoreItemArtworkCard extends StatelessWidget {
                     sigmaX: artwork.blurSigma,
                     sigmaY: artwork.blurSigma,
                   ),
-                  child: Container(color: Colors.white.withValues(alpha: 0.06)),
+                  child: Container(color: Colors.white.withOpacity(0.06)),
                 ),
               ),
               _buildHighlightRing(),
@@ -93,9 +93,9 @@ class StoreItemArtworkCard extends StatelessWidget {
   Color _borderColor(BuildContext context) {
     if (isEquipped) return Colors.white;
     if (item.highlighted) {
-      return Colors.white.withValues(alpha: 0.6);
+  return Colors.white.withOpacity(0.6);
     }
-    return Colors.white.withValues(alpha: 0.2);
+  return Colors.white.withOpacity(0.2);
   }
 
   List<BoxShadow> _buildShadows(List<Color> colors) {
@@ -103,7 +103,7 @@ class StoreItemArtworkCard extends StatelessWidget {
     final baseColor = colors.last;
     return [
       BoxShadow(
-        color: baseColor.withValues(alpha: 0.25),
+  color: baseColor.withOpacity(0.25),
         blurRadius: size * 0.4,
         spreadRadius: size * 0.05,
         offset: Offset(0, size * 0.12),
@@ -117,7 +117,7 @@ class StoreItemArtworkCard extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.3),
+          color: Colors.white.withOpacity(0.3),
           width: 1.4,
         ),
       ),
@@ -125,7 +125,7 @@ class StoreItemArtworkCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+          border: Border.all(color: Colors.white.withOpacity(0.25)),
         ),
       ),
     );
@@ -145,7 +145,7 @@ class _EquippedPill extends StatelessWidget {
         vertical: size * 0.08,
       ),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.48),
+  color: Colors.black.withOpacity(0.48),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white70, width: 1.2),
       ),
@@ -173,7 +173,7 @@ class _OwnedDot extends StatelessWidget {
         color: Colors.white,
         shape: BoxShape.circle,
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 6),
+          BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 6),
         ],
       ),
     );

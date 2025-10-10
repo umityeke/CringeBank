@@ -7,6 +7,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import '../utils/platform_utils.dart';
+import '../utils/store_feature_flags.dart';
+import 'telemetry/callable_latency_tracker.dart';
 
 import '../models/store_product.dart';
 import '../models/store_order.dart';
@@ -39,6 +41,111 @@ class CringeStoreService {
   );
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
+
+  Map<String, dynamic> _normalizeCallableResponse(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    if (data is Map) {
+      try {
+        return Map<String, dynamic>.from(data);
+      } catch (_) {
+        return data.map((key, value) => MapEntry(key.toString(), value));
+      }
+    }
+    return <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> _callStoreFunction(
+    String name, {
+    Map<String, dynamic>? payload,
+  }) async {
+    final effectivePayload = payload ?? <String, dynamic>{};
+    final result = await _functions.callWithLatency<dynamic>(
+      name,
+      payload: effectivePayload,
+      category: 'cringeStore',
+    );
+    return _normalizeCallableResponse(result.data);
+  }
+
+  Stream<T> _createPollingStream<T>(
+    Future<T> Function() fetch, {
+    Duration interval = const Duration(seconds: 6),
+    bool Function(T? previous, T next)? hasChanged,
+  }) {
+    late StreamController<T> controller;
+    Timer? timer;
+    int listenerCount = 0;
+    bool hasValue = false;
+    T? lastValue;
+
+    Future<void> poll() async {
+      try {
+        final value = await fetch();
+        final shouldEmit =
+            hasChanged?.call(hasValue ? lastValue : null, value) ??
+            (!hasValue || value != lastValue);
+        lastValue = value;
+        hasValue = true;
+        if (shouldEmit && !controller.isClosed) {
+          controller.add(value);
+        }
+      } catch (error, stackTrace) {
+        if (!controller.isClosed) {
+          controller.addError(error, stackTrace);
+        }
+      }
+    }
+
+    controller = StreamController<T>.broadcast(
+      onListen: () {
+        listenerCount++;
+        if (listenerCount == 1) {
+          poll();
+          timer = Timer.periodic(interval, (_) => poll());
+        }
+      },
+      onCancel: () {
+        listenerCount--;
+        if (listenerCount <= 0) {
+          timer?.cancel();
+          timer = null;
+          hasValue = false;
+          lastValue = null;
+        }
+      },
+    );
+
+    return controller.stream;
+  }
+
+  List<Map<String, dynamic>> _asMapList(dynamic value) {
+    if (value is List<Map<String, dynamic>>) {
+      return value;
+    }
+    if (value is List) {
+      return value
+          .whereType<Map>()
+          .map((map) => Map<String, dynamic>.from(map))
+          .toList();
+    }
+    return const <Map<String, dynamic>>[];
+  }
+
+  String? _mapFilterToSellerType(String filter) {
+    switch (filter.trim().toLowerCase()) {
+      case 'p2p':
+        return 'P2P';
+      case 'vendor':
+      case 'platform':
+        return 'VENDOR';
+      case 'community':
+        return 'COMMUNITY';
+      default:
+        return null;
+    }
+  }
 
   // Singleton pattern
   static final CringeStoreService _instance = CringeStoreService._internal();
@@ -89,11 +196,7 @@ class CringeStoreService {
 
   CollectionReference get _productsCol =>
       _firestore.collection('store_products');
-  CollectionReference get _ordersCol => _firestore.collection('store_orders');
-  CollectionReference get _walletsCol => _firestore.collection('store_wallets');
   CollectionReference get _escrowsCol => _firestore.collection('store_escrows');
-  CollectionReference get _sharesCol =>
-      _firestore.collection('store_product_shares');
 
   // ==================== PRODUCTS ====================
 
@@ -102,67 +205,73 @@ class CringeStoreService {
     String filter = 'all',
     String? category,
   }) {
-    Query query = _productsCol.where('status', isEqualTo: 'active');
+    Future<List<StoreProduct>> fetchFromSql() async {
+      final payload = <String, dynamic>{'status': 'ACTIVE', 'limit': 120};
 
-    // P2P: sellerId field exists and is not empty
-    if (filter == 'p2p') {
-      query = query.where('sellerType', isEqualTo: 'p2p');
-    } else if (filter == 'vendor') {
-      query = query.where('sellerType', isEqualTo: 'vendor');
-    }
-
-    if (category != null && category.isNotEmpty && category != 'all') {
-      query = query.where('category', isEqualTo: category);
-    }
-
-    if (isWindowsDesktop) {
-      final controller = StreamController<List<StoreProduct>>.broadcast();
-      Timer? timer;
-      List<StoreProduct>? last;
-      final ordered = query.orderBy('createdAt', descending: true);
-      Future<void> poll() async {
-        try {
-          final snapshot = await ordered.get();
-          final list = snapshot.docs
-              .map((d) => StoreProduct.fromFirestore(d))
-              .toList();
-          if (last == null ||
-              list.length != last!.length ||
-              !listEquals(list, last)) {
-            last = list;
-            if (!controller.isClosed) controller.add(list);
-          }
-        } catch (e) {
-          if (!controller.isClosed) controller.add(last ?? const []);
-        }
+      if (category != null && category.isNotEmpty && category != 'all') {
+        payload['category'] = category;
       }
 
-      controller
-        ..onListen = () {
-          poll();
-          timer = Timer.periodic(const Duration(seconds: 8), (_) => poll());
-        }
-        ..onCancel = () async {
-          timer?.cancel();
-        };
-      return controller.stream;
+      final sellerType = _mapFilterToSellerType(filter);
+      if (sellerType != null) {
+        payload['sellerType'] = sellerType;
+      }
+
+      payload.removeWhere((key, value) => value == null);
+
+      final response = await _callStoreFunction(
+        'storeListProducts',
+        payload: payload,
+      );
+
+      if (response['ok'] != true) {
+        throw StateError(
+          'storeListProducts failed: ${response['reason'] ?? response}',
+        );
+      }
+
+      final products = _asMapList(
+        response['products'],
+      ).map((product) => StoreProduct.fromGateway(product)).toList();
+      return products;
     }
 
-    return query
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => StoreProduct.fromFirestore(doc))
-              .toList(),
-        );
+    return _createPollingStream<List<StoreProduct>>(
+      fetchFromSql,
+      hasChanged: (previous, next) {
+        if (previous == null) {
+          return true;
+        }
+        if (previous.length != next.length) {
+          return true;
+        }
+        for (var i = 0; i < previous.length; i++) {
+          final prev = previous[i];
+          final curr = next[i];
+          if (prev.id != curr.id ||
+              prev.status != curr.status ||
+              prev.updatedAt != curr.updatedAt ||
+              prev.priceGold != curr.priceGold) {
+            return true;
+          }
+        }
+        return false;
+      },
+    );
   }
 
   /// Tek ürün detayı
   Future<StoreProduct?> getProduct(String productId) async {
-    final doc = await _productsCol.doc(productId).get();
-    if (!doc.exists) return null;
-    return StoreProduct.fromFirestore(doc);
+    final response = await _callStoreFunction(
+      'storeGetProduct',
+      payload: {'productId': productId},
+    );
+    if (response['ok'] == true && response['product'] != null) {
+      return StoreProduct.fromGateway(
+        Map<String, dynamic>.from(response['product']),
+      );
+    }
+    return null;
   }
 
   /// ürün ekle (seller için)
@@ -215,38 +324,37 @@ class CringeStoreService {
     if (productId.trim().isEmpty) {
       return false;
     }
-    final doc = await _sharesCol.doc(productId.trim()).get();
-    if (!doc.exists) return false;
-    final data = doc.data() as Map<String, dynamic>?;
-    return (data?['shared'] as bool?) ?? false;
+    final product = await getProduct(productId.trim());
+    return product?.isShared ?? false;
   }
 
   Future<StoreProductShareResult> shareSoldProduct({
     required StoreProduct product,
     required user_model.User seller,
   }) async {
-    if (!product.isP2P || product.status != 'sold') {
+    final latestProduct = await getProduct(product.id) ?? product;
+
+    if (!latestProduct.isP2P || latestProduct.status != 'sold') {
       return const StoreProductShareResult(
         success: false,
         alreadyShared: false,
-        message: 'Sadece satışı tamamlanmığ P2P ürünler paylaşılabilir.',
+        message: 'Sadece satışı tamamlanmış P2P ürünler paylaşılabilir.',
+        reason: 'invalid_status',
       );
     }
 
-    final shareDoc = _sharesCol.doc(product.id);
-    final existing = await shareDoc.get();
-    if (existing.exists) {
-      final data = existing.data() as Map<String, dynamic>?;
-      final entryId = data?['entryId'] as String?;
+    if (latestProduct.isShared) {
       return StoreProductShareResult(
         success: false,
         alreadyShared: true,
-        entryId: entryId,
-        message: 'Bu ürün zaten paylaşılmığ.',
+        entryId: latestProduct.sharedEntryId,
+        message: 'Bu ürün zaten paylaşılmış.',
+        product: latestProduct,
+        reason: 'already_shared',
       );
     }
 
-    final entryId = 'store_${product.id}';
+    final entryId = 'store_${latestProduct.id}';
     final displayName = _resolveUserName(seller);
     final handle = seller.username.trim().isNotEmpty
         ? '@${seller.username.trim()}'
@@ -255,16 +363,16 @@ class CringeStoreService {
         ? seller.avatar.trim()
         : null;
     final descriptionBuffer = StringBuffer()
-      ..writeln('${displayName.toUpperCase()} bir satığ gerçekleğtirdi!')
+      ..writeln('${displayName.toUpperCase()} bir satış gerçekleştirdi!')
       ..writeln()
       ..writeln(
-        product.desc.trim().isNotEmpty
-            ? product.desc.trim()
-            : '${product.title} satıldı.',
+        latestProduct.desc.trim().isNotEmpty
+            ? latestProduct.desc.trim()
+            : '${latestProduct.title} satıldı.',
       )
       ..writeln()
-      ..writeln('Fiyat: ${product.priceGold} Altın')
-      ..writeln('Kategori: ${getCategoryDisplayName(product.category)}')
+      ..writeln('Fiyat: ${latestProduct.priceGold} Altın')
+      ..writeln('Kategori: ${getCategoryDisplayName(latestProduct.category)}')
       ..writeln('#cringestore #satildi');
 
     final entry = CringeEntry(
@@ -272,7 +380,7 @@ class CringeStoreService {
       userId: seller.id,
       authorName: displayName,
       authorHandle: handle,
-      baslik: 'Satıldı: ${product.title}',
+      baslik: 'Satıldı: ${latestProduct.title}',
       aciklama: descriptionBuffer.toString().trim(),
       kategori: CringeCategory.sosyalRezillik,
       krepSeviyesi: 5.5,
@@ -282,7 +390,7 @@ class CringeStoreService {
       begeniSayisi: 0,
       yorumSayisi: 0,
       retweetSayisi: 0,
-      imageUrls: product.images,
+      imageUrls: latestProduct.images,
       audioUrl: null,
       videoUrl: null,
       borsaDegeri: null,
@@ -294,29 +402,106 @@ class CringeStoreService {
       return const StoreProductShareResult(
         success: false,
         alreadyShared: false,
-        message: 'ürün paylaşımı oluşturulamadı.',
+        message: 'Ürün paylaşımı oluşturulamadı.',
+        reason: 'entry_creation_failed',
       );
     }
 
-    await shareDoc.set({
-      'shared': true,
-      'entryId': entryId,
-      'sellerId': seller.id,
-      'productId': product.id,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    StoreProduct? updatedProduct;
 
-    await _productsCol.doc(product.id).set({
-      'sharedEntryId': entryId,
-      'sharedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    try {
+      final response = await _callStoreFunction(
+        'storeShareProduct',
+        payload: {'productId': latestProduct.id, 'entryId': entryId},
+      );
 
-    return StoreProductShareResult(
-      success: true,
-      alreadyShared: false,
-      entryId: entryId,
-      message: 'Satığ paylaşımı oluşturuldu.',
-    );
+      final productPayload = response['product'];
+      if (productPayload is Map) {
+        updatedProduct = StoreProduct.fromGateway(
+          Map<String, dynamic>.from(productPayload),
+        );
+      }
+
+      await _productsCol.doc(latestProduct.id).set({
+        'sharedEntryId': entryId,
+        'sharedByAuthUid': seller.id,
+        'sharedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      updatedProduct ??= await getProduct(latestProduct.id);
+      updatedProduct ??= latestProduct.copyWithShared(
+        sharedEntryId: entryId,
+        sharedByAuthUid: seller.id,
+        sharedAt: DateTime.now(),
+      );
+
+      return StoreProductShareResult(
+        success: true,
+        alreadyShared: false,
+        entryId: entryId,
+        message: 'Satış paylaşımı oluşturuldu.',
+        product: updatedProduct,
+        reason: 'shared_success',
+      );
+    } on FirebaseFunctionsException catch (error) {
+      await _safeDeleteEntry(entryId);
+
+      final normalizedReason = _normalizeGatewayReason(error);
+      final alreadyShared =
+          normalizedReason.endsWith('already_shared') ||
+          normalizedReason.contains('already_shared') ||
+          error.code == 'already-exists';
+
+      if (alreadyShared) {
+        updatedProduct = await getProduct(latestProduct.id) ?? latestProduct;
+        return StoreProductShareResult(
+          success: false,
+          alreadyShared: true,
+          entryId: updatedProduct.sharedEntryId,
+          message: error.message ?? 'Bu ürün zaten paylaşılmış.',
+          product: updatedProduct,
+          reason: normalizedReason,
+        );
+      }
+
+      return StoreProductShareResult(
+        success: false,
+        alreadyShared: false,
+        message: error.message ?? 'Paylaşım sırasında hata oluştu.',
+        reason: normalizedReason,
+      );
+    } catch (error) {
+      await _safeDeleteEntry(entryId);
+      return StoreProductShareResult(
+        success: false,
+        alreadyShared: false,
+        message: 'Paylaşım sırasında hata oluştu: $error',
+        reason: 'unexpected_failure',
+      );
+    }
+  }
+
+  Future<void> _safeDeleteEntry(String entryId) async {
+    try {
+      await CringeEntryService.instance.deleteEntry(entryId);
+    } catch (_) {
+      // Silme işlemi başarısız olsa da paylaşım akışını engellememesi için yutuyoruz.
+    }
+  }
+
+  String _normalizeGatewayReason(FirebaseFunctionsException error) {
+    final details = error.details;
+    if (details is Map && details['reason'] != null) {
+      return details['reason'].toString().trim().toLowerCase();
+    }
+    if (error.message != null && error.message!.trim().isNotEmpty) {
+      final message = error.message!.trim().toLowerCase();
+      if (message.startsWith('sp_store_recordproductshare failed')) {
+        return 'sql_gateway_share_update_failed';
+      }
+      return message;
+    }
+    return error.code.trim().toLowerCase();
   }
 
   String _resolveUserName(user_model.User user) {
@@ -330,39 +515,43 @@ class CringeStoreService {
 
   /// Kullanıcı cüzdanını dinle
   Stream<StoreWallet?> getWallet(String userId) {
-    if (isWindowsDesktop) {
-      final controller = StreamController<StoreWallet?>.broadcast();
-      Timer? timer;
-      StoreWallet? last;
-      Future<void> poll() async {
-        try {
-          final doc = await _walletsCol.doc(userId).get();
-          final next = doc.exists ? StoreWallet.fromFirestore(doc) : null;
-          if ((last == null && next != null) ||
-              (last != null && next == null) ||
-              (last != null && next != null && last != next)) {
-            last = next;
-            if (!controller.isClosed) controller.add(next);
-          }
-        } catch (e) {
-          if (!controller.isClosed) controller.add(last);
-        }
+    Future<StoreWallet?> fetchFromSql() async {
+      final response = await _callStoreFunction(
+        'storeGetWallet',
+        payload: {'targetAuthUid': userId, 'createIfMissing': true},
+      );
+
+      if (response['ok'] != true) {
+        throw StateError(
+          'storeGetWallet failed: ${response['reason'] ?? response}',
+        );
       }
 
-      controller
-        ..onListen = () {
-          poll();
-          timer = Timer.periodic(const Duration(seconds: 8), (_) => poll());
-        }
-        ..onCancel = () async {
-          timer?.cancel();
-        };
-      return controller.stream;
+      final walletData = response['wallet'];
+      if (walletData == null) {
+        return null;
+      }
+
+      return StoreWallet.fromGateway(
+        Map<String, dynamic>.from(walletData),
+        ledger: _asMapList(response['ledger']),
+      );
     }
-    return _walletsCol.doc(userId).snapshots().map((doc) {
-      if (!doc.exists) return null;
-      return StoreWallet.fromFirestore(doc);
-    });
+
+    return _createPollingStream<StoreWallet?>(
+      fetchFromSql,
+      hasChanged: (StoreWallet? previous, StoreWallet? next) {
+        if (previous == null && next == null) {
+          return false;
+        }
+        if (previous == null || next == null) {
+          return true;
+        }
+        return previous.goldBalance != next.goldBalance ||
+            previous.pendingGold != next.pendingGold ||
+            previous.updatedAt != next.updatedAt;
+      },
+    );
   }
 
   /// Mevcut kullanıcı cüzdanı
@@ -376,41 +565,43 @@ class CringeStoreService {
 
   /// Kullanıcının siparişlerini getir
   Stream<List<StoreOrder>> getUserOrders(String userId) {
-    final base = _ordersCol
-        .where('buyerId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true);
-    if (isWindowsDesktop) {
-      final controller = StreamController<List<StoreOrder>>.broadcast();
-      Timer? timer;
-      List<StoreOrder>? last;
-      Future<void> poll() async {
-        try {
-          final snapshot = await base.get();
-          final list = snapshot.docs
-              .map((d) => StoreOrder.fromFirestore(d))
-              .toList();
-          if (last == null || !listEquals(last, list)) {
-            last = list;
-            if (!controller.isClosed) controller.add(list);
-          }
-        } catch (e) {
-          if (!controller.isClosed) controller.add(last ?? const []);
-        }
+    Future<List<StoreOrder>> fetchFromSql() async {
+      final response = await _callStoreFunction(
+        'storeListOrdersForBuyer',
+        payload: {'buyerAuthUid': userId, 'limit': 100},
+      );
+
+      if (response['ok'] != true) {
+        throw StateError(
+          'storeListOrdersForBuyer failed: ${response['reason'] ?? response}',
+        );
       }
 
-      controller
-        ..onListen = () {
-          poll();
-          timer = Timer.periodic(const Duration(seconds: 8), (_) => poll());
-        }
-        ..onCancel = () async {
-          timer?.cancel();
-        };
-      return controller.stream;
+      return _asMapList(
+        response['orders'],
+      ).map(StoreOrder.fromGateway).toList();
     }
-    return base.snapshots().map(
-      (snapshot) =>
-          snapshot.docs.map((doc) => StoreOrder.fromFirestore(doc)).toList(),
+
+    return _createPollingStream<List<StoreOrder>>(
+      fetchFromSql,
+      hasChanged: (List<StoreOrder>? previous, List<StoreOrder> next) {
+        if (previous == null) {
+          return true;
+        }
+        if (previous.length != next.length) {
+          return true;
+        }
+        for (int i = 0; i < previous.length; i++) {
+          final a = previous[i];
+          final b = next[i];
+          if (a.id != b.id ||
+              a.status != b.status ||
+              a.updatedAt != b.updatedAt) {
+            return true;
+          }
+        }
+        return false;
+      },
     );
   }
 
@@ -428,11 +619,53 @@ class CringeStoreService {
   /// Returns: { ok: true, orderId: '...' }
   Future<Map<String, dynamic>> lockEscrow(String productId) async {
     try {
-      final callable = _functions.httpsCallable('escrowLock');
-      final result = await callable.call({'productId': productId});
-      return Map<String, dynamic>.from(result.data as Map);
+      if (StoreFeatureFlags.useSqlEscrowGateway) {
+        final result = await _functions.callWithLatency<dynamic>(
+          'sqlGatewayStoreCreateOrder',
+          payload: {'productId': productId},
+          category: 'cringeStore',
+        );
+        final data = _normalizeCallableResponse(result.data);
+        final fallbackOrderId = data['orderPublicId'] ?? data['OrderPublicId'];
+        final rawOrderId = data['orderId'] ?? fallbackOrderId;
+        final orderId = rawOrderId is String
+            ? rawOrderId.trim()
+            : rawOrderId != null
+            ? rawOrderId.toString().trim()
+            : '';
+
+        data['source'] = 'sqlGateway';
+        if (orderId.isNotEmpty) {
+          data['ok'] = true;
+          data['orderId'] = orderId;
+          return data;
+        }
+
+        return {
+          'ok': data['ok'] == true,
+          'orderId': orderId.isNotEmpty ? orderId : null,
+          'error': data['error']?.toString() ?? 'order_id_missing',
+          'source': 'sqlGateway',
+        };
+      }
+
+      final result = await _functions.callWithLatency<dynamic>(
+        'escrowLock',
+        payload: {'productId': productId},
+        category: 'cringeStore',
+      );
+      final data = _normalizeCallableResponse(result.data)
+        ..putIfAbsent('source', () => 'legacy');
+      if (!data.containsKey('ok')) data['ok'] = true;
+      return data;
     } catch (e) {
-      return {'ok': false, 'error': e.toString()};
+      return {
+        'ok': false,
+        'error': e.toString(),
+        'source': StoreFeatureFlags.useSqlEscrowGateway
+            ? 'sqlGateway'
+            : 'legacy',
+      };
     }
   }
 
@@ -441,24 +674,206 @@ class CringeStoreService {
   /// Returns: { ok: true }
   Future<Map<String, dynamic>> releaseEscrow(String orderId) async {
     try {
-      final callable = _functions.httpsCallable('escrowRelease');
-      final result = await callable.call({'orderId': orderId});
-      return Map<String, dynamic>.from(result.data as Map);
+      if (StoreFeatureFlags.useSqlEscrowGateway) {
+        final result = await _functions.callWithLatency<dynamic>(
+          'sqlGatewayStoreReleaseEscrow',
+          payload: {'orderId': orderId},
+          category: 'cringeStore',
+        );
+        final data = _normalizeCallableResponse(result.data);
+        final rawOrderId =
+            data['orderId'] ?? data['orderPublicId'] ?? data['OrderPublicId'];
+        final resolvedOrderId = rawOrderId is String
+            ? rawOrderId.trim()
+            : rawOrderId != null
+            ? rawOrderId.toString().trim()
+            : orderId;
+        return {
+          'ok': data['ok'] == false ? false : true,
+          'orderId': resolvedOrderId.isNotEmpty ? resolvedOrderId : orderId,
+          'status': data['status'] ?? 'released',
+          if (data.containsKey('returnValue'))
+            'returnValue': data['returnValue'],
+          'source': 'sqlGateway',
+        };
+      }
+
+      final result = await _functions.callWithLatency<dynamic>(
+        'escrowRelease',
+        payload: {'orderId': orderId},
+        category: 'cringeStore',
+      );
+      final data = _normalizeCallableResponse(result.data)
+        ..putIfAbsent('source', () => 'legacy')
+        ..putIfAbsent('ok', () => true)
+        ..putIfAbsent('orderId', () => orderId);
+      return data;
     } catch (e) {
-      return {'ok': false, 'error': e.toString()};
+      return {
+        'ok': false,
+        'error': e.toString(),
+        'orderId': orderId,
+        'source': StoreFeatureFlags.useSqlEscrowGateway
+            ? 'sqlGateway'
+            : 'legacy',
+      };
     }
   }
 
-  /// Siparişi iptal et (para alıcıya iade)
+  /// Siparişi iptal et (para alıcıya iade) - Legacy escrow refund
   /// Cloud Function: escrowRefund({ orderId })
   /// Returns: { ok: true }
+  /// @deprecated Use refundOrder instead for new implementations
   Future<Map<String, dynamic>> refundEscrow(String orderId) async {
     try {
-      final callable = _functions.httpsCallable('escrowRefund');
-      final result = await callable.call({'orderId': orderId});
-      return Map<String, dynamic>.from(result.data as Map);
+      if (StoreFeatureFlags.useSqlEscrowGateway) {
+        final result = await _functions.callWithLatency<dynamic>(
+          'sqlGatewayStoreRefundEscrow',
+          payload: {'orderId': orderId},
+          category: 'cringeStore',
+        );
+        final data = _normalizeCallableResponse(result.data);
+        final rawOrderId =
+            data['orderId'] ?? data['orderPublicId'] ?? data['OrderPublicId'];
+        final resolvedOrderId = rawOrderId is String
+            ? rawOrderId.trim()
+            : rawOrderId != null
+            ? rawOrderId.toString().trim()
+            : orderId;
+        return {
+          'ok': data['ok'] == false ? false : true,
+          'orderId': resolvedOrderId.isNotEmpty ? resolvedOrderId : orderId,
+          'status': data['status'] ?? 'refunded',
+          if (data.containsKey('returnValue'))
+            'returnValue': data['returnValue'],
+          'source': 'sqlGateway',
+        };
+      }
+
+      final result = await _functions.callWithLatency<dynamic>(
+        'escrowRefund',
+        payload: {'orderId': orderId},
+        category: 'cringeStore',
+      );
+      final data = _normalizeCallableResponse(result.data)
+        ..putIfAbsent('source', () => 'legacy')
+        ..putIfAbsent('ok', () => true)
+        ..putIfAbsent('orderId', () => orderId);
+      return data;
     } catch (e) {
-      return {'ok': false, 'error': e.toString()};
+      return {
+        'ok': false,
+        'error': e.toString(),
+        'orderId': orderId,
+        'source': StoreFeatureFlags.useSqlEscrowGateway
+            ? 'sqlGateway'
+            : 'legacy',
+      };
+    }
+  }
+
+  /// Siparişi iptal et ve iade işlemini başlat (Enhanced refund with full order lifecycle)
+  /// Cloud Function: sqlGatewayStoreRefundOrder({ orderId, refundReason })
+  /// Returns: { ok: true, orderId, refundId, status: 'refunded' }
+  Future<Map<String, dynamic>> refundOrder({
+    required String orderId,
+    String? refundReason,
+  }) async {
+    try {
+      if (StoreFeatureFlags.useSqlEscrowGateway) {
+        final result = await _functions.callWithLatency<dynamic>(
+          'sqlGatewayStoreRefundOrder',
+          payload: {
+            'orderId': orderId,
+            if (refundReason != null && refundReason.isNotEmpty)
+              'refundReason': refundReason,
+          },
+          category: 'cringeStore',
+        );
+        final data = _normalizeCallableResponse(result.data);
+        final rawOrderId =
+            data['orderId'] ?? data['orderPublicId'] ?? data['OrderPublicId'];
+        final resolvedOrderId = rawOrderId is String
+            ? rawOrderId.trim()
+            : rawOrderId != null
+            ? rawOrderId.toString().trim()
+            : orderId;
+        final rawRefundId =
+            data['refundId'] ??
+            data['refundPublicId'] ??
+            data['RefundPublicId'];
+        final refundId = rawRefundId is String
+            ? rawRefundId.trim()
+            : rawRefundId?.toString().trim();
+        return {
+          'ok': data['ok'] == false ? false : true,
+          'orderId': resolvedOrderId.isNotEmpty ? resolvedOrderId : orderId,
+          'refundId': refundId,
+          'status': data['status'] ?? 'refunded',
+          if (data.containsKey('returnValue'))
+            'returnValue': data['returnValue'],
+          'source': 'sqlGateway',
+        };
+      }
+
+      // Fallback to legacy refundEscrow if SQL Gateway disabled
+      return await refundEscrow(orderId);
+    } catch (e) {
+      return {
+        'ok': false,
+        'error': e.toString(),
+        'orderId': orderId,
+        'source': StoreFeatureFlags.useSqlEscrowGateway
+            ? 'sqlGateway'
+            : 'legacy',
+      };
+    }
+  }
+
+  /// Tek sipariş detayını getir
+  /// Cloud Function: sqlGatewayStoreGetOrder({ orderId })
+  /// Returns: { order: StoreOrder? }
+  Future<StoreOrder?> getOrder(String orderId) async {
+    if (orderId.trim().isEmpty) {
+      return null;
+    }
+
+    try {
+      if (StoreFeatureFlags.useSqlEscrowGateway) {
+        final result = await _functions.callWithLatency<dynamic>(
+          'sqlGatewayStoreGetOrder',
+          payload: {'orderId': orderId.trim()},
+          category: 'cringeStore',
+        );
+        final data = _normalizeCallableResponse(result.data);
+
+        if (data['ok'] == false) {
+          return null;
+        }
+
+        final orderData = data['order'];
+        if (orderData == null) {
+          return null;
+        }
+
+        return StoreOrder.fromGateway(Map<String, dynamic>.from(orderData));
+      }
+
+      // Fallback: search in Firestore (legacy)
+      final ordersSnapshot = await _firestore
+          .collection('store_orders')
+          .where('id', isEqualTo: orderId)
+          .limit(1)
+          .get();
+
+      if (ordersSnapshot.docs.isEmpty) {
+        return null;
+      }
+
+      return StoreOrder.fromFirestore(ordersSnapshot.docs.first);
+    } catch (e) {
+      // Log error silently, return null
+      return null;
     }
   }
 
@@ -591,12 +1006,16 @@ class StoreProductShareResult {
   final bool alreadyShared;
   final String message;
   final String? entryId;
+  final StoreProduct? product;
+  final String? reason;
 
   const StoreProductShareResult({
     required this.success,
     required this.alreadyShared,
     required this.message,
     this.entryId,
+    this.product,
+    this.reason,
   });
 }
 

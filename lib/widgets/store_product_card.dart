@@ -39,9 +39,9 @@ class StoreProductCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         child: Ink(
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.04),
+            color: Colors.white.withOpacity(0.04),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -70,7 +70,7 @@ class StoreProductCard extends StatelessWidget {
                         const SizedBox(width: 8),
                         _StatusPill(
                           label: sellerLabel,
-                          backgroundColor: sellerColor.withValues(alpha: 0.16),
+                          backgroundColor: sellerColor.withOpacity(0.16),
                           foregroundColor: sellerColor,
                         ),
                       ],
@@ -92,22 +92,20 @@ class StoreProductCard extends StatelessWidget {
                           label: CringeStoreService.getCategoryDisplayName(
                             product.category,
                           ),
-                          backgroundColor: Colors.white.withValues(alpha: 0.08),
+                          backgroundColor: Colors.white.withOpacity(0.08),
                           foregroundColor: Colors.white70,
                         ),
                         _StatusPill(
                           label: product.condition == 'new'
                               ? 'Yeni'
                               : 'İkinci El',
-                          backgroundColor: Colors.green.withValues(alpha: 0.1),
+                          backgroundColor: Colors.green.withOpacity(0.1),
                           foregroundColor: Colors.greenAccent,
                         ),
                         if (status.isHighlight)
                           _StatusPill(
                             label: status.label,
-                            backgroundColor: status.color.withValues(
-                              alpha: 0.14,
-                            ),
+                            backgroundColor: status.color.withOpacity(0.14),
                             foregroundColor: status.color,
                           ),
                       ],
@@ -173,7 +171,7 @@ class StoreProductCard extends StatelessWidget {
                   padding: const EdgeInsets.all(12),
                   child: _StatusPill(
                     label: status.label,
-                    backgroundColor: status.color.withValues(alpha: 0.85),
+                    backgroundColor: status.color.withOpacity(0.85),
                     foregroundColor: Colors.white,
                   ),
                 ),

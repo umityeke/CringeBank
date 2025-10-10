@@ -1,12 +1,16 @@
+import 'dart:async';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/direct_message.dart';
 import '../models/user_model.dart';
+import 'messaging_feature_service.dart';
+import 'telemetry/callable_latency_tracker.dart';
+import 'telemetry/sql_mirror_latency_monitor.dart';
 import 'user_service.dart';
 
 class DirectMessageAttachmentRequest {
@@ -61,6 +65,8 @@ class DirectMessageService {
   static const String _conversationCollection = 'conversations';
   static const String _messagesSubcollection = 'messages';
   static const int _maxAttachmentBytes = 10 * 1024 * 1024; // 10 MB
+  static const Duration _threadPollInterval = Duration(seconds: 8);
+  static const Duration _messagePollInterval = Duration(seconds: 3);
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
@@ -72,6 +78,16 @@ class DirectMessageService {
       return const Stream<List<DirectMessageThread>>.empty();
     }
 
+    if (MessagingFeatureService.instance.isSqlMirrorReadEnabled) {
+      return _watchThreadsViaSql(normalizedId);
+    }
+
+    return _watchThreadsViaFirestore(normalizedId);
+  }
+
+  Stream<List<DirectMessageThread>> _watchThreadsViaFirestore(
+    String normalizedId,
+  ) {
     return _firestore
         .collection(_conversationCollection)
         .where('members', arrayContains: normalizedId)
@@ -93,6 +109,16 @@ class DirectMessageService {
       return const Stream<List<DirectMessage>>.empty();
     }
 
+    if (MessagingFeatureService.instance.isSqlMirrorReadEnabled) {
+      return _watchMessagesViaSql(conversationId);
+    }
+
+    return _watchMessagesViaFirestore(conversationId);
+  }
+
+  Stream<List<DirectMessage>> _watchMessagesViaFirestore(
+    String conversationId,
+  ) {
     return _firestore
         .collection(_conversationCollection)
         .doc(conversationId)
@@ -106,6 +132,105 @@ class DirectMessageService {
         });
   }
 
+  Stream<List<DirectMessageThread>> _watchThreadsViaSql(String userId) {
+    final controller = StreamController<List<DirectMessageThread>>();
+    Timer? pollTimer;
+    bool isClosed = false;
+    bool isFetching = false;
+
+    Future<void> fetchLatest() async {
+      if (isClosed || isFetching) {
+        return;
+      }
+      isFetching = true;
+      try {
+        final page = await _fetchSqlConversations(authUid: userId, limit: 50);
+        if (!isClosed && !controller.isClosed) {
+          controller.add(page.threads);
+        }
+      } catch (error, stackTrace) {
+        if (!isClosed && !controller.isClosed) {
+          controller.addError(error, stackTrace);
+        }
+      } finally {
+        isFetching = false;
+      }
+    }
+
+    controller
+      ..onListen = () {
+        fetchLatest();
+        pollTimer = Timer.periodic(_threadPollInterval, (_) => fetchLatest());
+      }
+      ..onCancel = () {
+        isClosed = true;
+        pollTimer?.cancel();
+      }
+      ..onPause = () {
+        pollTimer?.cancel();
+      }
+      ..onResume = () {
+        if (isClosed) {
+          return;
+        }
+        pollTimer?.cancel();
+        pollTimer = Timer.periodic(_threadPollInterval, (_) => fetchLatest());
+      };
+
+    return controller.stream;
+  }
+
+  Stream<List<DirectMessage>> _watchMessagesViaSql(String conversationId) {
+    final controller = StreamController<List<DirectMessage>>();
+    Timer? pollTimer;
+    bool isClosed = false;
+    bool isFetching = false;
+
+    Future<void> fetchLatest() async {
+      if (isClosed || isFetching) {
+        return;
+      }
+      isFetching = true;
+      try {
+        final page = await _fetchSqlMessages(
+          conversationId: conversationId,
+          limit: 100,
+        );
+        if (!isClosed && !controller.isClosed) {
+          controller.add(page.messages);
+        }
+      } catch (error, stackTrace) {
+        if (!isClosed && !controller.isClosed) {
+          controller.addError(error, stackTrace);
+        }
+      } finally {
+        isFetching = false;
+      }
+    }
+
+    controller
+      ..onListen = () {
+        fetchLatest();
+        pollTimer = Timer.periodic(_messagePollInterval, (_) => fetchLatest());
+      }
+      ..onCancel = () {
+        isClosed = true;
+        pollTimer?.cancel();
+      }
+      ..onPause = () {
+        pollTimer?.cancel();
+      }
+      ..onResume = () {
+        if (isClosed) {
+          return;
+        }
+        pollTimer?.cancel();
+        pollTimer = Timer.periodic(_messagePollInterval, (_) => fetchLatest());
+      };
+
+    return controller.stream;
+  }
+
   Future<ConversationEnsureResult> ensureConversation({
     required User currentUser,
     required User otherUser,
@@ -115,13 +240,16 @@ class DirectMessageService {
       throw StateError('Conversation kimliği üretilemedi.');
     }
 
-    final callable = _functions.httpsCallable('createConversation');
     final participantMeta = _buildParticipantMeta(currentUser, otherUser);
 
-    final result = await callable.call(<String, dynamic>{
-      'otherUserId': otherUser.id,
-      'participantMeta': participantMeta,
-    });
+    final result = await _functions.callWithLatency<dynamic>(
+      'createConversation',
+      payload: {
+        'otherUserId': otherUser.id,
+        'participantMeta': participantMeta,
+      },
+      category: 'directMessage',
+    );
 
     final data = result.data as Map<dynamic, dynamic>? ?? {};
     final created = data['created'] == true;
@@ -156,6 +284,8 @@ class DirectMessageService {
       throw StateError('Conversation kimliği üretilemedi.');
     }
 
+    final participantMeta = _buildParticipantMeta(sender, recipient);
+
     await ensureConversation(currentUser: sender, otherUser: recipient);
 
     final messageId = _firestore
@@ -171,11 +301,10 @@ class DirectMessageService {
       attachments: attachments,
     );
 
-    final callable = _functions.httpsCallable('sendMessage');
     final payload = <String, dynamic>{
       'conversationId': conversationId,
       'clientMessageId': messageId,
-      'participantMeta': _buildParticipantMeta(sender, recipient),
+      'participantMeta': participantMeta,
     };
 
     if (trimmedText.isNotEmpty) {
@@ -190,9 +319,15 @@ class DirectMessageService {
       payload['mediaExternal'] = externalMedia.toMap();
     }
 
-    final response = await callable.call(payload);
+    // Use new dmSendMessage callable (SQL + Firestore dual-write)
+    final response = await _functions.callWithLatency<dynamic>(
+      'dmSendMessage',
+      payload: payload,
+      category: 'directMessage',
+    );
 
-    final responseMap = response.data as Map<dynamic, dynamic>? ?? {};
+    final responseMap =
+        _coerceStringKeyedMap(response.data) ?? <String, dynamic>{};
     final responseMessageId = (responseMap['messageId'] ?? messageId)
         .toString()
         .trim();
@@ -201,6 +336,9 @@ class DirectMessageService {
       storagePaths: mediaPaths,
       attachments: attachments,
     );
+
+    // Note: SQL dual-write is now handled by backend (dmSendMessage callable)
+    // No need for client-side SQL mirroring anymore
 
     return DirectMessageSendResult(
       conversationId: conversationId,
@@ -218,14 +356,16 @@ class DirectMessageService {
       throw ArgumentError('Geçerli conversation ve mesaj kimlikleri gerekli.');
     }
 
-    final callable = _functions.httpsCallable('editMessage');
-
-    await callable.call(<String, dynamic>{
-      'conversationId': conversationId,
-      'messageId': messageId,
-      if (text != null) 'text': text,
-      if (externalMedia != null) 'mediaExternal': externalMedia.toMap(),
-    });
+    await _functions.callWithLatency<dynamic>(
+      'editMessage',
+      payload: <String, dynamic>{
+        'conversationId': conversationId,
+        'messageId': messageId,
+        if (text != null) 'text': text,
+        if (externalMedia != null) 'mediaExternal': externalMedia.toMap(),
+      },
+      category: 'directMessage',
+    );
   }
 
   Future<void> deleteMessage({
@@ -237,13 +377,15 @@ class DirectMessageService {
       throw ArgumentError('Geçerli conversation ve mesaj kimlikleri gerekli.');
     }
 
-    final callable = _functions.httpsCallable('deleteMessage');
-
-    await callable.call(<String, dynamic>{
-      'conversationId': conversationId,
-      'messageId': messageId,
-      'deleteMode': forEveryone ? 'for-both' : 'only-me',
-    });
+    await _functions.callWithLatency<dynamic>(
+      'deleteMessage',
+      payload: <String, dynamic>{
+        'conversationId': conversationId,
+        'messageId': messageId,
+        'deleteMode': forEveryone ? 'for-both' : 'only-me',
+      },
+      category: 'directMessage',
+    );
   }
 
   Future<void> markRead({
@@ -254,11 +396,15 @@ class DirectMessageService {
       return;
     }
 
-    final callable = _functions.httpsCallable('setReadPointer');
-    await callable.call(<String, dynamic>{
-      'conversationId': conversationId,
-      'messageId': messageId,
-    });
+    // Use new dmMarkAsRead callable (SQL + Firestore dual-write)
+    await _functions.callWithLatency<dynamic>(
+      'dmMarkAsRead',
+      payload: <String, dynamic>{
+        'conversationId': conversationId,
+        'messageId': messageId,
+      },
+      category: 'directMessage',
+    );
   }
 
   Future<DirectMessageBlockStatus> getBlockStatus({
@@ -394,6 +540,153 @@ class DirectMessageService {
     await Future.wait(uploads);
   }
 
+  // Note: _buildAttachmentManifest and _mirrorMessageToSql removed
+  // SQL dual-write is now handled by backend dmSendMessage callable
+
+  Future<_SqlConversationPage> _fetchSqlConversations({
+    required String authUid,
+    int limit = 50,
+    String? updatedBefore,
+    String? beforeConversationId,
+  }) async {
+    if (authUid.isEmpty) {
+      throw StateError('Kullanıcı kimliği gerekli.');
+    }
+
+    final payload = <String, dynamic>{
+      'limit': limit,
+      if (updatedBefore != null && updatedBefore.isNotEmpty)
+        'updatedBefore': updatedBefore,
+      if (beforeConversationId != null && beforeConversationId.isNotEmpty)
+        'beforeConversationId': beforeConversationId,
+    };
+
+    // Use new dmGetConversations callable (SQL primary, Firestore fallback)
+    final response = await _functions.callWithLatency<dynamic>(
+      'dmGetConversations',
+      payload: payload,
+      category: 'sqlMirror',
+      onMeasured: (elapsedMs) {
+        SqlMirrorLatencyMonitor.instance.record(
+          operation: 'dmListConversations',
+          elapsedMs: elapsedMs,
+        );
+      },
+    );
+
+    final responseMap =
+        _coerceStringKeyedMap(response.data) ?? <String, dynamic>{};
+
+    final rawConversations = responseMap['conversations'];
+    final threads = <DirectMessageThread>[];
+    if (rawConversations is Iterable) {
+      for (final entry in rawConversations) {
+        final entryMap = _coerceStringKeyedMap(entry);
+        if (entryMap == null || entryMap.isEmpty) {
+          continue;
+        }
+        threads.add(DirectMessageThread.fromSql(entryMap));
+      }
+    }
+
+    final nextCursorRaw = responseMap['nextCursor']?.toString().trim() ?? '';
+    final nextConversationIdRaw =
+        responseMap['nextConversationId']?.toString().trim() ?? '';
+
+    return _SqlConversationPage(
+      threads: List<DirectMessageThread>.unmodifiable(threads),
+      nextCursor: nextCursorRaw.isEmpty ? null : nextCursorRaw,
+      nextConversationId: nextConversationIdRaw.isEmpty
+          ? null
+          : nextConversationIdRaw,
+    );
+  }
+
+  Future<_SqlMessagePage> _fetchSqlMessages({
+    required String conversationId,
+    int limit = 100,
+    String? beforeTimestamp,
+    String? beforeMessageId,
+  }) async {
+    if (conversationId.trim().isEmpty) {
+      throw StateError('Conversation kimliği gerekli.');
+    }
+
+    final payload = <String, dynamic>{
+      'conversationId': conversationId,
+      'limit': limit,
+      if (beforeTimestamp != null && beforeTimestamp.isNotEmpty)
+        'beforeTimestamp': beforeTimestamp,
+      if (beforeMessageId != null && beforeMessageId.isNotEmpty)
+        'beforeMessageId': beforeMessageId,
+    };
+
+    // Use new dmGetMessages callable (SQL primary, Firestore fallback)
+    final response = await _functions.callWithLatency<dynamic>(
+      'dmGetMessages',
+      payload: payload,
+      category: 'sqlMirror',
+      onMeasured: (elapsedMs) {
+        SqlMirrorLatencyMonitor.instance.record(
+          operation: 'dmListMessages',
+          elapsedMs: elapsedMs,
+        );
+      },
+    );
+
+    final responseMap =
+        _coerceStringKeyedMap(response.data) ?? <String, dynamic>{};
+
+    final rawMessages = responseMap['messages'];
+    final messages = <DirectMessage>[];
+    final seen = <String>{};
+    if (rawMessages is Iterable) {
+      for (final entry in rawMessages) {
+        final entryMap = _coerceStringKeyedMap(entry);
+        if (entryMap == null || entryMap.isEmpty) {
+          continue;
+        }
+        final message = DirectMessage.fromSql(
+          entryMap,
+          conversationId: conversationId,
+        );
+        if (message.id.isEmpty || !seen.add(message.id)) {
+          continue;
+        }
+        messages.add(message);
+      }
+    }
+
+    messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    final nextCursorRaw = responseMap['nextCursor']?.toString().trim() ?? '';
+    final nextMessageIdRaw =
+        responseMap['nextMessageId']?.toString().trim() ?? '';
+
+    return _SqlMessagePage(
+      messages: List<DirectMessage>.unmodifiable(messages),
+      nextCursor: nextCursorRaw.isEmpty ? null : nextCursorRaw,
+      nextMessageId: nextMessageIdRaw.isEmpty ? null : nextMessageIdRaw,
+    );
+  }
+
+  Map<String, dynamic>? _coerceStringKeyedMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) {
+      return raw;
+    }
+    if (raw is Map) {
+      final result = <String, dynamic>{};
+      raw.forEach((key, value) {
+        if (key == null) {
+          return;
+        }
+        result[key.toString()] = value;
+      });
+      return result;
+    }
+    return null;
+  }
+
   bool _isAllowedContentType(String contentType) {
     final lower = contentType.toLowerCase();
     return lower.startsWith('image/') ||
@@ -428,4 +721,28 @@ class DirectMessageService {
     final sorted = [normalizedA, normalizedB]..sort();
     return sorted.join('_');
   }
+}
+
+class _SqlConversationPage {
+  const _SqlConversationPage({
+    required this.threads,
+    this.nextCursor,
+    this.nextConversationId,
+  });
+
+  final List<DirectMessageThread> threads;
+  final String? nextCursor;
+  final String? nextConversationId;
+}
+
+class _SqlMessagePage {
+  const _SqlMessagePage({
+    required this.messages,
+    this.nextCursor,
+    this.nextMessageId,
+  });
+
+  final List<DirectMessage> messages;
+  final String? nextCursor;
+  final String? nextMessageId;
 }

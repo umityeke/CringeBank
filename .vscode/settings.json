@@ -42,5 +42,9 @@
         "**/build/**": true,
         "**/.github/**": true,
         "**/node_modules/**": true
-    }
+    },
+    "DockerRun.DisableDockerrc": true,
+    "DockerRun.Containers": [
+        "f288e8fff478"
+    ]
 }

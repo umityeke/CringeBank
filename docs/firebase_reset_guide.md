@@ -217,6 +217,35 @@ Her platform için yeni bir Firebase App oluşturun ve konfigürasyon dosyaları
 - [ ] Storage yükleme/indirme test edildi mi?
 - [ ] Crashlytics, Analytics ve Messaging etkin mi?
 
+### 9.1 Auth ↔ SQL Senkronizasyon Testi
+
+Kimlik veritabanı migrasyonunun eksiksiz tamamlandığından emin olmak için yeni `verify_auth_sync` betiğini kullanın. Betik, Firebase Authentication kullanıcılarını `dbo.Users.auth_uid` kayıtlarıyla karşılaştırır ve eksik/çakışan kayıtları raporlar.
+
+1. **Önkoşullar**
+   - `GOOGLE_APPLICATION_CREDENTIALS` ortam değişkeni staging/prod Firebase servis hesabını göstermeli.
+   - `SQLSERVER_HOST`, `SQLSERVER_USER`, `SQLSERVER_PASS`, `SQLSERVER_DB` gibi SQL bağlantı değişkenleri atanmış olmalı.
+
+2. **Komut**
+
+   ```powershell
+   cd scripts
+   npm install  # ilk çalıştırmada
+   node sql/verify_auth_sync.js --limit=1000 --output=table
+   ```
+
+   - `--dry-run`: Migration prosedürünü yazmadan çalıştırır, yalnızca rapor üretir.
+   - `--skip-migration`: Stored procedure çalıştırılmadan sadece mevcut durum raporlanır.
+   - `--output=json`: CI boru hattına entegre etmek için makine dostu JSON çıktısı üretir.
+
+3. **Beklenen çıktılar**
+   - `Summary` tablosunda `missingInSql`, `missingInFirebase`, `duplicates` değerleri sıfır olmalı.
+   - Çakışma varsa detay tablolarında ilk 20 kayıt listelenir; betik çıkış kodu `2` olur.
+   - SQL veya Firebase erişim hatasında betik `1` koduyla sonlanır.
+
+4. **Raporlama**
+   - CI ortamında `node sql/verify_auth_sync.js --output=json > auth_sync_report.json` komutuyla log saklayabilirsiniz.
+   - Raporu `docs/` klasörüne eklemeden önce kullanıcı verisi içeren satırları maskelendiğinden emin olun.
+
 ## 10. Eski Projeyi Kapatma
 
 - Yeni proje kararlı çalışmaya başladıktan sonra eski projeyi silin veya yalnızca okuma moduna alın.

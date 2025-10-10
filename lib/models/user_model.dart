@@ -94,7 +94,9 @@ class AdminRoleAssignment {
     this.expiresAt,
   });
 
-  bool get isActive => status == 'active' && (expiresAt == null || expiresAt!.isAfter(DateTime.now()));
+  bool get isActive =>
+      status == 'active' &&
+      (expiresAt == null || expiresAt!.isAfter(DateTime.now()));
 
   Map<String, dynamic> toMap() {
     return {
@@ -221,6 +223,10 @@ class User {
   final int coins;
   final DateTime joinDate;
   final DateTime lastActive;
+  final DateTime? lastUsernameChangeAt;
+  final DateTime? nextUsernameChangeAt;
+  final DateTime? lastDisplayNameChangeAt;
+  final DateTime? nextDisplayNameChangeAt;
   final List<String> rozetler;
   final bool isPremium;
   final bool isVerified;
@@ -263,6 +269,10 @@ class User {
     this.coins = 0,
     required this.joinDate,
     required this.lastActive,
+    this.lastUsernameChangeAt,
+    this.nextUsernameChangeAt,
+    this.lastDisplayNameChangeAt,
+    this.nextDisplayNameChangeAt,
     this.rozetler = const [],
     this.isPremium = false,
     this.isVerified = false,
@@ -341,7 +351,9 @@ class User {
 
   // JSON Serialization
   factory User.fromJson(Map<String, dynamic> json) {
-    final adminRolesData = _parseAdminRoles(json['adminRoles'] ?? json['roles']);
+    final adminRolesData = _parseAdminRoles(
+      json['adminRoles'] ?? json['roles'],
+    );
     final pendingApprovalsData = _parsePendingApprovals(
       json['pendingAdminApprovals'] ?? json['pendingApprovals'],
     );
@@ -379,6 +391,18 @@ class User {
       lastActive: json['lastActive'] != null
           ? DateTime.parse(json['lastActive'])
           : DateTime.now(),
+      lastUsernameChangeAt: _parseTimestamp(
+        json['lastUsernameChangeAt'],
+      )?.toLocal(),
+      nextUsernameChangeAt: _parseTimestamp(
+        json['nextUsernameChangeAt'],
+      )?.toLocal(),
+      lastDisplayNameChangeAt: _parseTimestamp(
+        json['lastDisplayNameChangeAt'],
+      )?.toLocal(),
+      nextDisplayNameChangeAt: _parseTimestamp(
+        json['nextDisplayNameChangeAt'],
+      )?.toLocal(),
       rozetler: List<String>.from(json['rozetler'] ?? []),
       isPremium: json['isPremium'] ?? false,
       isVerified: json['isVerified'] ?? false,
@@ -484,6 +508,18 @@ class User {
       lastActive: map['lastActive'] != null
           ? (map['lastActive'] as dynamic).toDate()
           : DateTime.now(),
+      lastUsernameChangeAt: _parseTimestamp(
+        map['lastUsernameChangeAt'],
+      )?.toLocal(),
+      nextUsernameChangeAt: _parseTimestamp(
+        map['nextUsernameChangeAt'],
+      )?.toLocal(),
+      lastDisplayNameChangeAt: _parseTimestamp(
+        map['lastDisplayNameChangeAt'],
+      )?.toLocal(),
+      nextDisplayNameChangeAt: _parseTimestamp(
+        map['nextDisplayNameChangeAt'],
+      )?.toLocal(),
       rozetler: List<String>.from(map['rozetler'] ?? []),
       isPremium: map['isPremium'] ?? false,
       isVerified: map['isVerified'] ?? false,
@@ -575,6 +611,19 @@ class User {
       'categoryPermissions': categoryPermissions,
     };
 
+    if (lastUsernameChangeAt != null) {
+      map['lastUsernameChangeAt'] = lastUsernameChangeAt!.toUtc();
+    }
+    if (nextUsernameChangeAt != null) {
+      map['nextUsernameChangeAt'] = nextUsernameChangeAt!.toUtc();
+    }
+    if (lastDisplayNameChangeAt != null) {
+      map['lastDisplayNameChangeAt'] = lastDisplayNameChangeAt!.toUtc();
+    }
+    if (nextDisplayNameChangeAt != null) {
+      map['nextDisplayNameChangeAt'] = nextDisplayNameChangeAt!.toUtc();
+    }
+
     if (adminRoles.isNotEmpty) {
       map['adminRoles'] = adminRoles.map((role) => role.toMap()).toList();
       map['roles'] = adminRoles.map((role) => role.role).toList();
@@ -592,8 +641,9 @@ class User {
     map['claims_version'] = claimsVersion;
 
     if (pendingApprovals.isNotEmpty) {
-      final serialized =
-          pendingApprovals.map((approval) => approval.toMap()).toList();
+      final serialized = pendingApprovals
+          .map((approval) => approval.toMap())
+          .toList();
       map['pendingAdminApprovals'] = serialized;
       map['pendingApprovals'] = serialized;
     }
@@ -654,6 +704,27 @@ class User {
       'categoryPermissions': categoryPermissions,
     };
 
+    if (lastUsernameChangeAt != null) {
+      json['lastUsernameChangeAt'] = lastUsernameChangeAt!
+          .toUtc()
+          .toIso8601String();
+    }
+    if (nextUsernameChangeAt != null) {
+      json['nextUsernameChangeAt'] = nextUsernameChangeAt!
+          .toUtc()
+          .toIso8601String();
+    }
+    if (lastDisplayNameChangeAt != null) {
+      json['lastDisplayNameChangeAt'] = lastDisplayNameChangeAt!
+          .toUtc()
+          .toIso8601String();
+    }
+    if (nextDisplayNameChangeAt != null) {
+      json['nextDisplayNameChangeAt'] = nextDisplayNameChangeAt!
+          .toUtc()
+          .toIso8601String();
+    }
+
     if (adminRoles.isNotEmpty) {
       json['adminRoles'] = adminRoles.map((role) => role.toMap()).toList();
       json['roles'] = adminRoles.map((role) => role.role).toList();
@@ -671,8 +742,9 @@ class User {
     json['claims_version'] = claimsVersion;
 
     if (pendingApprovals.isNotEmpty) {
-      final serialized =
-          pendingApprovals.map((approval) => approval.toMap()).toList();
+      final serialized = pendingApprovals
+          .map((approval) => approval.toMap())
+          .toList();
       json['pendingAdminApprovals'] = serialized;
       json['pendingApprovals'] = serialized;
     }
@@ -720,6 +792,10 @@ class User {
     int? entriesCount,
     DateTime? joinDate,
     DateTime? lastActive,
+    DateTime? lastUsernameChangeAt,
+    DateTime? nextUsernameChangeAt,
+    DateTime? lastDisplayNameChangeAt,
+    DateTime? nextDisplayNameChangeAt,
     List<String>? rozetler,
     bool? isPremium,
     bool? isVerified,
@@ -763,6 +839,12 @@ class User {
       coins: coins ?? this.coins,
       joinDate: joinDate ?? this.joinDate,
       lastActive: lastActive ?? this.lastActive,
+      lastUsernameChangeAt: lastUsernameChangeAt ?? this.lastUsernameChangeAt,
+      nextUsernameChangeAt: nextUsernameChangeAt ?? this.nextUsernameChangeAt,
+      lastDisplayNameChangeAt:
+          lastDisplayNameChangeAt ?? this.lastDisplayNameChangeAt,
+      nextDisplayNameChangeAt:
+          nextDisplayNameChangeAt ?? this.nextDisplayNameChangeAt,
       rozetler: rozetler ?? this.rozetler,
       isPremium: isPremium ?? this.isPremium,
       isVerified: isVerified ?? this.isVerified,
@@ -786,7 +868,7 @@ class User {
       grantedPermissions: grantedPermissions ?? this.grantedPermissions,
       claimsVersion: claimsVersion ?? this.claimsVersion,
       pendingApprovals: pendingApprovals ?? this.pendingApprovals,
-  superAdminOverride: superAdminOverride ?? isSuperAdmin,
+      superAdminOverride: superAdminOverride ?? isSuperAdmin,
       moderatedCategories: moderatedCategories ?? this.moderatedCategories,
       categoryPermissions: categoryPermissions ?? this.categoryPermissions,
     );
@@ -826,9 +908,9 @@ class User {
       .toList(growable: false);
 
   bool get hasPendingSuperAdminNomination => pendingApprovals.any(
-        (approval) =>
-            approval.type == 'superadmin_nomination' && !approval.isResolved,
-      );
+    (approval) =>
+        approval.type == 'superadmin_nomination' && !approval.isResolved,
+  );
 
   PendingAdminApproval? get pendingSuperAdminApproval {
     for (final approval in pendingApprovals) {
@@ -882,6 +964,48 @@ class User {
     } else {
       return '${difference.inDays} gün önce aktifti';
     }
+  }
+
+  bool get canChangeUsername {
+    final nextChange = nextUsernameChangeAt;
+    if (nextChange == null) {
+      return true;
+    }
+    final now = DateTime.now();
+    return !now.isBefore(nextChange);
+  }
+
+  Duration? get usernameCooldownRemaining {
+    final nextChange = nextUsernameChangeAt;
+    if (nextChange == null) {
+      return null;
+    }
+    final now = DateTime.now();
+    if (!now.isBefore(nextChange)) {
+      return Duration.zero;
+    }
+    return nextChange.difference(now);
+  }
+
+  bool get canChangeDisplayName {
+    final nextChange = nextDisplayNameChangeAt;
+    if (nextChange == null) {
+      return true;
+    }
+    final now = DateTime.now();
+    return !now.isBefore(nextChange);
+  }
+
+  Duration? get displayNameCooldownRemaining {
+    final nextChange = nextDisplayNameChangeAt;
+    if (nextChange == null) {
+      return null;
+    }
+    final now = DateTime.now();
+    if (!now.isBefore(nextChange)) {
+      return Duration.zero;
+    }
+    return nextChange.difference(now);
   }
 
   List<String> _deriveEquippedItemsList() {
@@ -1206,12 +1330,7 @@ List<AdminRoleAssignment> _parseAdminRoles(dynamic source) {
         .toList(growable: false);
   }
   if (source is String) {
-    return [
-      AdminRoleAssignment(
-        role: source,
-        grantedAt: DateTime.now(),
-      ),
-    ];
+    return [AdminRoleAssignment(role: source, grantedAt: DateTime.now())];
   }
   return const [];
 }

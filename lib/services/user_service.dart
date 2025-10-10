@@ -4,10 +4,76 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user_model.dart';
 import '../utils/search_normalizer.dart';
+import '../utils/username_policies.dart';
+import '../utils/store_feature_flags.dart';
+import 'telemetry/callable_latency_tracker.dart';
+
+class UsernameCheckResult {
+  const UsernameCheckResult({
+    required this.input,
+    required this.normalized,
+    required this.isValid,
+    required this.isAvailable,
+    this.isOnCooldown = false,
+    this.reasons = const <String>[],
+    this.nextChangeAt,
+    this.cooldown,
+  });
+
+  final String input;
+  final String normalized;
+  final bool isValid;
+  final bool isAvailable;
+  final bool isOnCooldown;
+  final List<String> reasons;
+  final DateTime? nextChangeAt;
+  final Duration? cooldown;
+
+  bool get canProceed => isValid && isAvailable && !isOnCooldown;
+}
+
+class UsernameOperationException implements Exception {
+  UsernameOperationException({
+    required this.code,
+    required this.message,
+    this.reasons = const <String>[],
+    this.nextChangeAt,
+    this.cooldown,
+  });
+
+  final String code;
+  final String message;
+  final List<String> reasons;
+  final DateTime? nextChangeAt;
+  final Duration? cooldown;
+
+  @override
+  String toString() => 'UsernameOperationException($code, $message)';
+}
+
+class DisplayNameOperationException implements Exception {
+  DisplayNameOperationException({
+    required this.code,
+    required this.message,
+    this.reasons = const <String>[],
+    this.nextChangeAt,
+    this.cooldown,
+  });
+
+  final String code;
+  final String message;
+  final List<String> reasons;
+  final DateTime? nextChangeAt;
+  final Duration? cooldown;
+
+  @override
+  String toString() => 'DisplayNameOperationException($code, $message)';
+}
 
 // 🏢 ENTERPRISE USER SERVICE WITH ADVANCED AUTHENTICATION & MONITORING
 class UserService {
@@ -23,8 +89,25 @@ class UserService {
 
   final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
+    region: 'europe-west1',
+  );
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   final DeviceInfoPlugin _deviceInfoPlugin = DeviceInfoPlugin();
+
+  Map<String, dynamic> _normalizeCallableResponse(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    if (data is Map) {
+      try {
+        return Map<String, dynamic>.from(data);
+      } catch (_) {
+        return data.map((key, value) => MapEntry(key.toString(), value));
+      }
+    }
+    return <String, dynamic>{};
+  }
 
   User? _currentUser;
   final Map<String, User> _userCache = {}; // Enterprise user cache
@@ -64,8 +147,9 @@ class UserService {
   // Enterprise Firebase user with validation
   firebase_auth.User? get firebaseUser {
     final user = _auth.currentUser;
+    final profileVerified = _currentUser?.isVerified;
     print(
-      '👤 FIREBASE USER ACCESS: ${user?.uid ?? 'null'} - Verified: ${user?.emailVerified ?? false}',
+      '👤 FIREBASE USER ACCESS: ${user?.uid ?? 'null'} - EmailVerified: ${user?.emailVerified ?? false} | ProfileVerified: ${profileVerified ?? 'unknown'}',
     );
     return user;
   }
@@ -597,7 +681,364 @@ class UserService {
   }
 
   Future<bool> isUsernameAvailable(String username) async {
-    return !(await _isUsernameExists(username.toLowerCase()));
+    final result = await checkUsername(username);
+    return result.isValid && result.isAvailable;
+  }
+
+  Future<UsernameCheckResult> checkUsername(String username) async {
+    final normalizedInput = UsernamePolicies.normalize(username);
+    final validation = UsernamePolicies.validate(normalizedInput);
+    final current = _currentUser;
+    final cooldown = current?.usernameCooldownRemaining;
+
+    if (!validation.isValid) {
+      return UsernameCheckResult(
+        input: username,
+        normalized: normalizedInput,
+        isValid: false,
+        isAvailable: false,
+        isOnCooldown: cooldown != null && cooldown > Duration.zero,
+        nextChangeAt: current?.nextUsernameChangeAt,
+        cooldown: cooldown,
+        reasons: UsernamePolicies.issueMessages(validation),
+      );
+    }
+
+    try {
+      final response = await _functions.callWithLatency<dynamic>(
+        'usernameCheck',
+        category: 'userAccount',
+        payload: <String, dynamic>{'username': normalizedInput},
+      );
+
+      final payload = _mapFromResponse(response.data);
+
+      final remoteValid = payload['valid'] != false;
+      final remoteAvailable = payload['available'] != false;
+      final reasons = _listOfStrings(payload['reasons']);
+      final cooldownDuration =
+          _durationFromDynamic(payload['cooldown']) ??
+          _durationUntil(payload['nextChangeAt']);
+      final nextChangeAt =
+          _parseFlexibleTimestamp(payload['nextChangeAt']) ??
+          current?.nextUsernameChangeAt;
+      final isOnCooldown =
+          cooldownDuration != null && cooldownDuration > Duration.zero;
+
+      return UsernameCheckResult(
+        input: username,
+        normalized: normalizedInput,
+        isValid: remoteValid,
+        isAvailable: remoteAvailable,
+        isOnCooldown: isOnCooldown,
+        cooldown: cooldownDuration,
+        nextChangeAt: nextChangeAt,
+        reasons: reasons,
+      );
+    } on FirebaseFunctionsException catch (error, stack) {
+      debugPrint('usernameCheck callable failed: ${error.message}\n$stack');
+      return UsernameCheckResult(
+        input: username,
+        normalized: normalizedInput,
+        isValid: false,
+        isAvailable: false,
+        isOnCooldown: cooldown != null && cooldown > Duration.zero,
+        nextChangeAt: current?.nextUsernameChangeAt,
+        cooldown: cooldown,
+        reasons: <String>[error.message ?? 'Kullanıcı adı kontrolü başarısız.'],
+      );
+    } catch (error, stack) {
+      debugPrint('usernameCheck unexpected error: $error\n$stack');
+      return UsernameCheckResult(
+        input: username,
+        normalized: normalizedInput,
+        isValid: false,
+        isAvailable: false,
+        isOnCooldown: cooldown != null && cooldown > Duration.zero,
+        nextChangeAt: current?.nextUsernameChangeAt,
+        cooldown: cooldown,
+        reasons: <String>['Kullanıcı adı uygunluğu doğrulanamadı.'],
+      );
+    }
+  }
+
+  Future<void> setUsername(String username) async {
+    final normalizedInput = UsernamePolicies.normalize(username);
+    final validation = UsernamePolicies.validate(normalizedInput);
+    final current = _currentUser;
+
+    if (current == null) {
+      throw UsernameOperationException(
+        code: 'not-authenticated',
+        message: 'Kullanıcı oturumu bulunamadı.',
+      );
+    }
+
+    if (normalizedInput == current.username) {
+      return;
+    }
+
+    if (!validation.isValid) {
+      throw UsernameOperationException(
+        code: 'invalid-username',
+        message: 'Kullanıcı adı geçersiz.',
+        reasons: UsernamePolicies.issueMessages(validation),
+      );
+    }
+
+    final remainingCooldown = current.usernameCooldownRemaining;
+    if (remainingCooldown != null && remainingCooldown > Duration.zero) {
+      throw UsernameOperationException(
+        code: 'cooldown-active',
+        message:
+            'Kullanıcı adını tekrar değiştirebilmen için beklemen gerekiyor.',
+        cooldown: remainingCooldown,
+        nextChangeAt: current.nextUsernameChangeAt,
+      );
+    }
+
+    try {
+      await _functions.callWithLatency<dynamic>(
+        'usernameSet',
+        category: 'userAccount',
+        payload: <String, dynamic>{'username': normalizedInput},
+      );
+
+      await refreshCurrentUser(forceRemote: true);
+    } on FirebaseFunctionsException catch (error) {
+      throw UsernameOperationException(
+        code: error.code,
+        message:
+            error.message ?? 'Kullanıcı adını güncellerken bir sorun oluştu.',
+        reasons: _reasonsFromDetails(error.details),
+        nextChangeAt: _parseFlexibleTimestamp(
+          _valueFromDetails(error.details, 'nextChangeAt'),
+        ),
+        cooldown: _durationFromDynamic(
+          _valueFromDetails(error.details, 'cooldown'),
+        ),
+      );
+    } catch (error) {
+      throw UsernameOperationException(
+        code: 'unknown',
+        message:
+            'Kullanıcı adı güncellemesi tamamlanamadı. Lütfen tekrar dene.',
+        reasons: <String>[error.toString()],
+      );
+    }
+  }
+
+  Future<void> setDisplayName(String displayName) async {
+    final normalizedInput = DisplayNamePolicies.normalize(displayName);
+    final validation = DisplayNamePolicies.validate(normalizedInput);
+    final current = _currentUser;
+
+    if (current == null) {
+      throw DisplayNameOperationException(
+        code: 'not-authenticated',
+        message: 'Kullanıcı oturumu bulunamadı.',
+      );
+    }
+
+    if (normalizedInput == current.displayName) {
+      return;
+    }
+
+    if (!validation.isValid) {
+      throw DisplayNameOperationException(
+        code: 'invalid-display-name',
+        message: 'Görünen ad geçersiz.',
+        reasons: DisplayNamePolicies.issueMessages(validation),
+      );
+    }
+
+    final remainingCooldown = current.displayNameCooldownRemaining;
+    if (remainingCooldown != null && remainingCooldown > Duration.zero) {
+      throw DisplayNameOperationException(
+        code: 'cooldown-active',
+        message: 'Adını yeniden düzenleyebilmek için beklemen gerekiyor.',
+        cooldown: remainingCooldown,
+        nextChangeAt: current.nextDisplayNameChangeAt,
+      );
+    }
+
+    try {
+      await _functions.callWithLatency<dynamic>(
+        'displayNameSet',
+        category: 'userAccount',
+        payload: <String, dynamic>{'displayName': normalizedInput},
+      );
+
+      await refreshCurrentUser(forceRemote: true);
+    } on FirebaseFunctionsException catch (error) {
+      throw DisplayNameOperationException(
+        code: error.code,
+        message: error.message ?? 'Görünen adı güncellerken bir sorun oluştu.',
+        reasons: _reasonsFromDetails(error.details),
+        nextChangeAt: _parseFlexibleTimestamp(
+          _valueFromDetails(error.details, 'nextChangeAt'),
+        ),
+        cooldown: _durationFromDynamic(
+          _valueFromDetails(error.details, 'cooldown'),
+        ),
+      );
+    } catch (error) {
+      throw DisplayNameOperationException(
+        code: 'unknown',
+        message: 'Adını güncellerken beklenmeyen bir hata oluştu.',
+        reasons: <String>[error.toString()],
+      );
+    }
+  }
+
+  Future<User?> refreshCurrentUser({bool forceRemote = false}) async {
+    final firebaseUser = _auth.currentUser;
+    if (firebaseUser == null) {
+      return null;
+    }
+
+    if (forceRemote) {
+      return await _loadFreshUserData(firebaseUser.uid);
+    }
+
+    await _loadEnterpriseUserData(firebaseUser.uid);
+    return _currentUser;
+  }
+
+  Map<String, dynamic> _mapFromResponse(dynamic data) {
+    if (data == null) {
+      return const <String, dynamic>{};
+    }
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    if (data is Map) {
+      return data.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return const <String, dynamic>{};
+  }
+
+  List<String> _listOfStrings(dynamic value) {
+    if (value == null) {
+      return const <String>[];
+    }
+    if (value is List) {
+      return value
+          .whereType<String>()
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList(growable: false);
+    }
+    if (value is String) {
+      return <String>[value];
+    }
+    return const <String>[];
+  }
+
+  Duration? _durationFromDynamic(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is Duration) {
+      return value;
+    }
+    if (value is num) {
+      if (value <= 0) {
+        return Duration.zero;
+      }
+      return Duration(seconds: value.round());
+    }
+    if (value is String) {
+      final parsed = double.tryParse(value);
+      if (parsed != null) {
+        return Duration(seconds: parsed.round());
+      }
+    }
+    if (value is Map && value.containsKey('seconds')) {
+      final seconds = value['seconds'];
+      if (seconds is num) {
+        return Duration(seconds: seconds.round());
+      }
+    }
+    return null;
+  }
+
+  Duration? _durationUntil(dynamic timestamp) {
+    final target = _parseFlexibleTimestamp(timestamp);
+    if (target == null) {
+      return null;
+    }
+    final now = DateTime.now();
+    if (!now.isBefore(target)) {
+      return Duration.zero;
+    }
+    return target.difference(now);
+  }
+
+  DateTime? _parseFlexibleTimestamp(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is DateTime) {
+      return value.toLocal();
+    }
+    if (value is String) {
+      return DateTime.tryParse(value)?.toLocal();
+    }
+    if (value is num) {
+      return DateTime.fromMillisecondsSinceEpoch(
+        (value * 1000).round(),
+        isUtc: true,
+      ).toLocal();
+    }
+    if (value is Map) {
+      final seconds = value['_seconds'] ?? value['seconds'];
+      if (seconds is num) {
+        return DateTime.fromMillisecondsSinceEpoch(
+          (seconds * 1000).round(),
+          isUtc: true,
+        ).toLocal();
+      }
+    }
+    return null;
+  }
+
+  List<String> _reasonsFromDetails(dynamic details) {
+    if (details == null) {
+      return const <String>[];
+    }
+    if (details is List) {
+      final extracted = <String>[];
+      for (final item in details) {
+        if (item is String) {
+          extracted.add(item);
+        } else if (item is Map && item['message'] is String) {
+          extracted.add(item['message'] as String);
+        }
+      }
+      return extracted;
+    }
+    final map = _mapFromResponse(details);
+    final reasons = _listOfStrings(map['reasons']);
+    if (reasons.isNotEmpty) {
+      return reasons;
+    }
+    final message = map['message'];
+    if (message is String && message.trim().isNotEmpty) {
+      return <String>[message.trim()];
+    }
+    return const <String>[];
+  }
+
+  dynamic _valueFromDetails(dynamic details, String key) {
+    if (details == null) {
+      return null;
+    }
+    if (details is Map) {
+      final map = _mapFromResponse(details);
+      return map[key];
+    }
+    return null;
   }
 
   Future<bool> register({
@@ -610,7 +1051,6 @@ class UserService {
       final rawEmail = email.trim();
       final normalizedEmail = rawEmail.toLowerCase();
       final normalizedUsername = username.trim();
-      final usernameLower = normalizedUsername.toLowerCase();
 
       print(
         'Starting registration for: $normalizedEmail with username $normalizedUsername',
@@ -630,8 +1070,11 @@ class UserService {
 
       // Kullanıcı adı kontrolü (Firebase'e bağlanmazsa skip et)
       try {
-        if (await _isUsernameExists(usernameLower)) {
-          print('Username already exists');
+        final usernameCheck = await checkUsername(normalizedUsername);
+        if (!usernameCheck.isAvailable || !usernameCheck.isValid) {
+          print(
+            'Username is not available: ${usernameCheck.reasons.join(', ')}',
+          );
           return false;
         }
       } catch (e) {
@@ -673,12 +1116,26 @@ class UserService {
           );
 
           try {
-            await _saveUserData(newUser);
+            final ensuredUser = await _ensureServerUser(newUser);
+            if (ensuredUser != null) {
+              _currentUser = ensuredUser;
+            } else {
+              _currentUser = newUser;
+            }
+          } on FirebaseFunctionsException catch (error) {
+            print(
+              'Firebase callable ensureSqlUser failed: ${error.code} ${error.message}',
+            );
+            return false;
           } catch (e) {
-            print('Failed to save user data: $e');
+            print('Failed to synchronize user data via ensureSqlUser: $e');
+            return false;
           }
 
-          _currentUser = newUser;
+          if (_currentUser != null) {
+            _userCache[_currentUser!.id] = _currentUser!;
+            _lastCacheUpdate = DateTime.now();
+          }
           await _logAuthActivity(credential.user, 'REGISTER');
           print('Registration successful');
           return true;
@@ -748,13 +1205,21 @@ class UserService {
           );
 
           try {
-            await _saveUserData(fallbackUser);
-            print('Fallback user document created for UID: $uid');
+            await _ensureServerUser(fallbackUser);
+            print(
+              'Fallback user document created via ensureSqlUser for UID: $uid',
+            );
+          } on FirebaseFunctionsException catch (error) {
+            print(
+              'ensureSqlUser fallback creation failed: ${error.code} ${error.message}',
+            );
           } catch (e) {
-            print('Failed to create fallback user document: $e');
+            print(
+              'Failed to create fallback user document via ensureSqlUser: $e',
+            );
           }
 
-          _currentUser = fallbackUser;
+          _currentUser ??= fallbackUser;
           await _updateLastActive();
           await getFollowingIds(forceRefresh: true);
         }
@@ -1065,6 +1530,132 @@ class UserService {
   }
 
   // Firestore'a kullanıcı verilerini kaydet
+  Future<User?> _ensureServerUser(User user) async {
+    final payload = <String, dynamic>{
+      'username': user.username,
+      'displayName': user.displayName,
+      'fullName': user.fullName,
+      'email': user.email,
+      'avatar': user.avatar,
+    };
+
+    if (StoreFeatureFlags.useSqlEscrowGateway) {
+      final sqlUser = await _ensureServerUserViaSqlGateway(user, payload);
+      if (sqlUser != null) {
+        return sqlUser;
+      }
+      print(
+        'Fallback to legacy ensureSqlUser callable after SQL gateway failure',
+      );
+    }
+
+    return _ensureServerUserViaLegacy(user, payload);
+  }
+
+  Future<User?> _ensureServerUserViaSqlGateway(
+    User user,
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final response = await _functions.callWithLatency<dynamic>(
+        'sqlGatewayEnsureUser',
+        category: 'userSqlGateway',
+        payload: payload,
+      );
+      final data = _normalizeCallableResponse(response.data);
+
+      print(
+        'sqlGatewayEnsureUser: completed with created=${data['created']} userId=${data['userId']}',
+      );
+
+      Map<String, dynamic>? profile;
+      try {
+        final profileResponse = await _functions.callWithLatency<dynamic>(
+          'sqlGatewayGetUserProfile',
+          category: 'userSqlGateway',
+          payload: <String, dynamic>{'authUid': user.id},
+        );
+        final profileData = _normalizeCallableResponse(profileResponse.data);
+
+        if (profileData.isNotEmpty) {
+          String pickString(dynamic value, String fallback) {
+            if (value == null) return fallback;
+            final text = value.toString().trim();
+            return text.isEmpty ? fallback : text;
+          }
+
+          final merged = Map<String, dynamic>.from(user.toMap())
+            ..['id'] = user.id
+            ..['username'] = pickString(profileData['username'], user.username)
+            ..['displayName'] = pickString(
+              profileData['displayName'] ?? profileData['fullName'],
+              user.displayName,
+            )
+            ..['fullName'] = pickString(
+              profileData['fullName'] ?? profileData['displayName'],
+              user.fullName,
+            )
+            ..['email'] = pickString(profileData['email'], user.email)
+            ..['avatar'] = user.avatar;
+
+          profile = merged;
+        }
+      } catch (profileError) {
+        print('sqlGatewayEnsureUser profile fetch failed: $profileError');
+      }
+
+      final ensuredUser = profile != null ? User.fromMap(profile) : user;
+
+      _userCache[user.id] = ensuredUser;
+      _currentUser = ensuredUser;
+      _lastCacheUpdate = DateTime.now();
+
+      return ensuredUser;
+    } on FirebaseFunctionsException catch (error) {
+      print(
+        'Firebase callable sqlGatewayEnsureUser failed: ${error.code} ${error.message}',
+      );
+      return null;
+    } catch (e) {
+      print('Failed to synchronize user data via sqlGatewayEnsureUser: $e');
+      return null;
+    }
+  }
+
+  Future<User?> _ensureServerUserViaLegacy(
+    User user,
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final response = await _functions.callWithLatency<dynamic>(
+        'ensureSqlUser',
+        category: 'userLegacy',
+        payload: payload,
+      );
+      var ensuredUser = user;
+
+      final responseData = _normalizeCallableResponse(response.data);
+      final profileData = responseData['profile'];
+      if (profileData is Map) {
+        final profile = Map<String, dynamic>.from(profileData)
+          ..['id'] = user.id;
+        ensuredUser = User.fromMap(profile);
+      }
+
+      _userCache[user.id] = ensuredUser;
+      _currentUser = ensuredUser;
+      _lastCacheUpdate = DateTime.now();
+      return ensuredUser;
+    } on FirebaseFunctionsException catch (error) {
+      print('ensureServerUser failed: ${error.code} ${error.message}');
+      rethrow;
+    } catch (e) {
+      print('ensureServerUser unexpected error: $e');
+      return null;
+    }
+  }
+
+  // Firestore'a kullanıcı verilerini kaydet
   Future<void> _saveUserData(User user) async {
     try {
       final data = user.toMap();
@@ -1105,20 +1696,6 @@ class UserService {
           .set(data, SetOptions(merge: true));
     } catch (e) {
       print('Save user data error: $e');
-    }
-  }
-
-  // Kullanıcı adının var olup olmadığını kontrol et
-  Future<bool> _isUsernameExists(String username) async {
-    try {
-      final query = await _firestore
-          .collection('users')
-          .where('usernameLower', isEqualTo: username.toLowerCase())
-          .get();
-      return query.docs.isNotEmpty;
-    } catch (e) {
-      print('Check username error: $e');
-      return false;
     }
   }
 
@@ -1311,7 +1888,11 @@ class UserService {
 
   // Kullanıcı var mı kontrolü
   Future<bool> userExists(String username) async {
-    return await _isUsernameExists(username);
+    final result = await checkUsername(username);
+    if (!result.isValid) {
+      return false;
+    }
+    return !result.isAvailable;
   }
 
   // Initialize user service

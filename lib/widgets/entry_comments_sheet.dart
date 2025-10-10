@@ -79,7 +79,7 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
         width: 42,
         height: 4,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.2),
+          color: Colors.white.withOpacity(0.2),
           borderRadius: BorderRadius.circular(2),
         ),
       ),
@@ -112,7 +112,7 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
                 Text(
                   'Yorumlar',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
+                    color: Colors.white.withOpacity(0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -149,7 +149,7 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
               child: Text(
                 'İlk yorumu sen yaz! 🙌',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: Colors.white.withOpacity(0.6),
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -212,7 +212,7 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
                     Text(
                       _formatTimestamp(comment.createdAt),
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.5),
+                        color: Colors.white.withOpacity(0.5),
                         fontSize: 11,
                       ),
                     ),
@@ -222,7 +222,7 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
                 Text(
                   comment.authorHandle,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: Colors.white.withOpacity(0.5),
                     fontSize: 12,
                   ),
                 ),
@@ -243,7 +243,7 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
                     TextButton(
                       onPressed: () => _handleReplyTap(comment),
                       style: TextButton.styleFrom(
-                        foregroundColor: Colors.white.withValues(alpha: 0.6),
+                        foregroundColor: Colors.white.withOpacity(0.6),
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppTheme.spacingXS,
                           vertical: 4,
@@ -350,7 +350,7 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
         : Icons.favorite_outline_rounded;
     final color = isLiked
         ? AppTheme.cringeOrange
-        : Colors.white.withValues(alpha: 0.7);
+  : Colors.white.withOpacity(0.7);
 
     return InkWell(
       onTap: isProcessing ? null : () => _handleToggleLike(comment),
@@ -359,8 +359,8 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: isLiked
-              ? AppTheme.cringeOrange.withValues(alpha: 0.12)
-              : Colors.white.withValues(alpha: 0.06),
+              ? AppTheme.cringeOrange.withOpacity(0.12)
+              : Colors.white.withOpacity(0.06),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -414,7 +414,7 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
         vertical: AppTheme.spacingS,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
+  color: Colors.white.withOpacity(0.08),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -507,10 +507,10 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
                   decoration: InputDecoration(
                     hintText: hintText,
                     hintStyle: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.4),
+                      color: Colors.white.withOpacity(0.4),
                     ),
                     filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.05),
+                    fillColor: Colors.white.withOpacity(0.05),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: AppTheme.spacingM,
                       vertical: AppTheme.spacingS,
@@ -518,13 +518,13 @@ class _EntryCommentsSheetState extends State<EntryCommentsSheet> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.08),
+                        color: Colors.white.withOpacity(0.08),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.08),
+                        color: Colors.white.withOpacity(0.08),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(

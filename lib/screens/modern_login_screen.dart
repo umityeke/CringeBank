@@ -57,8 +57,8 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         speed: 1.0,
         phase: 0.0,
         colors: [
-          const Color(0xFF3C8CE7).withValues(alpha: 0.55),
-          const Color(0xFF00EAFF).withValues(alpha: 0.25),
+          const Color(0xFF3C8CE7).withOpacity(0.55),
+          const Color(0xFF00EAFF).withOpacity(0.25),
         ],
       ),
       _BubbleConfig(
@@ -69,8 +69,8 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         speed: 0.75,
         phase: 0.35,
         colors: [
-          const Color(0xFF6A11CB).withValues(alpha: 0.45),
-          const Color(0xFF2575FC).withValues(alpha: 0.22),
+          const Color(0xFF6A11CB).withOpacity(0.45),
+          const Color(0xFF2575FC).withOpacity(0.22),
         ],
       ),
       _BubbleConfig(
@@ -81,8 +81,8 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         speed: 1.25,
         phase: 0.6,
         colors: [
-          const Color(0xFF00B4DB).withValues(alpha: 0.5),
-          const Color(0xFF0083B0).withValues(alpha: 0.2),
+          const Color(0xFF00B4DB).withOpacity(0.5),
+          const Color(0xFF0083B0).withOpacity(0.2),
         ],
       ),
       _BubbleConfig(
@@ -93,8 +93,8 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         speed: 0.9,
         phase: 0.9,
         colors: [
-          const Color(0xFFE96443).withValues(alpha: 0.42),
-          const Color(0xFF904E95).withValues(alpha: 0.18),
+          const Color(0xFFE96443).withOpacity(0.42),
+          const Color(0xFF904E95).withOpacity(0.18),
         ],
       ),
     ];
@@ -145,7 +145,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Colors.black.withValues(alpha: 0.25),
+                    Colors.black.withOpacity(0.25),
                     Colors.transparent,
                   ],
                   begin: Alignment.topCenter,
@@ -174,8 +174,8 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
   }
 
   Widget _buildLoginCard(BuildContext context, double cardWidth) {
-    final cardColor = Colors.white.withValues(alpha: 0.04);
-    final borderColor = Colors.white.withValues(alpha: 0.08);
+  final cardColor = Colors.white.withOpacity(0.04);
+  final borderColor = Colors.white.withOpacity(0.08);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
@@ -189,7 +189,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
             border: Border.all(color: borderColor, width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.45),
+                color: Colors.black.withOpacity(0.45),
                 blurRadius: 30,
                 offset: const Offset(0, 22),
                 spreadRadius: -18,
@@ -289,20 +289,20 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
     TextInputAction textInputAction = TextInputAction.next,
     TextInputType? keyboardType,
   }) {
-    final borderColor = Colors.white.withValues(alpha: 0.12);
+  final borderColor = Colors.white.withOpacity(0.12);
     const focusedBorderColor = Color(0xFF2D79F3);
 
     return Container(
       height: 56,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: 1.4),
-        color: Colors.white.withValues(alpha: 0.06),
+  borderRadius: BorderRadius.circular(16),
+  border: Border.all(color: borderColor, width: 1.4),
+  color: Colors.white.withOpacity(0.06),
       ),
       child: Row(
         children: [
           const SizedBox(width: 16),
-          Icon(icon, size: 20, color: Colors.white.withValues(alpha: 0.7)),
+          Icon(icon, size: 20, color: Colors.white.withOpacity(0.7)),
           const SizedBox(width: 12),
           Expanded(
             child: TextField(
@@ -319,7 +319,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                 hintText: hintText,
                 border: InputBorder.none,
                 hintStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: Colors.white.withOpacity(0.5),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -474,7 +474,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                   Text(
                     'E-posta adresini gir, sıfırlama bağlantısı gönderelim.',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
+                      color: Colors.white.withOpacity(0.7),
                       fontSize: 13,
                       height: 1.4,
                     ),
@@ -492,15 +492,15 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                     decoration: InputDecoration(
                       labelText: 'E-posta adresi',
                       labelStyle: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
+                        color: Colors.white.withOpacity(0.7),
                       ),
                       errorText: errorText,
                       filled: true,
-                      fillColor: Colors.white.withValues(alpha: 0.08),
+                      fillColor: Colors.white.withOpacity(0.08),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.18),
+                          color: Colors.white.withOpacity(0.18),
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
@@ -513,7 +513,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.16),
+                          color: Colors.white.withOpacity(0.16),
                         ),
                       ),
                       errorBorder: OutlineInputBorder(
@@ -649,7 +649,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
               boxShadow: _isButtonHovered
                   ? [
                       BoxShadow(
-                        color: const Color(0xFF2D79F3).withValues(alpha: 0.3),
+                        color: const Color(0xFF2D79F3).withOpacity(0.3),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -687,14 +687,14 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         Expanded(
           child: Container(
             height: 1,
-            color: Colors.white.withValues(alpha: 0.1),
+            color: Colors.white.withOpacity(0.1),
           ),
         ),
         const SizedBox(width: 12),
         Text(
           'ya da',
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.6),
+            color: Colors.white.withOpacity(0.6),
             fontSize: 13,
           ),
         ),
@@ -702,7 +702,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         Expanded(
           child: Container(
             height: 1,
-            color: Colors.white.withValues(alpha: 0.1),
+            color: Colors.white.withOpacity(0.1),
           ),
         ),
       ],
@@ -754,12 +754,12 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.16)),
+          side: BorderSide(color: Colors.white.withOpacity(0.16)),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
           foregroundColor: Colors.white,
-          backgroundColor: Colors.white.withValues(alpha: 0.04),
+          backgroundColor: Colors.white.withOpacity(0.04),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -786,7 +786,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w400,
-            color: Colors.white.withValues(alpha: 0.7),
+            color: Colors.white.withOpacity(0.7),
           ),
         ),
         const SizedBox(width: 4),

@@ -15,14 +15,19 @@ Aşağıdaki adımlar, mevcut SMTP ayarlarınızı yeni yönteme geçirmenize ya
 
 2. Oluşan `.env` dosyasını düzenleyip gerçek değerleri girin:
 
-```dotenv
-SMTP_FROM_EMAIL=cringeebank@gmail.com
-SMTP_USER=cringeebank@gmail.com
-SMTP_FROM_NAME=CringeBank
-SMTP_PASSWORD=zkys avkf eizv dphm
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=465
-```
+   ```dotenv
+   SMTP_FROM_EMAIL=cringeebank@gmail.com
+   SMTP_USER=cringeebank@gmail.com
+   SMTP_FROM_NAME=CringeBank
+   SMTP_PASSWORD=zkys avkf eizv dphm
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=465
+   # Opsiyonel gelişmiş ayarlar
+   # SMTP_APP_PASSWORD=
+   # SMTP_REQUIRE_TLS=true
+   # SMTP_DISABLE_TLS_VERIFICATION=false
+   ```
+
 
 > `SMTP_PASSWORD` alanına Google hesabında iki adımlı doğrulama etkinleştirildikten sonra
 > oluşturduğunuz 16 haneli uygulama şifresini yazın. Dosya `.gitignore` tarafından zaten
@@ -30,6 +35,8 @@ SMTP_PORT=465
 >
 > **Not:** Gmail ve benzeri sağlayıcılarda SMTP kullanıcı adı çoğunlukla gönderen e-posta adresiyle aynıdır.
 > Eğer `SMTP_USER` boş bırakılırsa kod otomatik olarak `SMTP_FROM_EMAIL` değerini kullanır.
+> `SMTP_REQUIRE_TLS` ve `SMTP_DISABLE_TLS_VERIFICATION` değişkenleri, TLS bağlantı zorunluluğunu
+> ve sertifika doğrulamasını özelleştirmenizi sağlar (gelişmiş/sorun giderme senaryoları için).
 
 ## 2. Firebase CLI ile dotenv sistemine geçiş
 
@@ -45,11 +52,31 @@ yedekleyin ve dotenv sistemine taşıyın:
    ```powershell
    firebase functions:config:migrate
    ```
+
    Bu komut `functions/.env`, `.env.local`, `.env.<projectId>` gibi dosyaları oluşturabilir.
    Var olan `.env` dosyanızla birleştirmeyi unutmayın.
 3. İhtiyaç duyduğunuz diğer ortamlar (örn. prod, staging) için
    `functions/.env.prod`, `functions/.env.staging` benzeri dosyalar oluşturabilir,
    CI/CD süreçlerinde bu dosyaları kullanabilirsiniz.
+
+### (Opsiyonel) Eski `functions:config` değerlerini güncelle
+
+Dotenv geçişi tamamlanana kadar legacy runtime config yöntemini kullanmanız gerekiyorsa,
+aşağıdaki komutla SMTP ayarlarını Firebase'e yazabilirsiniz:
+
+```powershell
+firebase functions:config:set `
+   smtp.host="smtp.gmail.com" `
+   smtp.port="465" `
+   smtp.user="cringeebank@gmail.com" `
+   smtp.password="jahi pqcg ugex nbbi" `
+   smtp.from_email="cringeebank@gmail.com" `
+   smtp.from_name="CringeBank"
+```
+
+> Bu komut yalnızca yerel `.env` dosyanızdaki değerlerin aynısını oluşturur ve uzun vadede
+> dotenv tabanlı yaklaşımın yerine geçmez. Komutu çalıştırdıktan sonra ilgili fonksiyonları
+> yeniden dağıtmayı (`firebase deploy --only functions:sendEmailOtpHttp`) unutmayın.
 
 ## 3. Deploy sırasında dotenv dosyalarını kullan
 
@@ -69,6 +96,28 @@ Kod tarafında `functions.config()` kullanmıyorsanız ek değişiklik gerekmez.
 `functions/index.js` dosyasında SMTP ayarları zaten `process.env.*` değişkenlerine
 bakacak şekilde tasarlanmıştır. Eğer başka yerlerde `functions.config()` kullanımı
 varsa, bunları da aynı şekilde environment değişkenlerine uyarlayın.
+
+---
+
+## Ek: Emülatörlerde güvenli test akışı
+
+Functions Shell veya testler sırasında prod kaynaklarına yazmamak için şu adımları izleyin:
+
+1. **`firebase.json` emülatör bloğu** — Bu repo içinde gerekli port ve servis tanımları aktiftir.
+2. **Emülatörleri başlatın** — Prod dışı bir proje kimliğiyle çalıştırın:
+
+    ```powershell
+    firebase emulators:start --project demo-cringebank `
+       --only functions,firestore,auth,storage,pubsub
+    ```
+
+   Emulator UI [http://localhost:4000](http://localhost:4000) adresinde açılır.
+
+3. **SDK'ları emülatöre yönlendirin** — Flutter tarafında `useFirestoreEmulator`, `useAuthEmulator`, `useFunctionsEmulator`, `useStorageEmulator` çağrılarını yapın (Android emülatörü için `10.0.2.2`, web/iOS için `localhost`). Node.js testlerinde ilgili ortam değişkenlerini ayarlayın (`FIRESTORE_EMULATOR_HOST`, `FIREBASE_AUTH_EMULATOR_HOST`, vb.).
+4. **Prod guard** — `functions/index.js` dosyasında emülatör dışında (yerel Functions Shell vb.) çalışıp prod'a erişmeyi engelleyen koruma bulunur. GCP üzerinde barındırılan ortam otomatik olarak izinlidir; yerelde bilinçli olarak prod'a bağlanmanız gerekirse `ALLOW_PROD=true` değişkenini siz set etmelisiniz.
+5. **Komutlarda demo proje kullanın** — Yanlışlıkla prod seçimini engellemek için `--project demo-cringebank` bayrağını veya `firebase use demo-cringebank` komutunu tercih edin.
+
+HTTP fonksiyonlarını test etmek için emülatör URL'lerini (`http://127.0.0.1:5001/demo-cringebank/...`) kullanın. Entegre testleri `firebase emulators:exec --project demo-cringebank "npm test"` ile izole şekilde çalıştırabilirsiniz.
 
 ---
 

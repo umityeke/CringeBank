@@ -10,6 +10,7 @@ import 'firebase_options.dart';
 import 'services/advanced_ai_service.dart';
 import 'services/cringe_entry_service.dart';
 import 'services/cringe_search_service.dart';
+import 'services/messaging_feature_service.dart';
 import 'services/user_service.dart';
 import 'services/crash_reporting/crash_reporting_service_factory.dart';
 import 'services/crash_reporting/i_crash_reporting_service.dart';
@@ -83,6 +84,7 @@ Future<void> _runAppWithGuards(Widget app) async {
     await _configureFirestore();
 
     AdvancedAIService.initialize();
+    await MessagingFeatureService.instance.initialize();
 
     await Future.wait([
       _notificationService.initialize(),

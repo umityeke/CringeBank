@@ -351,7 +351,7 @@ class CringeEntry {
       authorAvatarUrl: json['authorAvatarUrl'],
       // Security contract fields
       type: PostType.fromString(json['type']),
-      status: ModerationStatus.fromString(json['status']),
+      status: ModerationStatus.fromString(_resolveStatus(json)),
       updatedAt: json['updatedAt'] is int
           ? DateTime.fromMillisecondsSinceEpoch(json['updatedAt'])
           : (json['updatedAt'] != null
@@ -571,9 +571,7 @@ class CringeEntry {
       type: data['type'] != null
           ? PostType.fromString(data['type'])
           : PostType.spill,
-      status: data['status'] != null
-          ? ModerationStatus.fromString(data['status'])
-          : ModerationStatus.pending,
+      status: ModerationStatus.fromString(_resolveStatus(data)),
       updatedAt: parsedUpdatedAt,
       moderation: data['moderation'] != null
           ? Map<String, dynamic>.from(data['moderation'])
@@ -615,4 +613,27 @@ class CringeEntry {
   String get description => aciklama;
   double get krepValue => krepSeviyesi;
   CringeCategory get category => kategori;
+
+  static String? _resolveStatus(Map<String, dynamic> data) {
+    final dynamic status = data['status'];
+    if (status is String && status.isNotEmpty) {
+      return status;
+    }
+
+    final dynamic moderationStatus = data['moderationStatus'];
+    if (moderationStatus is String && moderationStatus.isNotEmpty) {
+      return moderationStatus;
+    }
+
+    if (data['isApproved'] == true || data['approved'] == true) {
+      return ModerationStatus.approved.value;
+    }
+
+    final dynamic legacyState = data['state'] ?? data['statusCode'];
+    if (legacyState is String && legacyState.toLowerCase() == 'approved') {
+      return ModerationStatus.approved.value;
+    }
+
+    return null;
+  }
 }

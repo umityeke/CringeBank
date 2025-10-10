@@ -14,6 +14,8 @@ import '../models/user_model.dart';
 import '../services/direct_message_service.dart';
 import '../services/user_service.dart';
 import '../utils/safe_haptics.dart';
+import '../widgets/cringe_default_background.dart';
+import '../theme/app_theme.dart';
 
 class DirectMessageThreadScreen extends StatefulWidget {
   const DirectMessageThreadScreen({
@@ -155,13 +157,17 @@ class _DirectMessageThreadScreenState extends State<DirectMessageThreadScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.backgroundColor,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: _buildAppBarTitle(),
         actions: _buildAppBarActions(),
       ),
-      body: _buildBody(),
+      body: CringeDefaultBackground(
+        child: SafeArea(bottom: false, child: _buildBody()),
+      ),
     );
   }
 
@@ -175,7 +181,7 @@ class _DirectMessageThreadScreenState extends State<DirectMessageThreadScreen> {
       children: [
         _AppBarAvatar(
           user: target,
-          backgroundColor: Colors.orange.withValues(alpha: 0.2),
+          backgroundColor: Colors.orange.withOpacity(0.2),
         ),
         const SizedBox(width: 12),
         Text(title),
@@ -457,10 +463,10 @@ class _DirectMessageThreadScreenState extends State<DirectMessageThreadScreen> {
                         ? 'Engeli kaldırmadan mesaj gönderemezsin.'
                         : 'Mesaj yaz...',
                     hintStyle: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
+                      color: Colors.white.withOpacity(0.5),
                     ),
                     filled: true,
-                    fillColor: Colors.white.withValues(alpha: 0.05),
+                    fillColor: Colors.white.withOpacity(0.05),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 12,
@@ -534,7 +540,7 @@ class _DirectMessageThreadScreenState extends State<DirectMessageThreadScreen> {
                   icon: const Icon(Icons.close),
                   color: Colors.white,
                   style: IconButton.styleFrom(
-                    backgroundColor: Colors.black.withValues(alpha: 0.6),
+                    backgroundColor: Colors.black.withOpacity(0.6),
                     minimumSize: const Size(28, 28),
                   ),
                 ),
@@ -888,9 +894,9 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final background = isOwnMessage
-        ? theme.colorScheme.primary.withValues(alpha: 0.2)
-        : Colors.white.withValues(alpha: 0.05);
+  final background = isOwnMessage
+    ? theme.colorScheme.primary.withOpacity(0.2)
+    : Colors.white.withOpacity(0.05);
     final alignment = isOwnMessage
         ? Alignment.centerRight
         : Alignment.centerLeft;
@@ -1022,7 +1028,7 @@ class _StorageAttachmentPreviewState extends State<_StorageAttachmentPreview> {
             height: isImage ? 160 : 72,
             width: isImage ? 200 : double.infinity,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: Colors.white.withOpacity(0.05),
               borderRadius: BorderRadius.circular(12),
             ),
             alignment: Alignment.center,
@@ -1039,7 +1045,7 @@ class _StorageAttachmentPreviewState extends State<_StorageAttachmentPreview> {
             height: 72,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: Colors.redAccent.withValues(alpha: 0.1),
+              color: Colors.redAccent.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             alignment: Alignment.center,
@@ -1086,7 +1092,7 @@ class _StorageAttachmentPreviewState extends State<_StorageAttachmentPreview> {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: Colors.white.withOpacity(0.05),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -1236,7 +1242,7 @@ class _ExternalMediaPreview extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
+          color: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -1279,8 +1285,8 @@ class _StatusBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        border: Border(bottom: BorderSide(color: color.withValues(alpha: 0.3))),
+        color: color.withOpacity(0.12),
+        border: Border(bottom: BorderSide(color: color.withOpacity(0.3))),
       ),
       child: Row(
         children: [

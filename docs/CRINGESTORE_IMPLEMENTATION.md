@@ -53,6 +53,7 @@
    - ✅ Komisyon hesaplama (%5)
    - ✅ Bakiye kontrolü
    - ✅ Kendi ürününü satın alma engeli
+      - ✅ Admin override: `superadmin` ve `system_writer` rolleri release/refund çağrılarını gerektiğinde gerçekleştirebilir
 
 3. **docs/CRINGESTORE_DEPLOYMENT.md**
    - Deployment guide
@@ -80,6 +81,7 @@
 ✅ Transaction ile atomik işlemler
 ✅ Validasyon ve error handling
 ✅ Audit trail (timestamp tracking)
+✅ RBAC: Admin rollerine escrow override yetkisi (`superadmin`, `system_writer`)
 ```
 
 ### Katman 3: Client Validations

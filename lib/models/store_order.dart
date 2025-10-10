@@ -1,5 +1,37 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+DateTime _parseDate(dynamic value, {DateTime? fallback}) {
+  if (value is Timestamp) {
+    return value.toDate();
+  }
+  if (value is DateTime) {
+    return value;
+  }
+  if (value is String && value.isNotEmpty) {
+    final parsed = DateTime.tryParse(value);
+    if (parsed != null) {
+      return parsed.toLocal();
+    }
+  }
+  return fallback ?? DateTime.now();
+}
+
+DateTime? _parseNullableDate(dynamic value) {
+  if (value == null) {
+    return null;
+  }
+  if (value is Timestamp) {
+    return value.toDate();
+  }
+  if (value is DateTime) {
+    return value;
+  }
+  if (value is String && value.isNotEmpty) {
+    return DateTime.tryParse(value);
+  }
+  return null;
+}
+
 enum StoreOrderStatus {
   created,
   held,
@@ -148,6 +180,48 @@ class StoreOrder {
       timeline: timelineData?.map((event) {
         return OrderTimelineEvent.fromMap(event as Map<String, dynamic>);
       }).toList(),
+    );
+  }
+
+  factory StoreOrder.fromGateway(Map<String, dynamic> payload) {
+    final timeline = (payload['timeline'] as List<dynamic>?)
+        ?.whereType<Map<String, dynamic>>()
+        .map(OrderTimelineEvent.fromMap)
+        .toList();
+
+    return StoreOrder(
+      id: payload['orderId']?.toString() ?? payload['id']?.toString() ?? '',
+      productId: payload['productId']?.toString() ?? '',
+      buyerId:
+          payload['buyerAuthUid']?.toString() ??
+          payload['buyerId']?.toString() ??
+          '',
+      sellerId:
+          payload['sellerAuthUid']?.toString() ??
+          payload['sellerId']?.toString(),
+      vendorId: payload['vendorId']?.toString(),
+      itemPriceGold:
+          (payload['itemPriceGold'] ?? payload['priceGold'] ?? 0) is num
+          ? (payload['itemPriceGold'] ?? payload['priceGold'] ?? 0).round()
+          : int.tryParse(payload['itemPriceGold']?.toString() ?? '0') ?? 0,
+      commissionGold: (payload['commissionGold'] ?? 0) is num
+          ? (payload['commissionGold'] ?? 0).round()
+          : int.tryParse(payload['commissionGold']?.toString() ?? '0') ?? 0,
+      totalGold: (payload['totalGold'] ?? 0) is num
+          ? (payload['totalGold'] ?? 0).round()
+          : int.tryParse(payload['totalGold']?.toString() ?? '0') ?? 0,
+      status: StoreOrderStatus.fromRaw(payload['status']?.toString()),
+      paymentStatus: paymentStatusFromRaw(payload['paymentStatus']?.toString()),
+      createdAt: _parseDate(payload['createdAt']),
+      updatedAt: _parseDate(
+        payload['updatedAt'],
+        fallback: _parseDate(payload['createdAt']),
+      ),
+      deliveredAt: _parseNullableDate(payload['deliveredAt']),
+      releasedAt: _parseNullableDate(payload['releasedAt']),
+      refundedAt: _parseNullableDate(payload['refundedAt']),
+      disputedAt: _parseNullableDate(payload['disputedAt']),
+      timeline: timeline,
     );
   }
 

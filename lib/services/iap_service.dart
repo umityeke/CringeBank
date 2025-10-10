@@ -9,6 +9,8 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import '../models/iap_product.dart';
 import '../services/user_service.dart';
 
+import 'telemetry/callable_latency_tracker.dart';
+
 enum IapPurchaseStatus { idle, pending, success, failure }
 
 typedef CoinPackage = ({IapProduct product, ProductDetails details});
@@ -223,17 +225,22 @@ class IapService {
           ? _coinsAmountForSku(productDetails.id)
           : null;
 
-      final result = await _functions.httpsCallable('verifyAndCreditIap').call({
-        'platform': platform,
-        'productId': _productIdForSku(purchase.productID) ?? purchase.productID,
-        'storeSku': purchase.productID,
-        'tokenOrReceipt': purchase.verificationData.serverVerificationData
-            .trim(),
-        'userId': userId,
-        'transactionId': purchase.purchaseID,
-        if (productDetails != null) 'price': productDetails.rawPrice,
-        if (productDetails != null) 'currency': productDetails.currencyCode,
-      });
+      final result = await _functions.callWithLatency<dynamic>(
+        'verifyAndCreditIap',
+        category: 'iap',
+        payload: {
+          'platform': platform,
+          'productId':
+              _productIdForSku(purchase.productID) ?? purchase.productID,
+          'storeSku': purchase.productID,
+          'tokenOrReceipt': purchase.verificationData.serverVerificationData
+              .trim(),
+          'userId': userId,
+          'transactionId': purchase.purchaseID,
+          if (productDetails != null) 'price': productDetails.rawPrice,
+          if (productDetails != null) 'currency': productDetails.currencyCode,
+        },
+      );
 
       final data = result.data as Map<String, dynamic>?;
       final creditedCoins = data?['amountCoins'] as int? ?? coinsAmount;

@@ -29,8 +29,8 @@ class UserSearchTile extends StatelessWidget {
         padding: const EdgeInsets.all(AppTheme.spacingM),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-          color: Colors.white.withValues(alpha: 0.04),
+          border: Border.all(color: Colors.white.withOpacity(0.15)),
+          color: Colors.white.withOpacity(0.04),
         ),
         child: Row(
           children: [
@@ -87,7 +87,7 @@ class UserSearchTile extends StatelessWidget {
                   Text(
                     '@${user.username}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.7),
+                      color: Colors.white.withOpacity(0.7),
                     ),
                   ),
                   if (user.bio.isNotEmpty) ...[
@@ -97,7 +97,7 @@ class UserSearchTile extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.6),
+                        color: Colors.white.withOpacity(0.6),
                         height: 1.3,
                       ),
                     ),
@@ -146,17 +146,17 @@ class UserSearchTile extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        color: Colors.white.withValues(alpha: 0.08),
+  color: Colors.white.withOpacity(0.08),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.white.withValues(alpha: 0.9)),
+          Icon(icon, size: 14, color: Colors.white.withOpacity(0.9)),
           const SizedBox(width: 6),
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.85),
+              color: Colors.white.withOpacity(0.85),
               fontWeight: FontWeight.w500,
               fontSize: 12,
             ),

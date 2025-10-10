@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../data/store_catalog.dart';
 import '../models/try_on_session.dart';
 import '../models/user_model.dart';
+import 'telemetry/callable_latency_tracker.dart';
 import 'user_service.dart';
 
 class StoreService {
@@ -144,13 +145,15 @@ class StoreService {
     String source = 'store',
   }) async {
     await _requireUser();
-
-    final callable = _functions.httpsCallable('storeStartTryOnSession');
     try {
-      final result = await callable.call({'itemId': item.id, 'source': source});
+      final callableResult = await _functions.callWithLatency<dynamic>(
+        'storeStartTryOnSession',
+        payload: {'itemId': item.id, 'source': source},
+        category: 'store',
+      );
 
-      final payload = result.data is Map
-          ? Map<String, dynamic>.from(result.data as Map)
+      final payload = callableResult.data is Map
+          ? Map<String, dynamic>.from(callableResult.data as Map)
           : <String, dynamic>{};
 
       final sessionPayload = payload['session'] is Map
@@ -242,13 +245,16 @@ class StoreService {
     String assetPath, {
     int expiresInSec = 120,
   }) async {
-    final callable = _functions.httpsCallable('storeIssueFullAssetUrl');
     try {
-      final result = await callable.call({
-        'itemId': itemId,
-        'assetPath': assetPath,
-        'expiresInSec': expiresInSec,
-      });
+      final result = await _functions.callWithLatency<dynamic>(
+        'storeIssueFullAssetUrl',
+        payload: {
+          'itemId': itemId,
+          'assetPath': assetPath,
+          'expiresInSec': expiresInSec,
+        },
+        category: 'store',
+      );
 
       final payload = result.data is Map
           ? Map<String, dynamic>.from(result.data as Map)

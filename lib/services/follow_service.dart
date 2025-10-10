@@ -1,18 +1,28 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/follow_models.dart';
 import '../models/user_model.dart';
+import 'messaging_feature_service.dart';
+import 'telemetry/callable_latency_tracker.dart';
+import 'telemetry/sql_mirror_latency_monitor.dart';
 
 class FollowService {
   FollowService._();
 
   static final FollowService instance = FollowService._();
 
+  static const Duration _relationshipPollInterval = Duration(seconds: 5);
+  static const String _callCategory = 'follow';
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
   DocumentReference<Map<String, dynamic>> _followDoc(
     String srcUid,
@@ -43,28 +53,16 @@ class FollowService {
       return const FollowRelationship(state: FollowRelationshipState.following);
     }
 
-    final followSnap = await _followDoc(viewerId, normalizedTarget).get();
-    final reverseSnap = await _followDoc(normalizedTarget, viewerId).get();
-    final outgoingBlockSnap = await _blockDoc(viewerId, normalizedTarget).get();
-    final incomingBlockSnap = await _blockDoc(normalizedTarget, viewerId).get();
-
-    final followEdge = _parseFollowSnapshot(followSnap);
-    final reverseEdge = _parseFollowSnapshot(reverseSnap);
-    final outgoingBlock = _parseBlockSnapshot(outgoingBlockSnap);
-    final incomingBlock = _parseBlockSnapshot(incomingBlockSnap);
-
-    return FollowRelationship(
-      state: _resolveState(
+    if (MessagingFeatureService.instance.isSqlMirrorReadEnabled) {
+      return _getRelationshipViaSql(
         viewerId: viewerId,
         targetUid: normalizedTarget,
-        outgoing: followEdge,
-        incoming: reverseEdge,
-        outgoingBlock: outgoingBlock,
-        incomingBlock: incomingBlock,
-      ),
-      follow: followEdge,
-      outgoingBlock: outgoingBlock,
-      incomingBlock: incomingBlock,
+      );
+    }
+
+    return _getRelationshipViaFirestore(
+      viewerId: viewerId,
+      targetUid: normalizedTarget,
     );
   }
 
@@ -81,6 +79,52 @@ class FollowService {
       );
     }
 
+    if (MessagingFeatureService.instance.isSqlMirrorReadEnabled) {
+      return _watchRelationshipViaSql(
+        viewerId: viewerId,
+        targetUid: normalizedTarget,
+      );
+    }
+
+    return _watchRelationshipViaFirestore(
+      viewerId: viewerId,
+      targetUid: normalizedTarget,
+    );
+  }
+
+  Future<FollowRelationship> _getRelationshipViaFirestore({
+    required String viewerId,
+    required String targetUid,
+  }) async {
+    final followSnap = await _followDoc(viewerId, targetUid).get();
+    final reverseSnap = await _followDoc(targetUid, viewerId).get();
+    final outgoingBlockSnap = await _blockDoc(viewerId, targetUid).get();
+    final incomingBlockSnap = await _blockDoc(targetUid, viewerId).get();
+
+    final followEdge = _parseFollowSnapshot(followSnap);
+    final reverseEdge = _parseFollowSnapshot(reverseSnap);
+    final outgoingBlock = _parseBlockSnapshot(outgoingBlockSnap);
+    final incomingBlock = _parseBlockSnapshot(incomingBlockSnap);
+
+    return FollowRelationship(
+      state: _resolveState(
+        viewerId: viewerId,
+        targetUid: targetUid,
+        outgoing: followEdge,
+        incoming: reverseEdge,
+        outgoingBlock: outgoingBlock,
+        incomingBlock: incomingBlock,
+      ),
+      follow: followEdge,
+      outgoingBlock: outgoingBlock,
+      incomingBlock: incomingBlock,
+    );
+  }
+
+  Stream<FollowRelationship> _watchRelationshipViaFirestore({
+    required String viewerId,
+    required String targetUid,
+  }) {
     final controller = StreamController<FollowRelationship>.broadcast();
 
     DocumentSnapshot<Map<String, dynamic>>? followSnapshot;
@@ -111,7 +155,7 @@ class FollowService {
           FollowRelationship(
             state: _resolveState(
               viewerId: viewerId,
-              targetUid: normalizedTarget,
+              targetUid: targetUid,
               outgoing: followEdge,
               incoming: reverseEdge,
               outgoingBlock: outgoingBlock,
@@ -127,22 +171,22 @@ class FollowService {
 
     final subscriptions =
         <StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>>[
-          _followDoc(viewerId, normalizedTarget).snapshots().listen((snapshot) {
+          _followDoc(viewerId, targetUid).snapshots().listen((snapshot) {
             followSnapshot = snapshot;
             followReady = true;
             emitIfReady();
           }, onError: controller.addError),
-          _followDoc(normalizedTarget, viewerId).snapshots().listen((snapshot) {
+          _followDoc(targetUid, viewerId).snapshots().listen((snapshot) {
             reverseSnapshot = snapshot;
             reverseReady = true;
             emitIfReady();
           }, onError: controller.addError),
-          _blockDoc(viewerId, normalizedTarget).snapshots().listen((snapshot) {
+          _blockDoc(viewerId, targetUid).snapshots().listen((snapshot) {
             outgoingBlockSnapshot = snapshot;
             outgoingBlockReady = true;
             emitIfReady();
           }, onError: controller.addError),
-          _blockDoc(normalizedTarget, viewerId).snapshots().listen((snapshot) {
+          _blockDoc(targetUid, viewerId).snapshots().listen((snapshot) {
             incomingBlockSnapshot = snapshot;
             incomingBlockReady = true;
             emitIfReady();
@@ -158,6 +202,288 @@ class FollowService {
       ..onListen = emitIfReady;
 
     return controller.stream;
+  }
+
+  Stream<FollowRelationship> _watchRelationshipViaSql({
+    required String viewerId,
+    required String targetUid,
+  }) {
+    final controller = StreamController<FollowRelationship>.broadcast();
+    final subscriptions =
+        <StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>>[];
+
+    Timer? pollTimer;
+    bool isClosed = false;
+    bool isFetching = false;
+
+    FollowEdge? outgoingEdge;
+    FollowEdge? incomingEdge;
+    BlockEdge? outgoingBlock;
+    BlockEdge? incomingBlock;
+
+    bool sqlReady = false;
+    bool outgoingBlockReady = false;
+    bool incomingBlockReady = false;
+
+    void emitIfReady() {
+      if (!sqlReady ||
+          !outgoingBlockReady ||
+          !incomingBlockReady ||
+          controller.isClosed) {
+        return;
+      }
+
+      final relationshipState = _resolveState(
+        viewerId: viewerId,
+        targetUid: targetUid,
+        outgoing: outgoingEdge,
+        incoming: incomingEdge,
+        outgoingBlock: outgoingBlock,
+        incomingBlock: incomingBlock,
+      );
+
+      controller.add(
+        FollowRelationship(
+          state: relationshipState,
+          follow: outgoingEdge,
+          outgoingBlock: outgoingBlock,
+          incomingBlock: incomingBlock,
+        ),
+      );
+    }
+
+    Future<void> fetchSqlSnapshot() async {
+      if (isClosed || isFetching) {
+        return;
+      }
+      isFetching = true;
+      try {
+        final snapshot = await _fetchSqlFollowSnapshot(
+          viewerId: viewerId,
+          targetUid: targetUid,
+        );
+        outgoingEdge = snapshot.outgoing;
+        incomingEdge = snapshot.incoming;
+
+        if (snapshot.outgoingBlock != null) {
+          outgoingBlock = snapshot.outgoingBlock;
+          outgoingBlockReady = true;
+        }
+
+        if (snapshot.incomingBlock != null) {
+          incomingBlock = snapshot.incomingBlock;
+          incomingBlockReady = true;
+        }
+
+        sqlReady = true;
+        emitIfReady();
+      } catch (error, stackTrace) {
+        if (!isClosed && !controller.isClosed) {
+          controller.addError(error, stackTrace);
+        }
+      } finally {
+        isFetching = false;
+      }
+    }
+
+    Future<void> primeBlocks() async {
+      try {
+        final pair = await _fetchBlockEdges(
+          viewerId: viewerId,
+          targetUid: targetUid,
+        );
+        if (isClosed || controller.isClosed) {
+          return;
+        }
+        outgoingBlock = pair.outgoing;
+        incomingBlock = pair.incoming;
+        outgoingBlockReady = true;
+        incomingBlockReady = true;
+        emitIfReady();
+      } catch (error, stackTrace) {
+        if (!isClosed && !controller.isClosed) {
+          controller.addError(error, stackTrace);
+        }
+      }
+    }
+
+    subscriptions.add(
+      _blockDoc(viewerId, targetUid).snapshots().listen((snapshot) {
+        outgoingBlock = _parseBlockSnapshot(snapshot);
+        outgoingBlockReady = true;
+        emitIfReady();
+      }, onError: controller.addError),
+    );
+
+    subscriptions.add(
+      _blockDoc(targetUid, viewerId).snapshots().listen((snapshot) {
+        incomingBlock = _parseBlockSnapshot(snapshot);
+        incomingBlockReady = true;
+        emitIfReady();
+      }, onError: controller.addError),
+    );
+
+    controller
+      ..onListen = () {
+        primeBlocks();
+        fetchSqlSnapshot();
+        pollTimer = Timer.periodic(
+          _relationshipPollInterval,
+          (_) => fetchSqlSnapshot(),
+        );
+      }
+      ..onCancel = () async {
+        if (isClosed) {
+          return;
+        }
+        isClosed = true;
+        pollTimer?.cancel();
+        for (final sub in subscriptions) {
+          await sub.cancel();
+        }
+      }
+      ..onPause = () {
+        pollTimer?.cancel();
+      }
+      ..onResume = () {
+        if (isClosed) {
+          return;
+        }
+        pollTimer?.cancel();
+        pollTimer = Timer.periodic(
+          _relationshipPollInterval,
+          (_) => fetchSqlSnapshot(),
+        );
+      };
+
+    return controller.stream;
+  }
+
+  Future<FollowRelationship> _getRelationshipViaSql({
+    required String viewerId,
+    required String targetUid,
+  }) async {
+    final snapshot = await _fetchSqlFollowSnapshot(
+      viewerId: viewerId,
+      targetUid: targetUid,
+    );
+
+    BlockEdge? outgoingBlock = snapshot.outgoingBlock;
+    BlockEdge? incomingBlock = snapshot.incomingBlock;
+
+    if (outgoingBlock == null || incomingBlock == null) {
+      final fallback = await _fetchBlockEdges(
+        viewerId: viewerId,
+        targetUid: targetUid,
+      );
+      outgoingBlock ??= fallback.outgoing;
+      incomingBlock ??= fallback.incoming;
+    }
+
+    final state = _resolveState(
+      viewerId: viewerId,
+      targetUid: targetUid,
+      outgoing: snapshot.outgoing,
+      incoming: snapshot.incoming,
+      outgoingBlock: outgoingBlock,
+      incomingBlock: incomingBlock,
+    );
+
+    return FollowRelationship(
+      state: state,
+      follow: snapshot.outgoing,
+      outgoingBlock: outgoingBlock,
+      incomingBlock: incomingBlock,
+    );
+  }
+
+  Future<_SqlFollowSnapshot> _fetchSqlFollowSnapshot({
+    required String viewerId,
+    required String targetUid,
+  }) async {
+    final payload = {'viewerUid': viewerId, 'targetUid': targetUid};
+
+    final response = await _functions.callWithLatency<dynamic>(
+      'sqlGatewayFollowGetRelationship',
+      payload: payload,
+      category: _callCategory,
+      onMeasured: (elapsedMs) {
+        SqlMirrorLatencyMonitor.instance.record(
+          operation: 'followGetRelationship',
+          elapsedMs: elapsedMs,
+        );
+      },
+    );
+
+    final responseMap =
+        _coerceStringKeyedMap(response.data) ?? <String, dynamic>{};
+    final relationshipMap =
+        _coerceStringKeyedMap(responseMap['relationship']) ??
+        <String, dynamic>{};
+
+    return _SqlFollowSnapshot(
+      outgoing: _parseSqlFollowEdge(relationshipMap['outgoing']),
+      incoming: _parseSqlFollowEdge(relationshipMap['incoming']),
+      outgoingBlock: _parseSqlBlockEdge(relationshipMap['outgoingBlock']),
+      incomingBlock: _parseSqlBlockEdge(relationshipMap['incomingBlock']),
+    );
+  }
+
+  Future<_BlockEdgePair> _fetchBlockEdges({
+    required String viewerId,
+    required String targetUid,
+  }) async {
+    try {
+      final results = await Future.wait([
+        _blockDoc(viewerId, targetUid).get(),
+        _blockDoc(targetUid, viewerId).get(),
+      ]);
+
+      return _BlockEdgePair(
+        outgoing: _parseBlockSnapshot(results[0]),
+        incoming: _parseBlockSnapshot(results[1]),
+      );
+    } catch (error, stackTrace) {
+      FirebaseCrashlytics.instance.recordError(
+        error,
+        stackTrace,
+        reason: 'Failed to fetch block edges for follow relationship',
+      );
+      return const _BlockEdgePair();
+    }
+  }
+
+  FollowEdge? _parseSqlFollowEdge(dynamic raw) {
+    final map = _coerceStringKeyedMap(raw);
+    if (map == null || map.isEmpty) {
+      return null;
+    }
+    return FollowEdge.fromSql(map);
+  }
+
+  BlockEdge? _parseSqlBlockEdge(dynamic raw) {
+    final map = _coerceStringKeyedMap(raw);
+    if (map == null || map.isEmpty) {
+      return null;
+    }
+    return BlockEdge.fromSql(map);
+  }
+
+  Map<String, dynamic>? _coerceStringKeyedMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) {
+      return raw;
+    }
+    if (raw is Map) {
+      final result = <String, dynamic>{};
+      raw.forEach((key, value) {
+        if (key == null) {
+          return;
+        }
+        result[key.toString()] = value;
+      });
+      return result;
+    }
+    return null;
   }
 
   FollowEdge? _parseFollowSnapshot(
@@ -238,6 +564,9 @@ class FollowService {
         ? FollowEdgeStatus.pending
         : FollowEdgeStatus.active;
 
+    final followRef = _followDoc(normalizedViewer, normalizedTarget);
+    DocumentSnapshot<Map<String, dynamic>>? previousSnapshot;
+
     await _firestore.runTransaction((transaction) async {
       final outgoingBlockRef = _blockDoc(normalizedViewer, normalizedTarget);
       final incomingBlockRef = _blockDoc(normalizedTarget, normalizedViewer);
@@ -254,8 +583,8 @@ class FollowService {
         );
       }
 
-      final followRef = _followDoc(normalizedViewer, normalizedTarget);
       final snapshot = await transaction.get(followRef);
+      previousSnapshot = snapshot;
       final now = FieldValue.serverTimestamp();
 
       if (!snapshot.exists) {
@@ -285,6 +614,17 @@ class FollowService {
       });
     });
 
+    final currentSnapshot = await followRef.get();
+    final mirrorBundle = _FollowMirrorBundle(
+      userId: normalizedViewer,
+      targetId: normalizedTarget,
+      operation: previousSnapshot?.exists ?? false ? 'update' : 'create',
+      document: currentSnapshot.data(),
+      previousDocument: previousSnapshot?.data(),
+    );
+
+    await _mirrorFollowEdgeToSql(mirrorBundle);
+
     return getRelationship(normalizedTarget);
   }
 
@@ -292,11 +632,13 @@ class FollowService {
     final viewerId = _requireCurrentUserId();
     final normalizedTarget = targetUid.trim();
 
-    await _updateEdgeStatus(
+    final mirrorBundle = await _updateEdgeStatus(
       srcUid: viewerId,
       dstUid: normalizedTarget,
       nextStatus: FollowEdgeStatus.removed,
     );
+
+    await _mirrorFollowEdgeToSql(mirrorBundle);
 
     return getRelationship(normalizedTarget);
   }
@@ -305,11 +647,13 @@ class FollowService {
     final viewerId = _requireCurrentUserId();
     final normalizedTarget = targetUid.trim();
 
-    await _updateEdgeStatus(
+    final mirrorBundle = await _updateEdgeStatus(
       srcUid: viewerId,
       dstUid: normalizedTarget,
       nextStatus: FollowEdgeStatus.removed,
     );
+
+    await _mirrorFollowEdgeToSql(mirrorBundle);
 
     return getRelationship(normalizedTarget);
   }
@@ -318,11 +662,13 @@ class FollowService {
     final viewerId = _requireCurrentUserId();
     final normalizedFollower = followerUid.trim();
 
-    await _updateEdgeStatus(
+    final mirrorBundle = await _updateEdgeStatus(
       srcUid: normalizedFollower,
       dstUid: viewerId,
       nextStatus: FollowEdgeStatus.active,
     );
+
+    await _mirrorFollowEdgeToSql(mirrorBundle);
 
     return getRelationship(normalizedFollower);
   }
@@ -331,11 +677,13 @@ class FollowService {
     final viewerId = _requireCurrentUserId();
     final normalizedFollower = followerUid.trim();
 
-    await _updateEdgeStatus(
+    final mirrorBundle = await _updateEdgeStatus(
       srcUid: normalizedFollower,
       dstUid: viewerId,
       nextStatus: FollowEdgeStatus.removed,
     );
+
+    await _mirrorFollowEdgeToSql(mirrorBundle);
 
     return getRelationship(normalizedFollower);
   }
@@ -382,7 +730,7 @@ class FollowService {
     await _blockDoc(viewerId, normalizedTarget).delete();
   }
 
-  Future<void> _updateEdgeStatus({
+  Future<_FollowMirrorBundle?> _updateEdgeStatus({
     required String srcUid,
     required String dstUid,
     required FollowEdgeStatus nextStatus,
@@ -391,9 +739,13 @@ class FollowService {
       throw ArgumentError('Geçersiz takip kenarı.');
     }
 
+    final followRef = _followDoc(srcUid, dstUid);
+    DocumentSnapshot<Map<String, dynamic>>? previousSnapshot;
+    var updated = false;
+
     await _firestore.runTransaction((transaction) async {
-      final followRef = _followDoc(srcUid, dstUid);
       final snapshot = await transaction.get(followRef);
+      previousSnapshot = snapshot;
       if (!snapshot.exists) {
         return;
       }
@@ -402,13 +754,153 @@ class FollowService {
         'status': nextStatus.asFirestoreValue,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      updated = true;
     });
+
+    if (!updated) {
+      return null;
+    }
+
+    final currentSnapshot = await followRef.get();
+
+    return _FollowMirrorBundle(
+      userId: srcUid,
+      targetId: dstUid,
+      operation: 'update',
+      document: currentSnapshot.data(),
+      previousDocument: previousSnapshot?.data(),
+    );
+  }
+
+  Future<void> _mirrorFollowEdgeToSql(_FollowMirrorBundle? bundle) async {
+    if (bundle == null) {
+      return;
+    }
+
+    final features = MessagingFeatureService.instance;
+    if (!features.isSqlMirrorDoubleWriteEnabled) {
+      return;
+    }
+
+    final envelope = _buildFollowSqlMirrorEnvelope(bundle);
+    if (envelope == null || envelope.isEmpty) {
+      return;
+    }
+
+    final operationType =
+        envelope['type']?.toString() ?? 'follow.edge.${bundle.operation}';
+
+    try {
+      await _functions.callWithLatency<dynamic>(
+        'sqlGatewayFollowEdgeUpsert',
+        payload: envelope,
+        category: 'sqlMirror',
+        onMeasured: (elapsedMs) {
+          SqlMirrorLatencyMonitor.instance.record(
+            operation: operationType,
+            elapsedMs: elapsedMs,
+          );
+        },
+      );
+    } catch (error, stackTrace) {
+      await FirebaseCrashlytics.instance.recordError(
+        error,
+        stackTrace,
+        reason: 'FollowSqlMirrorFailure',
+        fatal: false,
+      );
+      debugPrint('sqlGatewayFollowEdgeUpsert failed: $error');
+    }
+  }
+
+  Map<String, dynamic>? _buildFollowSqlMirrorEnvelope(
+    _FollowMirrorBundle bundle,
+  ) {
+    final now = DateTime.now().toUtc();
+    final nowIso = now.toIso8601String();
+    final document = _normalizeFollowDocument(bundle.document, nowIso);
+    final previousDocument = _normalizeFollowDocument(
+      bundle.previousDocument,
+      nowIso,
+    );
+
+    if (document == null && previousDocument == null) {
+      return null;
+    }
+
+    final eventId =
+        'follow.edge.${bundle.operation}:${bundle.userId}:${bundle.targetId}:${now.microsecondsSinceEpoch}';
+
+    return {
+      'id': eventId,
+      'type': 'follow.edge.${bundle.operation}',
+      'source': 'flutter://follow-service',
+      'time': nowIso,
+      'data': {
+        'operation': bundle.operation,
+        'userId': bundle.userId,
+        'targetId': bundle.targetId,
+        'timestamp': nowIso,
+        'document': document,
+        'previousDocument': previousDocument,
+        'source': 'flutter://follow-service',
+      },
+    };
+  }
+
+  Map<String, dynamic>? _normalizeFollowDocument(
+    Map<String, dynamic>? raw,
+    String fallbackIso,
+  ) {
+    if (raw == null) {
+      return null;
+    }
+
+    final status = (raw['status'] ?? raw['state'])?.toString().toUpperCase();
+    final source = (raw['source'] ?? raw['origin'] ?? 'firestore://follows')
+        .toString();
+    final createdAt = _coerceIsoString(raw['createdAt']) ?? fallbackIso;
+    final updatedAt = _coerceIsoString(raw['updatedAt']) ?? fallbackIso;
+
+    return {
+      'status': status ?? 'REMOVED',
+      'source': source.isEmpty ? 'firestore://follows' : source,
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
+    };
+  }
+
+  String? _coerceIsoString(dynamic value) {
+    if (value is Timestamp) {
+      return value.toDate().toUtc().toIso8601String();
+    }
+    if (value is DateTime) {
+      return value.toUtc().toIso8601String();
+    }
+    if (value is String && value.isNotEmpty) {
+      final parsed = DateTime.tryParse(value);
+      return parsed?.toUtc().toIso8601String();
+    }
+    return null;
   }
 
   Future<bool> isFollowing(String targetUid) async {
     final viewerId = _requireCurrentUserId();
     final normalizedTarget = targetUid.trim();
     if (normalizedTarget.isEmpty) return false;
+
+    if (viewerId == normalizedTarget) {
+      return true;
+    }
+
+    if (MessagingFeatureService.instance.isSqlMirrorReadEnabled) {
+      final snapshot = await _fetchSqlFollowSnapshot(
+        viewerId: viewerId,
+        targetUid: normalizedTarget,
+      );
+      final followEdge = snapshot.outgoing;
+      return followEdge?.status.isActive ?? false;
+    }
 
     final snapshot = await _followDoc(viewerId, normalizedTarget).get();
     if (!snapshot.exists) return false;
@@ -419,4 +911,41 @@ class FollowService {
     );
     return status.isActive;
   }
+}
+
+class _SqlFollowSnapshot {
+  const _SqlFollowSnapshot({
+    this.outgoing,
+    this.incoming,
+    this.outgoingBlock,
+    this.incomingBlock,
+  });
+
+  final FollowEdge? outgoing;
+  final FollowEdge? incoming;
+  final BlockEdge? outgoingBlock;
+  final BlockEdge? incomingBlock;
+}
+
+class _BlockEdgePair {
+  const _BlockEdgePair({this.outgoing, this.incoming});
+
+  final BlockEdge? outgoing;
+  final BlockEdge? incoming;
+}
+
+class _FollowMirrorBundle {
+  const _FollowMirrorBundle({
+    required this.userId,
+    required this.targetId,
+    required this.operation,
+    required this.document,
+    required this.previousDocument,
+  });
+
+  final String userId;
+  final String targetId;
+  final String operation;
+  final Map<String, dynamic>? document;
+  final Map<String, dynamic>? previousDocument;
 }

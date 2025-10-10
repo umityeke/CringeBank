@@ -68,7 +68,7 @@ class ModernAvatar extends StatelessWidget {
     if (trimmed.isEmpty) {
       return _AvatarInitialsPlaceholder(
         initials: initials,
-        backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.08),
+  backgroundColor: AppTheme.primaryColor.withOpacity(0.08),
         textColor: AppTheme.primaryColor,
         fontSize: size / 2.5,
       );
@@ -82,13 +82,13 @@ class ModernAvatar extends StatelessWidget {
         height: size,
         placeholder: (context, url) => _AvatarInitialsPlaceholder(
           initials: initials,
-          backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.08),
+          backgroundColor: AppTheme.primaryColor.withOpacity(0.08),
           textColor: AppTheme.primaryColor,
           fontSize: size / 2.5,
         ),
         errorWidget: (context, url, error) => _AvatarInitialsPlaceholder(
           initials: initials,
-          backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.08),
+          backgroundColor: AppTheme.primaryColor.withOpacity(0.08),
           textColor: AppTheme.primaryColor,
           fontSize: size / 2.5,
         ),
@@ -110,7 +110,7 @@ class ModernAvatar extends StatelessWidget {
     if (trimmed.length <= 3) {
       return _AvatarInitialsPlaceholder(
         initials: trimmed,
-        backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.08),
+  backgroundColor: AppTheme.primaryColor.withOpacity(0.08),
         textColor: AppTheme.primaryColor,
         fontSize: size / 2.4,
       );
@@ -118,7 +118,7 @@ class ModernAvatar extends StatelessWidget {
 
     return _AvatarInitialsPlaceholder(
       initials: initials,
-      backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.08),
+  backgroundColor: AppTheme.primaryColor.withOpacity(0.08),
       textColor: AppTheme.primaryColor,
       fontSize: size / 2.5,
     );
@@ -464,7 +464,7 @@ class ModernBadge extends StatelessWidget {
         vertical: isSmall ? AppTheme.spacingXS : AppTheme.spacingXS,
       ),
       decoration: BoxDecoration(
-        color: backgroundColor ?? AppTheme.primaryColor.withValues(alpha: 0.1),
+  color: backgroundColor ?? AppTheme.primaryColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(isSmall ? 8 : 12),
       ),
       child: Text(

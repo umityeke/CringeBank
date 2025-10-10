@@ -10,8 +10,9 @@
 ### 1. Firebase Security Rules ✅
 
 #### Firestore Rules (`firestore.rules`)
+
 - ✅ **Conversations Collection**: Member-based access, email verification required
-- ✅ **Messages Subcollection**: 
+- ✅ **Messages Subcollection**:
   - Create: Content validation (text/media/mediaExternal)
   - Edit: 15-minute window, immutable field protection
   - Delete: Soft delete (only-me) and hard delete (for-both) modes
@@ -23,6 +24,7 @@
 **Status**: ✅ Active (1 minor warning on mediaExternal type - safe to ignore)
 
 #### Storage Rules (`storage.rules`)
+
 - ✅ **DM Media Paths**: `dm/{cid}/{mid}/{fileName}`
   - Member check via Firestore
   - Sender validation
@@ -33,6 +35,7 @@
 **Status**: ✅ Active (1 minor warning on exists() function name - safe to ignore)
 
 #### Realtime Database Rules (`database.rules.json`)
+
 - ✅ **Typing Indicators**: `/typing/{cid}/{uid}`
 - ✅ **Online Status**: `/status/{uid}`
 
@@ -46,8 +49,10 @@
 All messaging functions deployed to **us-central1** region:
 
 #### `sendMessage` ✅
+
 **Purpose**: Create new message with validation  
 **Features**:
+
 - Authentication check (Firebase Auth)
 - Conversation membership verification
 - Blocking check (bidirectional)
@@ -63,8 +68,10 @@ All messaging functions deployed to **us-central1** region:
 **URL**: `https://us-central1-cringe-bank.cloudfunctions.net/sendMessage`
 
 #### `editMessage` ✅
+
 **Purpose**: Edit existing message within time window  
 **Features**:
+
 - Ownership verification (sender only)
 - 15-minute edit window enforcement
 - Tombstone check (can't edit deleted messages)
@@ -75,8 +82,10 @@ All messaging functions deployed to **us-central1** region:
 **URL**: `https://us-central1-cringe-bank.cloudfunctions.net/editMessage`
 
 #### `deleteMessage` ✅
+
 **Purpose**: Delete message (soft or hard)  
 **Features**:
+
 - **Only-Me Mode**: Soft delete (`deletedFor.{uid} = true`)
   - Message hidden only for requesting user
   - Other user can still see
@@ -89,8 +98,10 @@ All messaging functions deployed to **us-central1** region:
 **URL**: `https://us-central1-cringe-bank.cloudfunctions.net/deleteMessage`
 
 #### `setReadPointer` ✅
+
 **Purpose**: Update read status for user  
 **Features**:
+
 - Conversation membership check
 - Updates `readPointers.{uid}` with last read message ID
 - Enables unread count calculation
@@ -106,7 +117,7 @@ All messaging functions deployed to **us-central1** region:
 
 ### Multi-Layer Defense
 
-```
+```text
 ┌─────────────────────────────────────────────────────┐
 │ Layer 1: Firebase Authentication                   │
 │ - email_verified = true required                    │
@@ -153,7 +164,7 @@ All messaging functions deployed to **us-central1** region:
 
 **Firebase Console Action Required**:
 
-```
+```text
 Collection: config
 Document ID: allowedMediaHosts
 Field:
@@ -161,6 +172,7 @@ Field:
 ```
 
 **Instructions**:
+
 1. Open [Firebase Console - Firestore](https://console.firebase.google.com/project/cringe-bank/firestore)
 2. Create collection: `config`
 3. Add document ID: `allowedMediaHosts`
@@ -187,6 +199,7 @@ Field:
 ```
 
 **Create via**:
+
 - Firebase Console → Firestore → Indexes → Composite
 - OR add to `firestore.indexes.json` and deploy
 
@@ -197,18 +210,21 @@ Field:
 ## 🧪 Testing Checklist
 
 ### Basic Messaging
+
 - [ ] Send text-only message
 - [ ] Send message with Storage media
 - [ ] Send message with external URL (allowlist domain)
 - [ ] Try external URL with non-allowlist domain (should fail)
 
 ### Editing
+
 - [ ] Edit message within 15 minutes
 - [ ] Try editing after 15 minutes (should fail)
 - [ ] Edit message with external URL change
 - [ ] Verify immutable fields (senderId, createdAt) protected
 
 ### Deleting
+
 - [ ] Delete message "Only Me" mode
 - [ ] Verify other user still sees message
 - [ ] Delete message "For Both" mode
@@ -216,11 +232,13 @@ Field:
 - [ ] Try editing tombstoned message (should fail)
 
 ### Blocking
+
 - [ ] Block user
 - [ ] Try sending message (should fail)
 - [ ] Verify bidirectional block works
 
 ### Security
+
 - [ ] Try sending message without email verification
 - [ ] Try sending to non-member conversation
 - [ ] Try editing someone else's message
@@ -232,6 +250,7 @@ Field:
 ## 📊 Monitoring
 
 ### Cloud Functions Logs
+
 ```bash
 # View all messaging function logs
 firebase functions:log --only sendMessage,editMessage,deleteMessage,setReadPointer
@@ -241,10 +260,12 @@ firebase functions:log --only sendMessage --follow
 ```
 
 ### Firestore Rules Debug
+
 - Firebase Console → Firestore → Rules → Playground
 - Test queries with user context
 
 ### Error Tracking
+
 - Check Cloud Functions → Logs in Firebase Console
 - Monitor for validation errors, timeouts, rate limits
 
@@ -253,6 +274,7 @@ firebase functions:log --only sendMessage --follow
 ## 🔄 Future Enhancements
 
 ### Phase 2 (Optional)
+
 - [ ] Push notifications for new messages
 - [ ] Message reactions (emoji)
 - [ ] Voice messages
@@ -261,6 +283,7 @@ firebase functions:log --only sendMessage --follow
 - [ ] File attachments (PDF, documents)
 
 ### Phase 3 (Advanced)
+
 - [ ] End-to-end encryption
 - [ ] Message search
 - [ ] Conversation pinning
@@ -272,7 +295,9 @@ firebase functions:log --only sendMessage --follow
 ## 📝 Migration Notes
 
 ### From Legacy System
+
 If migrating from old DM system:
+
 1. Export old messages to JSON
 2. Transform to new schema:
    - Add `editAllowedUntil` (set to past for old messages)
@@ -282,6 +307,7 @@ If migrating from old DM system:
 4. Update conversation metadata
 
 ### Breaking Changes
+
 - `begeniSayisi` → `likeCount` (already migrated in entries)
 - Old DM conversations need schema update
 - Blocking system changed to subcollection structure
@@ -293,6 +319,7 @@ If migrating from old DM system:
 ### Client Implementation
 
 #### Send Message with External URL
+
 ```dart
 final result = await FirebaseFunctions.instance
     .httpsCallable('sendMessage')
@@ -309,6 +336,7 @@ final result = await FirebaseFunctions.instance
 ```
 
 #### Edit Message
+
 ```dart
 await FirebaseFunctions.instance
     .httpsCallable('editMessage')
@@ -320,6 +348,7 @@ await FirebaseFunctions.instance
 ```
 
 #### Delete Message
+
 ```dart
 await FirebaseFunctions.instance
     .httpsCallable('deleteMessage')
@@ -331,6 +360,7 @@ await FirebaseFunctions.instance
 ```
 
 #### Set Read Pointer
+
 ```dart
 await FirebaseFunctions.instance
     .httpsCallable('setReadPointer')
@@ -341,6 +371,7 @@ await FirebaseFunctions.instance
 ```
 
 ### Query Messages
+
 ```dart
 FirebaseFirestore.instance
     .collection('conversations')
@@ -358,11 +389,13 @@ FirebaseFirestore.instance
 ## 📞 Support
 
 ### Issues?
+
 - Check [MESSAGING_SECURITY_RULES.md](./MESSAGING_SECURITY_RULES.md) for detailed docs
 - Review Cloud Function logs for errors
 - Test with Firestore Rules Playground
 
 ### Contact
+
 - GitHub: umityeke/CRINGE-BANKASI
 - Firebase Project: cringe-bank
 

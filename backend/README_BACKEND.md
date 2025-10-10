@@ -94,6 +94,41 @@ ALTER DATABASE CringeBank SET READ_COMMITTED_SNAPSHOT ON;
 GO
 ```
 
+## Realtime Mirror Dağıtımı
+
+Realtime Mirror tablolarını ve saklı yordamlarını kurmak için `backend/scripts` klasöründeki paketleri kullanabilirsiniz:
+
+```powershell
+# SQL kimliği ile örnek
+cd backend/scripts
+./deploy_realtime_mirror.ps1 -Server localhost,1433 -Database CringeBank -Username sa
+
+# Windows kimliği (AAD/Integrated) örneği
+cd backend/scripts
+./deploy_realtime_mirror.ps1 -Server sql.mycorp.net -Database CringeBank -UseIntegratedSecurity
+```
+
+Betik, `deploy_realtime_mirror.sqlcmd` dosyasını sırasıyla çalıştırarak migration ve saklı yordam paketini uygular. `sqlcmd` aracının yüklü olduğundan emin olun (<https://learn.microsoft.com/sql/tools/sqlcmd-utility>).
+
+SQL tarafı ayarlandıktan sonra örnek DM/follow verilerini oluşturmak için Functions paketindeki seed betiğini kullanabilirsiniz:
+
+```powershell
+cd functions
+npm run mirror:seed -- --dry-run   # sadece log
+npm run mirror:seed                # SQL tablo ve SP’lere yazar
+```
+
+Betiğin varsayılan fixture dosyası `functions/scripts/fixtures/realtime_mirror_seed.json` konumundadır; senaryoları burada güncelleyebilirsiniz.
+
+Firestore ile SQL mirror eşleşmelerini gözden geçirmek için `scripts` paketindeki kontrol betiğini kullanabilirsiniz:
+
+```powershell
+cd scripts
+npm run mirror:consistency -- --limit=25 --check=messages
+```
+
+Komut, Firestore belgeleri ile SQL tabloları arasındaki farkları tablo olarak raporlar (`--output=json` ile JSON dönebilir).
+
 ## Paket Referansları (önerilen)
 
 - `Microsoft.EntityFrameworkCore.SqlServer`

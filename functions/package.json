@@ -8,15 +8,20 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "mirror:sql-writer": "node realtime_mirror/sql_writer_worker.js",
+    "mirror:seed": "node scripts/seed_realtime_mirror.js"
   },
   "dependencies": {
+    "@azure/service-bus": "^7.9.5",
     "firebase-admin": "^12.5.0",
     "firebase-functions": "^5.1.1",
-    "nodemailer": "^6.9.15",
     "googleapis": "^140.0.0",
+    "mssql": "^10.0.1",
+    "nodemailer": "^6.9.15",
+    "pg": "^8.13.0",
     "twilio": "^4.23.0",
-    "pg": "^8.13.0"
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
     "firebase-functions-test": "^3.2.0",

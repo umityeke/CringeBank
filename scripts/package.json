@@ -3,7 +3,14 @@
   "version": "1.0.0",
   "main": "seed_store_products.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+  "backfill:auth-users": "node sql/backfill_auth_users.js",
+  "backfill:follow": "node sql/backfill_follow_edges.js",
+    "migrate:sql": "node sql/run_migrations.js",
+    "access:roles": "node access/manage_roles.js",
+    "ci:phase0": "node sql/staging_phase0_check.js",
+    "mirror:consistency": "node dm_follow_consistency.js",
+    "mirror:validate": "node sql/run_mirror_validation.js"
   },
   "keywords": [],
   "author": "",
@@ -12,6 +19,10 @@
   "dependencies": {
     "firebase": "^12.3.0",
     "firebase-admin": "^13.5.0",
-    "iconv-lite": "^0.6.3"
+    "iconv-lite": "^0.6.3",
+    "mssql": "^10.0.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
   }
 }

@@ -10,6 +10,8 @@ import '../models/user_model.dart';
 import '../services/cringe_store_service.dart';
 import '../services/user_service.dart';
 import '../utils/profile_navigation.dart';
+import '../theme/app_theme.dart';
+import '../widgets/cringe_default_background.dart';
 
 /// ürün detay ekranı - Escrow ile satın alma
 class StoreProductDetailScreen extends StatefulWidget {
@@ -24,7 +26,6 @@ class StoreProductDetailScreen extends StatefulWidget {
 
 class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
   final CringeStoreRepository _storeRepository = CringeStoreRepository.instance;
-  final CringeStoreService _legacyStoreService = CringeStoreService();
   bool _isPurchasing = false;
   late final Stream<StoreWallet?> _walletStream;
   late final Stream<StoreProduct?> _productStream;
@@ -53,27 +54,38 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('ürün Detayı')),
-      body: StreamBuilder<StoreProduct?>(
-        stream: _productStream,
-        builder: (context, snapshot) {
-          final product = snapshot.data;
+      backgroundColor: AppTheme.backgroundColor,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text('ürün Detayı'),
+      ),
+      body: CringeDefaultBackground(
+        child: SafeArea(
+          bottom: false,
+          child: StreamBuilder<StoreProduct?>(
+            stream: _productStream,
+            builder: (context, snapshot) {
+              final product = snapshot.data;
 
-          if (snapshot.connectionState == ConnectionState.waiting &&
-              product == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  product == null) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          if (snapshot.hasError) {
-            return Center(child: Text('Hata: ${snapshot.error}'));
-          }
+              if (snapshot.hasError) {
+                return Center(child: Text('Hata: ${snapshot.error}'));
+              }
 
-          if (product == null) {
-            return const Center(child: Text('ürün bulunamadı'));
-          }
+              if (product == null) {
+                return const Center(child: Text('ürün bulunamadı'));
+              }
 
-          return _buildProductContent(product);
-        },
+              return _buildProductContent(product);
+            },
+          ),
+        ),
       ),
     );
   }
@@ -113,7 +125,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     User? seller,
     bool isSellerLoading = false,
   }) {
-    _shareStatusFuture ??= _legacyStoreService.isProductShared(product.id);
+    _shareStatusFuture ??= _storeRepository.isProductShared(product.id);
 
     return FutureBuilder<bool>(
       future: _shareStatusFuture,
@@ -222,7 +234,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.4),
+                  color: Colors.black.withOpacity(0.4),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -236,7 +248,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                         decoration: BoxDecoration(
                           color: _currentImageIndex == i
                               ? Colors.white
-                              : Colors.white.withValues(alpha: 0.5),
+                              : Colors.white.withOpacity(0.5),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -668,9 +680,9 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: iconColor.withValues(alpha: 0.08),
+  color: iconColor.withOpacity(0.08),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: iconColor.withValues(alpha: 0.2)),
+  border: Border.all(color: iconColor.withOpacity(0.2)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -715,9 +727,9 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: baseColor.withValues(alpha: 0.08),
+  color: baseColor.withOpacity(0.08),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: baseColor.withValues(alpha: 0.2)),
+  border: Border.all(color: baseColor.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -856,16 +868,17 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     setState(() => _isSharingProduct = true);
 
     try {
-      final result = await _legacyStoreService.shareSoldProduct(
+      final result = await _storeRepository.shareSoldProduct(
         product: product,
         seller: seller,
       );
       if (!mounted) return;
 
       if (result.success || result.alreadyShared) {
+        final sharedResolved = result.product?.isShared ?? true;
         setState(() {
           _hasSharedProduct = true;
-          _shareStatusFuture = Future.value(true);
+          _shareStatusFuture = Future.value(sharedResolved);
         });
       }
 

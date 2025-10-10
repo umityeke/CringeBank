@@ -87,6 +87,46 @@ class FollowEdge {
       updatedAt: updated,
     );
   }
+
+  factory FollowEdge.fromSql(Map<String, dynamic> map, {String? id}) {
+    String readString(dynamic value) => (value ?? '').toString().trim();
+
+    final src = readString(
+      map['srcUid'] ??
+          map['followerId'] ??
+          map['followerUid'] ??
+          map['userId'] ??
+          map['sourceUserId'],
+    );
+    final dst = readString(
+      map['dstUid'] ??
+          map['targetId'] ??
+          map['targetUid'] ??
+          map['targetUserId'] ??
+          map['destinationUserId'],
+    );
+
+    final statusRaw = map['status'] ?? map['state'] ?? map['edgeState'];
+    final createdRaw =
+        map['createdAt'] ?? map['created'] ?? map['createdTimestamp'];
+    final updatedRaw =
+        map['updatedAt'] ?? map['updated'] ?? map['updatedTimestamp'];
+
+    final computedId =
+        id ??
+        map['id'] ??
+        map['edgeId'] ??
+        '${src.isNotEmpty ? src : 'unknown'}_${dst.isNotEmpty ? dst : 'unknown'}';
+
+    return FollowEdge(
+      id: computedId.toString(),
+      srcUid: src,
+      dstUid: dst,
+      status: FollowEdgeStatusMapper.fromFirestore(statusRaw?.toString()),
+      createdAt: _parseTimestamp(createdRaw),
+      updatedAt: _parseTimestamp(updatedRaw),
+    );
+  }
 }
 
 class BlockEdge {
@@ -118,6 +158,44 @@ class BlockEdge {
       srcUid: (map['srcUid'] ?? '').toString(),
       dstUid: (map['dstUid'] ?? '').toString(),
       createdAt: _parseTimestamp(map['createdAt']),
+    );
+  }
+
+  factory BlockEdge.fromSql(Map<String, dynamic> map, {String? id}) {
+    String readString(dynamic value) => (value ?? '').toString().trim();
+
+    final src = readString(
+      map['srcUid'] ??
+          map['userId'] ??
+          map['blockUserId'] ??
+          map['blockerUserId'] ??
+          map['sourceUserId'],
+    );
+    final dst = readString(
+      map['dstUid'] ??
+          map['targetId'] ??
+          map['blockedUserId'] ??
+          map['blockTargetUserId'] ??
+          map['targetUserId'],
+    );
+
+    final createdRaw =
+        map['createdAt'] ??
+        map['created'] ??
+        map['blockedAt'] ??
+        map['createdTimestamp'];
+
+    final computedId =
+        id ??
+        map['id'] ??
+        map['blockId'] ??
+        '${src.isNotEmpty ? src : 'unknown'}_${dst.isNotEmpty ? dst : 'unknown'}';
+
+    return BlockEdge(
+      id: computedId.toString(),
+      srcUid: src,
+      dstUid: dst,
+      createdAt: _parseTimestamp(createdRaw),
     );
   }
 }

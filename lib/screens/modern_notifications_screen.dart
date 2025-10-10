@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/cringe_notification_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/animated_bubble_background.dart';
+import '../widgets/cringe_default_background.dart';
 
 class CringeNotificationItem {
   CringeNotificationItem({
@@ -162,9 +162,9 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
       },
       child: Scaffold(
         backgroundColor: AppTheme.backgroundColor,
-        body: AnimatedBubbleBackground(
+        body: CringeDefaultBackground(
           bubbleCount: 24,
-          bubbleColor: Colors.white.withValues(alpha: 0.08),
+          bubbleColor: Colors.white.withOpacity(0.08),
           child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -225,7 +225,7 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
                     ? '$_unreadCount yeni bildirim'
                     : 'Tm bildirimleri grntledin',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7),
+                  color: Colors.white.withOpacity(0.7),
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -320,7 +320,7 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
           Text(
             'Yeni bir cringe olduğunda seni ilk biz haberdar edeceğiz.',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
+              color: Colors.white.withOpacity(0.7),
               fontSize: 14,
             ),
             textAlign: TextAlign.center,
@@ -336,9 +336,9 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
-        color: AppTheme.statusError.withValues(alpha: 0.18),
+        color: AppTheme.statusError.withOpacity(0.18),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.statusError.withValues(alpha: 0.4)),
+        border: Border.all(color: AppTheme.statusError.withOpacity(0.4)),
       ),
       child: Row(
         children: [
@@ -381,8 +381,8 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
             height: 52,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
-              color: Colors.white.withValues(alpha: 0.08),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+              color: Colors.white.withOpacity(0.08),
+              border: Border.all(color: Colors.white.withOpacity(0.14)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -420,11 +420,11 @@ class _ModernNotificationsScreenState extends State<ModernNotificationsScreen>
           height: 46,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            color: Colors.white.withValues(alpha: 0.12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+            color: Colors.white.withOpacity(0.12),
+            border: Border.all(color: Colors.white.withOpacity(0.2)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.23),
+                color: Colors.black.withOpacity(0.23),
                 blurRadius: 12,
                 offset: const Offset(0, 5),
               ),
@@ -455,11 +455,12 @@ class _NotificationCard extends StatelessWidget {
       curve: Curves.easeInOut,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
-        color: AppTheme.cardColor.withValues(alpha: item.isUnread ? 0.75 : 0.5),
+    color:
+      AppTheme.cardColor.withOpacity(item.isUnread ? 0.75 : 0.5),
         border: Border.all(
-          color: item.isUnread
-              ? item.accentColor.withValues(alpha: 0.6)
-              : Colors.white.withValues(alpha: 0.1),
+      color: item.isUnread
+        ? item.accentColor.withOpacity(0.6)
+        : Colors.white.withOpacity(0.1),
           width: 1.2,
         ),
         boxShadow: AppTheme.glowShadow(
@@ -477,8 +478,8 @@ class _NotificationCard extends StatelessWidget {
               shape: BoxShape.circle,
               gradient: LinearGradient(
                 colors: [
-                  item.accentColor.withValues(alpha: 0.85),
-                  item.accentColor.withValues(alpha: 0.45),
+                  item.accentColor.withOpacity(0.85),
+                  item.accentColor.withOpacity(0.45),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -507,7 +508,7 @@ class _NotificationCard extends StatelessWidget {
                     Text(
                       item.timestampLabel,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
+                        color: Colors.white.withOpacity(0.6),
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -518,7 +519,7 @@ class _NotificationCard extends StatelessWidget {
                 Text(
                   item.message,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.78),
+                    color: Colors.white.withOpacity(0.78),
                     fontSize: 14,
                     height: 1.5,
                   ),
@@ -532,9 +533,9 @@ class _NotificationCard extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(14),
-                      color: item.accentColor.withValues(alpha: 0.2),
+                      color: item.accentColor.withOpacity(0.2),
                       border: Border.all(
-                        color: item.accentColor.withValues(alpha: 0.18),
+                        color: item.accentColor.withOpacity(0.18),
                       ),
                     ),
                     child: Text(

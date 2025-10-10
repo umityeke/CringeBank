@@ -8,6 +8,7 @@ import 'services/user_service.dart';
 import 'screens/modern_login_screen.dart';
 import 'screens/main_navigation.dart';
 import 'screens/admin_test_page.dart';
+import 'screens/admin/admin_panel_screen.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
@@ -25,10 +26,7 @@ class CringeBankApp extends StatelessWidget {
       scrollBehavior: const _NoScrollbarScrollBehavior(),
       debugShowCheckedModeBanner: false,
       locale: const Locale('tr', 'TR'),
-      supportedLocales: const [
-        Locale('tr', 'TR'),
-        Locale('en', 'US'),
-      ],
+      supportedLocales: const [Locale('tr', 'TR'), Locale('en', 'US')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -54,6 +52,7 @@ class CringeBankApp extends StatelessWidget {
         '/main': (context) => const MainNavigation(),
         '/login': (context) => const ModernLoginScreen(),
         '/admin-test': (context) => const AdminTestPage(),
+        '/admin': (context) => const AdminPanelScreen(),
       },
     );
   }

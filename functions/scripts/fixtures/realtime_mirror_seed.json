@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "description": "Seed dataset for realtime mirror integration tests.",
+  "events": [
+    {
+      "type": "dm.conversation.create",
+      "source": "seed://dm/conversations/seed-conv-alice-bob",
+      "operation": "create",
+      "conversationId": "seed-conv-alice-bob",
+      "document": {
+        "type": "direct",
+        "isGroup": false,
+        "memberCount": 2,
+        "members": ["user_alice", "user_bob"],
+        "participantMeta": {
+          "user_alice": { "role": "owner", "nick": "Alice" },
+          "user_bob": { "role": "member", "nick": "Bobby" }
+        },
+        "readPointers": {
+          "user_alice": "seed-msg-1",
+          "user_bob": "seed-msg-1"
+        },
+        "lastMessageId": "seed-msg-1",
+        "lastSenderId": "user_alice",
+        "lastMessageText": "Hey Bob, bu bir seed mesajıdır!",
+        "lastMessageAt": "2025-10-08T10:00:00.000Z",
+        "createdAt": "2025-10-08T09:59:00.000Z",
+        "updatedAt": "2025-10-08T10:00:00.000Z"
+      }
+    },
+    {
+      "type": "dm.message.create",
+      "source": "seed://dm/conversations/seed-conv-alice-bob/messages/seed-msg-1",
+      "operation": "create",
+      "conversationId": "seed-conv-alice-bob",
+      "messageId": "seed-msg-1",
+      "document": {
+        "senderId": "user_alice",
+        "text": "Hey Bob, bu bir seed mesajıdır!",
+        "clientMessageId": "client-001",
+        "createdAt": "2025-10-08T10:00:00.000Z",
+        "updatedAt": "2025-10-08T10:00:00.000Z",
+        "media": [],
+        "mediaExternal": null,
+        "deletedFor": null,
+        "tombstone": null
+      }
+    },
+    {
+      "type": "dm.message.update",
+      "source": "seed://dm/conversations/seed-conv-alice-bob/messages/seed-msg-1",
+      "operation": "update",
+      "conversationId": "seed-conv-alice-bob",
+      "messageId": "seed-msg-1",
+      "document": {
+        "senderId": "user_alice",
+        "text": "Hey Bob, mesajı biraz güncelledim.",
+        "clientMessageId": "client-001",
+        "createdAt": "2025-10-08T10:00:00.000Z",
+        "updatedAt": "2025-10-08T10:05:00.000Z",
+        "edited": {
+          "at": "2025-10-08T10:05:00.000Z",
+          "by": "user_alice"
+        },
+        "media": [],
+        "mediaExternal": null,
+        "deletedFor": null,
+        "tombstone": null
+      },
+      "previousDocument": {
+        "senderId": "user_alice",
+        "text": "Hey Bob, bu bir seed mesajıdır!",
+        "clientMessageId": "client-001",
+        "createdAt": "2025-10-08T10:00:00.000Z",
+        "updatedAt": "2025-10-08T10:00:00.000Z",
+        "media": [],
+        "mediaExternal": null,
+        "deletedFor": null,
+        "tombstone": null
+      }
+    },
+    {
+      "type": "dm.message.delete",
+      "source": "seed://dm/conversations/seed-conv-alice-bob/messages/seed-msg-1",
+      "operation": "delete",
+      "conversationId": "seed-conv-alice-bob",
+      "messageId": "seed-msg-1",
+      "previousDocument": {
+        "senderId": "user_alice",
+        "text": "Hey Bob, mesajı biraz güncelledim.",
+        "clientMessageId": "client-001",
+        "createdAt": "2025-10-08T10:00:00.000Z",
+        "updatedAt": "2025-10-08T10:05:00.000Z",
+        "edited": {
+          "at": "2025-10-08T10:05:00.000Z",
+          "by": "user_alice"
+        },
+        "deletedFor": {
+          "user_bob": "2025-10-08T10:06:00.000Z"
+        },
+        "tombstone": {
+          "at": "2025-10-08T10:06:00.000Z",
+          "by": "user_alice"
+        }
+      }
+    },
+    {
+      "type": "follow.edge.create",
+      "source": "seed://follow/user_alice/targets/user_bob",
+      "operation": "create",
+      "userId": "user_alice",
+      "targetId": "user_bob",
+      "document": {
+        "status": "active",
+        "source": "mobile",
+        "createdAt": "2025-10-01T08:00:00.000Z",
+        "updatedAt": "2025-10-01T08:00:00.000Z"
+      }
+    },
+    {
+      "type": "follow.edge.delete",
+      "source": "seed://follow/user_alice/targets/user_bob",
+      "operation": "delete",
+      "userId": "user_alice",
+      "targetId": "user_bob",
+      "previousDocument": {
+        "status": "active",
+        "source": "mobile",
+        "createdAt": "2025-10-01T08:00:00.000Z",
+        "updatedAt": "2025-10-02T09:00:00.000Z"
+      }
+    }
+  ]
+}

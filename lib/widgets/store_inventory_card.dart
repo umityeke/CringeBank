@@ -22,9 +22,9 @@ class StoreInventoryCard extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
+  color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+  border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -41,7 +41,7 @@ class StoreInventoryCard extends StatelessWidget {
           Text(
             '${ownedItems.length} ürün · ${equippedItems.length} aktif',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
+              color: Colors.white.withOpacity(0.6),
               fontSize: 13,
             ),
           ),
@@ -77,7 +77,7 @@ class StoreInventoryCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (ownedItems.isEmpty)
-            _EmptyStateMessage(color: Colors.white.withValues(alpha: 0.6))
+            _EmptyStateMessage(color: Colors.white.withOpacity(0.6))
           else
             Wrap(
               spacing: 12,
@@ -132,7 +132,7 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: Colors.white.withValues(alpha: 0.65)),
+  Icon(icon, size: 18, color: Colors.white.withOpacity(0.65)),
         const SizedBox(width: 8),
         Text(
           label,

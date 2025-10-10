@@ -13,6 +13,23 @@ DateTime? _readTimestamp(dynamic value) {
   return null;
 }
 
+DateTime? _readIsoTimestamp(dynamic value) {
+  if (value is DateTime) {
+    return value;
+  }
+  if (value is Timestamp) {
+    return value.toDate();
+  }
+  if (value == null) {
+    return null;
+  }
+  final raw = value.toString().trim();
+  if (raw.isEmpty || raw == 'null') {
+    return null;
+  }
+  return DateTime.tryParse(raw)?.toLocal();
+}
+
 String? _readMediaReference(dynamic value) {
   if (value == null) {
     return null;
@@ -179,6 +196,147 @@ class DirectMessageThread {
       lastMessageAt: _readTimestamp(data['lastMessageAt']),
       updatedAt: _readTimestamp(data['updatedAt']),
       memberCount: (data['memberCount'] as num?)?.toInt(),
+      isGroup: data['isGroup'] == true,
+    );
+  }
+
+  factory DirectMessageThread.fromSql(Map<String, dynamic> raw) {
+    Map<String, dynamic> asStringKeyedMap(dynamic input) {
+      if (input is Map<String, dynamic>) {
+        return input;
+      }
+      if (input is Map) {
+        return input.map((key, value) => MapEntry(key.toString(), value));
+      }
+      return <String, dynamic>{};
+    }
+
+    final data = asStringKeyedMap(raw);
+    final conversationId =
+        (data['conversationId'] ?? data['conversationKey'] ?? '')
+            .toString()
+            .trim();
+
+    final participants = <String>[];
+    final readPointers = <String, String?>{};
+
+    final participantsRaw = data['participants'];
+    if (participantsRaw is Iterable) {
+      for (final entry in participantsRaw) {
+        if (entry is String) {
+          final id = entry.trim();
+          if (id.isNotEmpty && !participants.contains(id)) {
+            participants.add(id);
+          }
+          continue;
+        }
+
+        if (entry is Map) {
+          final entryMap = entry.map(
+            (key, value) => MapEntry(key.toString(), value),
+          );
+          final userId = (entryMap['userId'] ?? entryMap['UserId'] ?? '')
+              .toString()
+              .trim();
+          if (userId.isEmpty) {
+            continue;
+          }
+          if (!participants.contains(userId)) {
+            participants.add(userId);
+          }
+
+          final pointer =
+              (entryMap['readPointerMessageId'] ??
+                      entryMap['ReadPointerMessageId'])
+                  ?.toString()
+                  .trim();
+          if (pointer != null && pointer.isNotEmpty) {
+            readPointers[userId] = pointer;
+          } else {
+            readPointers[userId] = readPointers[userId];
+          }
+        }
+      }
+    }
+
+    final participantMetaRaw = data['participantMeta'];
+    final participantMeta = <String, DirectMessageParticipantMeta>{};
+    if (participantMetaRaw is Map) {
+      participantMetaRaw.forEach((key, value) {
+        if (key == null) {
+          return;
+        }
+        final normalizedKey = key.toString();
+        if (normalizedKey.isEmpty) {
+          return;
+        }
+        final valueMap = value is Map<String, dynamic>
+            ? value
+            : value is Map
+            ? value.map((k, v) => MapEntry(k.toString(), v))
+            : <String, dynamic>{};
+        participantMeta[normalizedKey] = DirectMessageParticipantMeta.fromMap(
+          valueMap,
+        );
+      });
+    }
+
+    final readPointersRaw = data['readPointers'];
+    if (readPointersRaw is Map) {
+      readPointersRaw.forEach((key, value) {
+        if (key == null) {
+          return;
+        }
+        final normalizedKey = key.toString();
+        if (normalizedKey.isEmpty) {
+          return;
+        }
+        final pointer = value?.toString().trim();
+        if (pointer == null || pointer.isEmpty) {
+          readPointers[normalizedKey] = readPointers[normalizedKey];
+        } else {
+          readPointers[normalizedKey] = pointer;
+        }
+      });
+    }
+
+    final lastMessageRaw = data['lastMessage'];
+    String? lastMessageText;
+    String? lastMessageSenderId;
+    String? lastMessageId;
+    DateTime? lastMessageAt;
+
+    if (lastMessageRaw is Map) {
+      final lastMap = lastMessageRaw.map(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+      lastMessageText = lastMap['preview']?.toString();
+      lastMessageSenderId = lastMap['senderId']?.toString();
+      final messageId = lastMap['messageId']?.toString().trim();
+      lastMessageId = messageId != null && messageId.isNotEmpty
+          ? messageId
+          : null;
+      lastMessageAt = _readIsoTimestamp(lastMap['timestamp']);
+    }
+
+    final updatedAt = _readIsoTimestamp(data['updatedAt']);
+
+    final memberCountRaw = data['memberCount'];
+    final memberCount = memberCountRaw is num ? memberCountRaw.toInt() : null;
+
+    return DirectMessageThread(
+      id: conversationId.isNotEmpty
+          ? conversationId
+          : (data['conversationKey'] ?? '').toString(),
+      members: List<String>.unmodifiable(participants),
+      participantMeta: participantMeta,
+      readPointers: Map<String, String?>.unmodifiable(readPointers),
+      lastMessageText: lastMessageText,
+      lastSenderId: lastMessageSenderId,
+      lastMessageId: lastMessageId,
+      lastMessageAt: lastMessageAt,
+      updatedAt: updatedAt,
+      memberCount: memberCount,
       isGroup: data['isGroup'] == true,
     );
   }
@@ -375,6 +533,93 @@ class DirectMessage {
           ? DirectMessageTombstone.fromMap(data['tombstone'])
           : const DirectMessageTombstone(active: false),
       editAllowedUntil: _readTimestamp(data['editAllowedUntil']),
+      editedAt: editedAt,
+      editedBy: editedBy,
+    );
+  }
+
+  factory DirectMessage.fromSql(
+    Map<String, dynamic> raw, {
+    required String conversationId,
+  }) {
+    Map<String, dynamic> asStringKeyedMap(dynamic input) {
+      if (input is Map<String, dynamic>) {
+        return input;
+      }
+      if (input is Map) {
+        return input.map((key, value) => MapEntry(key.toString(), value));
+      }
+      return <String, dynamic>{};
+    }
+
+    final data = asStringKeyedMap(raw);
+    final messageId = (data['messageId'] ?? data['MessageFirestoreId'] ?? '')
+        .toString()
+        .trim();
+    final senderId = (data['authorUserId'] ?? data['AuthorUserId'] ?? '')
+        .toString()
+        .trim();
+
+    final mediaRaw = data['attachments'];
+    final media = <String>[];
+    if (mediaRaw is Iterable) {
+      for (final item in mediaRaw) {
+        final reference = _readMediaReference(item);
+        if (reference != null && reference.isNotEmpty) {
+          media.add(reference);
+        }
+      }
+    } else if (mediaRaw != null) {
+      final reference = _readMediaReference(mediaRaw);
+      if (reference != null && reference.isNotEmpty) {
+        media.add(reference);
+      }
+    }
+
+    final deletedRaw = data['deletedFor'];
+    final deletedFor = <String, bool>{};
+    if (deletedRaw is Map) {
+      deletedRaw.forEach((key, value) {
+        if (key == null) {
+          return;
+        }
+        final normalizedKey = key.toString();
+        if (normalizedKey.isEmpty) {
+          return;
+        }
+        deletedFor[normalizedKey] = value == true;
+      });
+    }
+
+    final tombstoneRaw = data['tombstone'];
+
+    final editedAt = _readIsoTimestamp(data['editedAt']);
+    final editedByRaw = data['editedBy']?.toString().trim();
+    final editedBy = editedByRaw != null && editedByRaw.isNotEmpty
+        ? editedByRaw
+        : null;
+
+    return DirectMessage(
+      id: messageId.isNotEmpty
+          ? messageId
+          : (data['messageId'] ?? '').toString(),
+      conversationId: conversationId,
+      senderId: senderId,
+      text: data['bodyText']?.toString(),
+      createdAt: _readIsoTimestamp(data['createdAt']) ?? DateTime.now(),
+      updatedAt:
+          _readIsoTimestamp(data['updatedAt']) ??
+          _readIsoTimestamp(data['createdAt']) ??
+          DateTime.now(),
+      media: List<String>.unmodifiable(media),
+      mediaExternal: data['externalMedia'] != null
+          ? DirectMessageExternalMedia.fromMap(data['externalMedia'])
+          : null,
+      deletedFor: Map<String, bool>.unmodifiable(deletedFor),
+      tombstone: tombstoneRaw != null
+          ? DirectMessageTombstone.fromMap(tombstoneRaw)
+          : const DirectMessageTombstone(active: false),
+      editAllowedUntil: _readIsoTimestamp(data['editAllowedUntil']),
       editedAt: editedAt,
       editedBy: editedBy,
     );

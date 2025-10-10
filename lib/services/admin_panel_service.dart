@@ -2,6 +2,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import 'telemetry/callable_latency_tracker.dart';
+
 /// 🛡️ ADMIN PANEL SERVICE - Secure Admin Operations
 ///
 /// Tüm admin işlemleri Cloud Functions üzerinden yapılır.
@@ -38,13 +40,16 @@ class AdminPanelService {
     debugPrint('🔐 Calling assignCategoryAdmin function...');
 
     try {
-      final callable = _functions.httpsCallable('assignCategoryAdmin');
-      final result = await callable.call({
-        'category': category,
-        'targetUserId': targetUserId,
-        'targetUsername': targetUsername,
-        'permissions': permissions,
-      });
+      final result = await _functions.callWithLatency<dynamic>(
+        'assignCategoryAdmin',
+        payload: {
+          'category': category,
+          'targetUserId': targetUserId,
+          'targetUsername': targetUsername,
+          'permissions': permissions,
+        },
+        category: 'adminPanel',
+      );
 
       debugPrint('✅ ${result.data['message']}');
       return Map<String, dynamic>.from(result.data);
@@ -62,11 +67,11 @@ class AdminPanelService {
     debugPrint('🔐 Calling removeCategoryAdmin function...');
 
     try {
-      final callable = _functions.httpsCallable('removeCategoryAdmin');
-      final result = await callable.call({
-        'category': category,
-        'targetUserId': targetUserId,
-      });
+      final result = await _functions.callWithLatency<dynamic>(
+        'removeCategoryAdmin',
+        payload: {'category': category, 'targetUserId': targetUserId},
+        category: 'adminPanel',
+      );
 
       debugPrint('✅ ${result.data['message']}');
       return Map<String, dynamic>.from(result.data);
@@ -85,12 +90,15 @@ class AdminPanelService {
     debugPrint('🔐 Calling toggleCategoryAdminStatus function...');
 
     try {
-      final callable = _functions.httpsCallable('toggleCategoryAdminStatus');
-      final result = await callable.call({
-        'category': category,
-        'targetUserId': targetUserId,
-        'isActive': isActive,
-      });
+      final result = await _functions.callWithLatency<dynamic>(
+        'toggleCategoryAdminStatus',
+        payload: {
+          'category': category,
+          'targetUserId': targetUserId,
+          'isActive': isActive,
+        },
+        category: 'adminPanel',
+      );
 
       debugPrint('✅ ${result.data['message']}');
       return Map<String, dynamic>.from(result.data);
@@ -111,14 +119,17 @@ class AdminPanelService {
     debugPrint('🔐 Calling createCompetition function...');
 
     try {
-      final callable = _functions.httpsCallable('createCompetition');
-      final result = await callable.call({
-        'title': title,
-        'description': description,
-        'visibility': visibility,
-        'startDate': startDate?.toIso8601String(),
-        'endDate': endDate?.toIso8601String(),
-      });
+      final result = await _functions.callWithLatency<dynamic>(
+        'createCompetition',
+        payload: {
+          'title': title,
+          'description': description,
+          'visibility': visibility,
+          'startDate': startDate?.toIso8601String(),
+          'endDate': endDate?.toIso8601String(),
+        },
+        category: 'adminPanel',
+      );
 
       debugPrint('✅ Competition created: ${result.data['competitionId']}');
       return Map<String, dynamic>.from(result.data);
@@ -136,11 +147,11 @@ class AdminPanelService {
     debugPrint('🔐 Calling updateCompetition function...');
 
     try {
-      final callable = _functions.httpsCallable('updateCompetition');
-      final result = await callable.call({
-        'competitionId': competitionId,
-        'updates': updates,
-      });
+      final result = await _functions.callWithLatency<dynamic>(
+        'updateCompetition',
+        payload: {'competitionId': competitionId, 'updates': updates},
+        category: 'adminPanel',
+      );
 
       debugPrint('✅ ${result.data['message']}');
       return Map<String, dynamic>.from(result.data);
@@ -157,8 +168,11 @@ class AdminPanelService {
     debugPrint('🔐 Calling deleteCompetition function...');
 
     try {
-      final callable = _functions.httpsCallable('deleteCompetition');
-      final result = await callable.call({'competitionId': competitionId});
+      final result = await _functions.callWithLatency<dynamic>(
+        'deleteCompetition',
+        payload: {'competitionId': competitionId},
+        category: 'adminPanel',
+      );
 
       debugPrint('✅ ${result.data['message']}');
       return Map<String, dynamic>.from(result.data);

@@ -576,7 +576,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.orange.withValues(alpha: 0.35),
+                          color: Colors.orange.withOpacity(0.35),
                           blurRadius: 22,
                           offset: const Offset(0, 10),
                         ),
@@ -589,7 +589,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.6),
+                        color: Colors.white.withOpacity(0.6),
                         width: 2.2,
                       ),
                     ),
@@ -603,10 +603,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
                     child: Container(
                       padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.65),
+                        color: Colors.black.withOpacity(0.65),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.4),
+                          color: Colors.white.withOpacity(0.4),
                           width: 1.2,
                         ),
                       ),

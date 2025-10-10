@@ -51,7 +51,7 @@ class AppTheme {
   // Shadows
   static List<BoxShadow> cardShadow = [
     BoxShadow(
-      color: const Color(0xFF05050A).withValues(alpha: 0.7),
+  color: const Color(0xFF05050A).withOpacity(0.7),
       blurRadius: 28,
       spreadRadius: -12,
       offset: const Offset(0, 22),
@@ -60,7 +60,7 @@ class AppTheme {
 
   static List<BoxShadow> glowShadow(Color color) => [
     BoxShadow(
-      color: color.withValues(alpha: 0.38),
+  color: color.withOpacity(0.38),
       blurRadius: 20,
       spreadRadius: 3,
       offset: const Offset(0, 8),
@@ -247,11 +247,11 @@ class AppTheme {
         fillColor: glassSurface,
         border: OutlineInputBorder(
           borderRadius: inputRadius,
-          borderSide: BorderSide(color: dividerColor.withValues(alpha: 0.5)),
+          borderSide: BorderSide(color: dividerColor.withOpacity(0.5)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: inputRadius,
-          borderSide: BorderSide(color: dividerColor.withValues(alpha: 0.4)),
+          borderSide: BorderSide(color: dividerColor.withOpacity(0.4)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: inputRadius,
@@ -282,7 +282,7 @@ class AppTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: glassSurface,
-        selectedColor: primaryColor.withValues(alpha: 0.24),
+  selectedColor: primaryColor.withOpacity(0.24),
         labelStyle: GoogleFonts.inter(
           fontWeight: FontWeight.w600,
           fontSize: 13,

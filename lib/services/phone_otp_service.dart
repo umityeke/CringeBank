@@ -1,6 +1,8 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
+import 'telemetry/callable_latency_tracker.dart';
+
 enum PhoneOtpFailureReason {
   invalidCode,
   expired,
@@ -65,8 +67,11 @@ class PhoneOtpService {
     final normalizedPhone = _normalizePhone(phoneNumber);
 
     try {
-      final callable = _functions.httpsCallable('sendPhoneOtp');
-      final result = await callable.call({'phoneNumber': normalizedPhone});
+      final result = await _functions.callWithLatency<dynamic>(
+        'sendPhoneOtp',
+        payload: {'phoneNumber': normalizedPhone},
+        category: 'phoneOtp',
+      );
       if (result.data == null) return null;
       if (result.data is Map) {
         final map = Map<String, dynamic>.from(result.data as Map);
@@ -90,11 +95,11 @@ class PhoneOtpService {
     final sanitizedCode = code.trim();
 
     try {
-      final callable = _functions.httpsCallable('confirmPhoneUpdate');
-      final result = await callable.call({
-        'phoneNumber': normalizedPhone,
-        'code': sanitizedCode,
-      });
+      final result = await _functions.callWithLatency<dynamic>(
+        'confirmPhoneUpdate',
+        payload: {'phoneNumber': normalizedPhone, 'code': sanitizedCode},
+        category: 'phoneOtp',
+      );
       return PhoneOtpVerificationResult.fromResponse(result.data);
     } on FirebaseFunctionsException catch (e, stack) {
       debugPrint(

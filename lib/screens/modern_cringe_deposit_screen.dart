@@ -167,7 +167,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                   height: 240,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.orange.withValues(alpha: 0.18),
+                    color: Colors.orange.withOpacity(0.18),
                   ),
                 ),
               ),
@@ -179,7 +179,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                   height: 220,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.pinkAccent.withValues(alpha: 0.12),
+                    color: Colors.pinkAccent.withOpacity(0.12),
                   ),
                 ),
               ),

@@ -9,7 +9,9 @@ import '../models/direct_message.dart';
 import '../models/user_model.dart';
 import '../services/direct_message_service.dart';
 import '../services/user_service.dart';
+import '../theme/app_theme.dart';
 import '../utils/safe_haptics.dart';
+import '../widgets/cringe_default_background.dart';
 import 'direct_message_thread_screen.dart';
 import 'modern_login_screen.dart';
 
@@ -66,12 +68,16 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.backgroundColor,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: const Text('Mesajlar'),
       ),
-      body: _buildBody(),
+      body: CringeDefaultBackground(
+        child: SafeArea(bottom: false, child: _buildBody()),
+      ),
     );
   }
 
@@ -253,9 +259,9 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
+            color: Colors.white.withOpacity(0.08),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+            border: Border.all(color: Colors.white.withOpacity(0.1)),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -331,7 +337,7 @@ class _DirectMessageThreadTile extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Card(
-      color: Colors.white.withValues(alpha: 0.05),
+      color: Colors.white.withOpacity(0.05),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -344,9 +350,8 @@ class _DirectMessageThreadTile extends StatelessWidget {
                 avatar: data.avatar,
                 displayName: data.displayName,
                 radius: 28,
-                backgroundColor: theme.colorScheme.primary.withValues(
-                  alpha: 0.15,
-                ),
+                backgroundColor:
+                    theme.colorScheme.primary.withOpacity(0.15),
               ),
               const SizedBox(width: 16),
               Expanded(

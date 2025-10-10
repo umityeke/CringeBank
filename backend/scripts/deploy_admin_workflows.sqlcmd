@@ -1,0 +1,35 @@
+/*
+  Deployment bundle: Admin workflows schema and stored procedures
+
+  Usage examples:
+    sqlcmd -S localhost,1433 -d CringeBank -U sa -P "<AdminPassword>" -b -i deploy_admin_workflows.sqlcmd
+    sqlcmd -S localhost,1433 -d CringeBank -G -b -i deploy_admin_workflows.sqlcmd
+
+  Requirements:
+    - Run from the `backend/scripts` directory (paths are relative).
+    - Database context must already exist (see provision_sql.sql).
+    - sqlcmd version >= 15 recommended for UTF-8 support.
+*/
+
+:on error exit
+GO
+
+PRINT '🚀 Starting admin workflows deployment bundle';
+GO
+
+:r .\migrations\20251009_01_create_admin_workflows.sql
+:r .\stored_procedures\sp_Admin_LogAudit.sql
+:r .\stored_procedures\sp_Admin_CreateBadge.sql
+:r .\stored_procedures\sp_Admin_UpdateBadge.sql
+:r .\stored_procedures\sp_Admin_ListBadges.sql
+:r .\stored_procedures\sp_Admin_AssignBadge.sql
+:r .\stored_procedures\sp_Admin_RevokeBadge.sql
+:r .\stored_procedures\sp_Admin_SubmitVerificationRequest.sql
+:r .\stored_procedures\sp_Admin_ListVerificationRequests.sql
+:r .\stored_procedures\sp_Admin_ReviewVerificationRequest.sql
+:r .\stored_procedures\sp_Admin_ListRoles.sql
+:r .\stored_procedures\sp_Admin_AssignRole.sql
+:r .\stored_procedures\sp_Admin_RevokeRole.sql
+
+PRINT '✅ Admin workflows deployment bundle completed.';
+GO

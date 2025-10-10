@@ -1,1002 +1,136 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ====================================================================
-    // HELPER FUNCTIONS - Authentication & Authorization
-    // ====================================================================
-    
+    // ===================================================================
+    // Identity Helpers
+    // ===================================================================
+
     function isSignedIn() {
       return request.auth != null;
     }
 
+    function currentUid() {
+      return isSignedIn() ? request.auth.uid : null;
+    }
+
     function isSuperAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == 'umityeke@gmail.com' ||
         request.auth.token.superadmin == true ||
-        request.auth.token.admin == true
+        request.auth.token.email == 'umityeke@gmail.com'
       );
     }
 
-    function isModerator() {
-      return isSignedIn() && request.auth.token.moderator == true;
-    }
-
-    function authUserStatus() {
-      if (!isSignedIn()) {
-        return 'anonymous';
-      }
-
-      return request.auth.token.user_status is string
-        ? request.auth.token.user_status
-        : 'unknown';
-    }
-
-    function authClaimsVersion() {
-      return isSignedIn() && request.auth.token.claims_version is int
-        ? request.auth.token.claims_version
-        : 0;
-    }
-
-    function hasFreshClaims() {
-      if (!isSignedIn()) {
-        return false;
-      }
-
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-
-      if (userDoc == null || userDoc.data == null) {
-        return true;
-      }
-
-      let docVersion = userDoc.data.claimsVersion;
-
-      if (!(docVersion is int)) {
-        return true;
-      }
-
-      return authClaimsVersion() >= docVersion;
-    }
-
-    function isUserActive() {
-      return isSignedIn() && authUserStatus() == 'active';
-    }
-
-    function ensureActiveAndFreshClaims() {
-      return isUserActive() && hasFreshClaims();
-    }
-
-    function isCategoryAdmin(category) {
-      let categoryDoc = get(/databases/$(database)/documents/category_admins/$(category));
-      return categoryDoc != null 
-        && categoryDoc.data != null
-        && categoryDoc.data.admins != null
-        && categoryDoc.data.admins.hasAny([{'userId': request.auth.uid, 'isActive': true}]);
-    }
-
-    function canModerateCategory(category) {
-      return isSuperAdmin() || isModerator() || isCategoryAdmin(category);
-    }
-
-    function isOwner(ownerId) {
-      return isSignedIn() && ownerId is string && request.auth.uid == ownerId;
-    }
-
-    function isOwnerOrModerator(ownerId) {
-      return isOwner(ownerId) || isModerator() || isSuperAdmin();
-    }
-
-    // ====================================================================
-    // HELPER FUNCTIONS - Validation
-    // ====================================================================
-    
-    function validStatus(status) {
-      return status is string &&
-        (status == 'pending' || status == 'approved' || status == 'rejected' || status == 'blocked');
-    }
-
-    function canReadModerated(ownerId, status) {
-      return status == 'approved'
-        || (status == 'pending' && isOwnerOrModerator(ownerId))
-        || (status == 'rejected' && isOwnerOrModerator(ownerId))
-        || (status == 'blocked' && isModerator());
-    }
-
-    function isValidTimestamp(value) {
-      return (value is int && value >= 0)
-        || (value is timestamp);
-    }
-
-    function stringWithin(value, minLength, maxLength) {
-      return value is string && value.size() >= minLength && value.size() <= maxLength;
-    }
-
-    function optionalStringWithin(data, key, maxLength) {
-      return !data.keys().hasAny([key])
-        || stringWithin(data[key], 0, maxLength);
-    }
-
-    function mediaListValid(mediaItems, minItems, maxItems) {
-      return mediaItems is list
-        && mediaItems.size() >= minItems
-        && mediaItems.size() <= maxItems;
-    }
-
-    function optionalMediaValid(data, minItems, maxItems) {
-      return (!data.keys().hasAny(['media']) && minItems == 0)
-        || (data.keys().hasAny(['media']) && mediaListValid(data.media, minItems, maxItems));
-    }
-
-    function requiresMedia(data) {
-      return data.keys().hasAny(['media']);
-    }
-
-    function ensureModerationUnchanged() {
-      return !request.resource.data.keys().hasAny(['moderation']) || isModerator();
-    }
-
-    function fieldUnchanged(field) {
-      return !request.resource.data.keys().hasAny([field])
-        || request.resource.data[field] == resource.data[field];
-    }
-
-    // ====================================================================
-    // POST TYPE VALIDATION - Content-specific rules
-    // ====================================================================
-
-    // ====================================================================
-    // POST TYPE VALIDATION - Content-specific rules
-    // ====================================================================
-    
-    function postPayloadValid(data) {
-      let type = data.type;
-      return type is string
-        && (
-          // SPILL: Text-focused post, 0-1 media, text required (1-2000 chars)
-          (type == 'spill'
-            && data.keys().hasAny(['text'])
-            && stringWithin(data.text, 1, 2000)
-            && optionalMediaValid(data, 0, 1))
-          
-          // CLAP: Short punchy text, 0-1 media, text required (1-140 chars)
-          || (type == 'clap'
-            && data.keys().hasAny(['text'])
-            && stringWithin(data.text, 1, 500)
-            && optionalMediaValid(data, 0, 1))
-          
-          // FRAME: Image-focused, ≥1 image required, text optional (≤300 chars)
-          || (type == 'frame'
-            && optionalStringWithin(data, 'text', 300)
-            && requiresMedia(data)
-            && mediaListValid(data.media, 1, 20))
-          
-          // CRINGECAST: Video post, exactly 1 video, text optional (≤300 chars)
-          || (type == 'cringecast'
-            && optionalStringWithin(data, 'text', 300)
-            && requiresMedia(data)
-            && mediaListValid(data.media, 1, 1))
-          
-          // MASH: Mixed media, 1-5 items (image+video), text required (1-200 chars)
-          || (type == 'mash'
-            && data.keys().hasAny(['text'])
-            && stringWithin(data.text, 1, 200)
-            && requiresMedia(data)
-            && mediaListValid(data.media, 1, 5))
-        );
-    }
-
-    // ====================================================================
-    // POST UPDATE VALIDATION
-    // ====================================================================
-    
-    function ownerPostUpdateAllowed() {
-      let changed = request.resource.data.diff(resource.data).changedKeys();
-      let ownerId = resource.data.ownerId;
-      
-      return isOwner(ownerId)
-        && ensureActiveAndFreshClaims()
-        // Only owner can modify: text, media, updatedAt
-        && changed.hasOnly(['text', 'media', 'updatedAt'])
-        // Core fields must remain unchanged
-        && fieldUnchanged('ownerId')
-        && fieldUnchanged('type')
-        && fieldUnchanged('createdAt')
-        && fieldUnchanged('status')
-        // Moderation field cannot be changed by owner
-        && ensureModerationUnchanged()
-        // Updated fields must be valid
-        && (!changed.hasAny(['text'])
-          || !request.resource.data.keys().hasAny(['text'])
-          || stringWithin(request.resource.data.text, 0, 2000))
-        && (!changed.hasAny(['media']) 
-          || mediaListValid(request.resource.data.media, 0, 50))
-        && (!changed.hasAny(['updatedAt']) 
-          || isValidTimestamp(request.resource.data.updatedAt))
-        // Full payload must still be valid
-        && postPayloadValid(request.resource.data);
-    }
-
-    function moderatorPostUpdateAllowed() {
-      let category = resource.data.category;
-      
-      return (isSuperAdmin() || isModerator() || (category != null && canModerateCategory(category)))
-        // Core ownership/type fields cannot change even by moderator
-        && fieldUnchanged('ownerId')
-        && fieldUnchanged('type')
-        // Status must be valid
-        && validStatus(request.resource.data.status)
-        // Timestamps must be valid
-        && isValidTimestamp(request.resource.data.createdAt)
-        && (!request.resource.data.keys().hasAny(['updatedAt']) 
-          || isValidTimestamp(request.resource.data.updatedAt))
-        // Full payload must be valid
-        && postPayloadValid(request.resource.data);
-    }
-
-    // Engagement updates (likes, views, shares) - anyone can update
-    function engagementUpdateAllowed() {
-      let changed = request.resource.data.diff(resource.data).changedKeys();
-      
-      return ensureActiveAndFreshClaims()
-        // Only engagement fields can change
-        && changed.hasOnly(['likeCount', 'likedBy', 'viewCount', 'shareCount', 'updatedAt'])
-        // Core fields unchanged
-        && fieldUnchanged('ownerId')
-        && fieldUnchanged('type')
-        && fieldUnchanged('status')
-        && fieldUnchanged('createdAt')
-        && fieldUnchanged('text')
-        && fieldUnchanged('media')
-        // Moderation unchanged
-        && ensureModerationUnchanged()
-        // Counts must be non-negative integers
-        && (!changed.hasAny(['likeCount']) || request.resource.data.likeCount is int && request.resource.data.likeCount >= 0)
-        && (!changed.hasAny(['viewCount']) || request.resource.data.viewCount is int && request.resource.data.viewCount >= 0)
-        && (!changed.hasAny(['shareCount']) || request.resource.data.shareCount is int && request.resource.data.shareCount >= 0)
-        // likedBy must be a list
-        && (!changed.hasAny(['likedBy']) || request.resource.data.likedBy is list);
-    }
-
-    // ====================================================================
-    // COMMENT VALIDATION
-    // ====================================================================
-    
-    function commentPayloadValid(data) {
-      return data.ownerId is string
-        && data.ownerId == request.auth.uid
-        && stringWithin(data.text, 1, 2000)
-        && validStatus(data.status)
-        && data.status == 'pending'
-        && isValidTimestamp(data.createdAt)
-        && (!data.keys().hasAny(['updatedAt']) || isValidTimestamp(data.updatedAt))
-        && !data.keys().hasAny(['moderation']);
-    }
-
-    function ownerCommentUpdateAllowed() {
-      let changed = request.resource.data.diff(resource.data).changedKeys();
-      
-      return isOwner(resource.data.ownerId)
-        && ensureActiveAndFreshClaims()
-        // Owner can only modify: text, updatedAt
-        && changed.hasOnly(['text', 'updatedAt'])
-        // Text must be valid
-        && stringWithin(request.resource.data.text, 1, 2000)
-        // Timestamp must be valid
-        && (!changed.hasAny(['updatedAt']) 
-          || isValidTimestamp(request.resource.data.updatedAt))
-        // Core fields unchanged
-        && fieldUnchanged('ownerId')
-        && fieldUnchanged('createdAt')
-        && fieldUnchanged('status')
-        // Cannot touch moderation
-        && ensureModerationUnchanged();
-    }
-
-    function moderatorCommentUpdateAllowed() {
-      return (isModerator() || isSuperAdmin())
-        // Owner cannot change
-        && fieldUnchanged('ownerId')
-        && fieldUnchanged('createdAt')
-        // Text must be valid
-        && stringWithin(request.resource.data.text, 1, 2000)
-        // Status must be valid
-        && validStatus(request.resource.data.status)
-        // Timestamp must be valid
-        && (!request.resource.data.keys().hasAny(['updatedAt']) 
-          || isValidTimestamp(request.resource.data.updatedAt));
-    }
-
-    // ====================================================================
-    // REPORT VALIDATION
-    // ====================================================================
-    
-    function reportPayloadValid(data) {
-      let target = data.target;
-      let validReasons = ['nudity', 'harassment', 'spam', 'hate', 'violence', 'other'];
-      let validTargetTypes = ['post', 'comment', 'user'];
-      
-      return data.reporterId is string
-        && data.reporterId == request.auth.uid
-        && target is map
-        && target.keys().hasOnly(['type', 'id'])
-        && target.type is string
-        && validTargetTypes.hasAny([target.type])
-        && target.id is string
-        && target.id.size() > 0
-        && data.reason is string
-        && validReasons.hasAny([data.reason])
-        && (!data.keys().hasAny(['note']) 
-          || (data.note is string && data.note.size() <= 1000))
-        && data.status == 'open'
-        && isValidTimestamp(data.createdAt);
-    }
-
-    function reportUpdateAllowed() {
-      return isModerator()
-        // Core report data cannot change
-        && fieldUnchanged('reporterId')
-        && fieldUnchanged('target')
-        && fieldUnchanged('reason')
-        && fieldUnchanged('createdAt')
-        // Status must be valid (moderator can change to: open, investigating, resolved, dismissed)
-        && request.resource.data.status is string
-        && isValidTimestamp(resource.data.createdAt);
-    }
-
-    // ====================================================================
-    // USER VALIDATION
-    // ====================================================================
-    
-    function userProtectedFieldsUnchanged() {
-      return fieldUnchanged('role')
-        && fieldUnchanged('claims')
-        && fieldUnchanged('isBanned')
-        && fieldUnchanged('moderation')
-        && fieldUnchanged('status')
-        && fieldUnchanged('claimsVersion')
-        && fieldUnchanged('claims_version')
-        && fieldUnchanged('emailVerified')
-        && fieldUnchanged('isDisabled')
-        && fieldUnchanged('disabledAt')
-        && fieldUnchanged('disabledAtUtc')
-        && fieldUnchanged('deletedAt')
-        && fieldUnchanged('deletedAtUtc')
-        && fieldUnchanged('lastSyncedAt')
-        && fieldUnchanged('lastSyncedAtUtc')
-        && fieldUnchanged('lastLoginAt')
-        && fieldUnchanged('lastLoginAtUtc')
-        && fieldUnchanged('firebaseUid')
-        && fieldUnchanged('lastSeenAppVersion')
-        && fieldUnchanged('claimsLastSyncedAt');
-    }
-
-    function userCreationFieldsValid(data) {
-      return !data.keys().hasAny([
-        'role',
-        'claims',
-        'isBanned',
-        'moderation',
-        'status',
-        'claimsVersion',
-        'claims_version',
-        'emailVerified',
-        'isDisabled',
-        'disabledAt',
-        'disabledAtUtc',
-        'deletedAt',
-        'deletedAtUtc',
-        'lastSyncedAt',
-        'lastSyncedAtUtc',
-        'lastLoginAt',
-        'lastLoginAtUtc',
-        'firebaseUid',
-        'lastSeenAppVersion',
-        'claimsLastSyncedAt'
-      ]);
-    }
-
-    // ====================================================================
-    // COLLECTION RULES - POSTS (Collection: cringe_entries)
-    // ====================================================================
-    
-    match /cringe_entries/{postId} {
-      // READ: Approved posts are public, others only for owner/moderator
-      // LIST: Allow queries for approved posts (public feed)
-      // List sorgularında temel kimlik doğrulaması yeterlidir; doküman bazlı
-      // yetkilendirme allow get kontrolünde yapılır.
-      allow list: if isSignedIn();
-      allow get: if canReadModerated(
-        resource.data.ownerId != null ? resource.data.ownerId : resource.data.userId,
-        resource.data.status
+    function isSystemWriter() {
+      return isSignedIn() && (
+        request.auth.token.system_writer == true ||
+        request.auth.token.app_server == true ||
+        request.auth.token.backend == true
       );
-
-      // CREATE: Any signed-in user can create, status must be approved or pending
-      allow create: if ensureActiveAndFreshClaims()
-        && request.resource.data.ownerId == request.auth.uid
-        && validStatus(request.resource.data.status)
-        && (request.resource.data.status == 'approved' || request.resource.data.status == 'pending')
-    && postPayloadValid(request.resource.data)
-        && isValidTimestamp(request.resource.data.createdAt)
-        && (!request.resource.data.keys().hasAny(['updatedAt']) 
-          || isValidTimestamp(request.resource.data.updatedAt))
-        && !request.resource.data.keys().hasAny(['moderation']);
-
-      // UPDATE: Owner can edit safe fields, moderator can change status/moderation, anyone can like/view
-      allow update: if ensureModerationUnchanged()
-        && (ownerPostUpdateAllowed() || moderatorPostUpdateAllowed() || engagementUpdateAllowed());
-
-      // DELETE: Owner or moderator can delete (check ownerId first, fallback to userId for legacy docs)
-      allow delete: if isOwnerOrModerator(
-        resource.data.ownerId != null ? resource.data.ownerId : resource.data.userId
-      );
-
-      // ====================================================================
-      // SUB-COLLECTION RULES - COMMENTS
-      // ====================================================================
-      
-      match /comments/{commentId} {
-        // READ: Same moderation rules as posts
-        allow read: if canReadModerated(resource.data.ownerId, resource.data.status);
-
-        // CREATE: Any signed-in user can comment
-        allow create: if ensureActiveAndFreshClaims()
-          && request.resource.data.ownerId == request.auth.uid
-          && commentPayloadValid(request.resource.data);
-
-        // UPDATE: Owner can edit text, moderator can change status/moderation
-        allow update: if ownerCommentUpdateAllowed() 
-          || moderatorCommentUpdateAllowed();
-
-        // DELETE: Owner or moderator can delete
-        allow delete: if isOwnerOrModerator(resource.data.ownerId);
-      }
     }
 
-    // ====================================================================
-    // COLLECTION RULES - REPORTS
-    // ====================================================================
-    
-    match /reports/{reportId} {
-      // READ: Only moderator or reporter can read
-      allow read: if isModerator() 
-        || (isSignedIn() && resource.data.reporterId == request.auth.uid);
-
-      // CREATE: Any signed-in user can create reports
-  allow create: if ensureActiveAndFreshClaims() && reportPayloadValid(request.resource.data);
-
-      // UPDATE: Only moderator can update (change status, add notes, etc.)
-      allow update: if reportUpdateAllowed();
-
-      // DELETE: Only moderator can delete
-      allow delete: if isModerator();
+    function ownerMatchesDocId(docId) {
+      return isSignedIn() && docId == currentUid();
     }
 
-    // ====================================================================
-    // COLLECTION RULES - USERS
-    // ====================================================================
-    
+    function serverSideWrite() {
+      return isSystemWriter() || isSuperAdmin();
+    }
+
+    // ===================================================================
+    // Users (auth metadata mirrored from MSSQL)
+    // ===================================================================
+
     match /users/{userId} {
-      // READ: Public profiles (you can restrict if needed)
-      allow read: if true;
+      // Clients sadece kendi kayıtlarını okuyabilir, super admin her şeyi görebilir
+      allow get: if ownerMatchesDocId(userId) || isSuperAdmin();
+      allow list: if false;
 
-      // CREATE: User can create their own profile
-      allow create: if isSignedIn()
-        && request.auth.uid == userId
-        && userCreationFieldsValid(request.resource.data);
-
-      // UPDATE: Super admin can update everything, user can update own profile (except protected fields), 
-      //         moderator can update everything
-      allow update: if isSuperAdmin()
-        || isModerator()
-        || (ensureActiveAndFreshClaims()
-          && request.auth.uid == userId
-          && userProtectedFieldsUnchanged());
-
-      // DELETE: Only super admin can delete users
+      // Yazma hakları sadece backend servislerinde
+      allow create: if serverSideWrite();
+      allow update: if serverSideWrite();
       allow delete: if isSuperAdmin();
-
-      // ==================================================================
-      // SUB-COLLECTION RULES - FOLLOW RELATIONSHIPS
-      // ==================================================================
-
-      match /following/{targetUserId} {
-        // READ: Only the owner of the profile (or elevated roles) can see their following list
-        allow read: if isOwner(userId) || isModerator() || isSuperAdmin();
-
-        // CREATE: Only the owner of the profile can follow someone from their account
-        allow create: if isOwner(userId)
-          && request.resource.data.userId is string
-          && request.resource.data.userId == targetUserId
-          && isValidTimestamp(request.resource.data.followedAt);
-
-  // DELETE: Only the profile owner (or elevated roles) can unfollow from their account
-  allow delete: if isOwner(userId) || isModerator() || isSuperAdmin();
-
-        // UPDATE: Follow docs are immutable after creation
-        allow update: if false;
-      }
-
-      match /followers/{followerId} {
-        // READ: Allow the profile owner, the follower, or elevated roles to inspect follower records
-        allow read: if isOwner(userId)
-          || (request.auth != null && request.auth.uid == followerId)
-          || isModerator()
-          || isSuperAdmin();
-
-        // CREATE: Follower can add themselves to someone else's followers list
-        allow create: if request.auth != null
-          && request.auth.uid == followerId
-          && request.resource.data.followerId is string
-          && request.resource.data.followerId == followerId
-          && isValidTimestamp(request.resource.data.followedAt);
-
-        // DELETE: Follower or profile owner (or elevated roles) can remove the relationship
-        allow delete: if
-          (request.auth != null && request.auth.uid == followerId)
-          || isOwner(userId)
-          || isModerator()
-          || isSuperAdmin();
-
-        // UPDATE: Followers entries are immutable after creation
-        allow update: if false;
-      }
     }
 
-    // ====================================================================
-    // COLLECTION RULES - CATEGORY ADMINS
-    // ====================================================================
-    
-    match /category_admins/{category} {
-      // READ: Any signed-in user can see who manages categories
-      allow read: if isSignedIn();
+    // ===================================================================
+    // Kullanıcı güvenlik dokümanları (cihaz fingerprint, oturum kayıtları)
+    // ===================================================================
 
-      // WRITE: Only super admin can assign/remove category admins
-      // Client CANNOT write - must use callable Functions
-      allow create, update, delete: if false;
+    match /user_security/{userId} {
+      allow get, list: if ownerMatchesDocId(userId) || isSuperAdmin();
+      allow create: if serverSideWrite();
+      allow update: if serverSideWrite();
+      allow delete: if serverSideWrite();
     }
 
-    // ====================================================================
-    // COLLECTION RULES - COMPETITIONS
-    // ====================================================================
-    
-    match /competitions/{competitionId} {
-      // READ: Public or owner/admin based on visibility
-      allow read: if true; // or add visibility check later
-      
-      // WRITE: Client CANNOT write - must use callable Functions
-      // Only super admin via Cloud Functions (Admin SDK bypasses rules)
-      allow create, update, delete: if false;
+    // ===================================================================
+    // Oturum sinyalleri (client-side telemetry) - sadece backend yazar
+    // ===================================================================
+
+    match /session_signals/{userId}/{signalId} {
+      allow get, list: if ownerMatchesDocId(userId) || isSuperAdmin();
+      allow create: if serverSideWrite();
+      allow update: if false;
+      allow delete: if serverSideWrite();
     }
 
-    // ====================================================================
-    // COLLECTION RULES - ADMIN AUDIT LOG
-    // ====================================================================
-    
-    match /admin_audit/{logId} {
-      // READ: Only super admin can read audit logs
-      allow read: if isSuperAdmin();
-      
-      // WRITE: Client CANNOT write - only Functions
-      allow create, update, delete: if false;
+    // ===================================================================
+    // MSSQL'den türetilen herkese açık cache koleksiyonları (sadece okuma)
+    // ===================================================================
+
+    match /public_profiles/{uid} {
+      allow get, list: if true;
+      allow create, update, delete: if serverSideWrite();
     }
 
-    // ====================================================================
-    // COLLECTION RULES - CHAT ROOMS & MESSAGES
-    // ====================================================================
-    
-    match /chat_rooms/{chatRoomId} {
-      // READ: Only participants can read
-      allow read: if isSignedIn() 
-        && request.auth.uid in resource.data.participantIds;
-
-      // CREATE: Any signed-in user can create chat room
-      allow create: if isSignedIn()
-        && request.resource.data.participantIds.size() == 2
-        && request.auth.uid in request.resource.data.participantIds;
-
-      // UPDATE: Only participants can update (last message, etc)
-      allow update: if isSignedIn()
-        && request.auth.uid in resource.data.participantIds;
-
-      // DELETE: Not allowed (keep chat history)
-      allow delete: if false;
-
-      // Messages subcollection
-      match /messages/{messageId} {
-        // READ: Only participants of parent chat room can read
-        allow read: if isSignedIn()
-          && request.auth.uid in get(/databases/$(database)/documents/chat_rooms/$(chatRoomId)).data.participantIds;
-
-        // CREATE: Only participants can send messages
-        allow create: if isSignedIn()
-          && request.auth.uid in get(/databases/$(database)/documents/chat_rooms/$(chatRoomId)).data.participantIds
-          && request.resource.data.senderId == request.auth.uid;
-
-        // UPDATE: Only sender can update (mark as read, etc)
-        allow update: if isSignedIn()
-          && (request.auth.uid == resource.data.senderId
-            || request.auth.uid in get(/databases/$(database)/documents/chat_rooms/$(chatRoomId)).data.participantIds);
-
-        // DELETE: Only sender can delete their messages
-        allow delete: if isSignedIn()
-          && request.auth.uid == resource.data.senderId;
-      }
+    match /public_follow_counts/{uid} {
+      allow get, list: if true;
+      allow create, update, delete: if serverSideWrite();
     }
 
-    // ====================================================================
-    // DIRECT MESSAGING - Advanced messaging system with edit/delete/blocking
-    // ====================================================================
-
-    // Helper functions for DM
-    function emailVerified() {
-      return request.auth != null && request.auth.token.email_verified == true;
+    match /public_entry_counts/{uid} {
+      allow get, list: if true;
+      allow create, update, delete: if serverSideWrite();
     }
 
-    function isMemberOfConversation(cid) {
-      return emailVerified() &&
-        get(/databases/$(database)/documents/conversations/$(cid)).data.members
-          .hasAny([request.auth.uid]);
+    // ===================================================================
+    // Takip grafiği sadece okuma amaçlı; yazma sadece backend'den
+    // ===================================================================
+
+    match /follows/{ownerId}/following/{targetId} {
+      allow get, list: if ownerMatchesDocId(ownerId) || isSuperAdmin();
+      allow create, update, delete: if serverSideWrite();
     }
 
-    function getCounterpartUid(cid) {
-      let members = get(/databases/$(database)/documents/conversations/$(cid)).data.members;
-      return members[0] == request.auth.uid ? members[1] : members[0];
+    match /follows_index/{ownerId}/{kind}/{targetId} {
+      allow get, list: if ownerMatchesDocId(ownerId) || isSuperAdmin();
+      allow create, update, delete: if serverSideWrite();
     }
 
-    function isNotBlocked(target) {
-      return !(exists(/databases/$(database)/documents/blocks/$(request.auth.uid)/targets/$(target)) ||
-               exists(/databases/$(database)/documents/blocks/$(target)/targets/$(request.auth.uid)));
+    // ===================================================================
+    // Sistemsel ayarlar ve kilitler
+    // ===================================================================
+
+    match /system_config/{docId} {
+      allow get: if isSignedIn();
+      allow list: if isSuperAdmin();
+      allow create, update, delete: if serverSideWrite();
     }
 
-    function fieldUnchangedInMessage(field) {
-      return resource.data[field] == request.resource.data[field];
+    match /config_messaging/{docId} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create, update, delete: if serverSideWrite();
     }
 
-    function onlyChangedKeysInMessage(allowedKeys) {
-      return request.resource.data.diff(resource.data).changedKeys().hasOnly(allowedKeys);
+    match /system_cache/{bucketId}/{docId} {
+      allow get, list: if serverSideWrite() || isSuperAdmin();
+      allow create, update, delete: if serverSideWrite();
     }
 
-    /* ---- ALLOWLIST: /config/allowedMediaHosts { hosts: ["imgur.com","cdn.xyz"] } ---- */
-    function allowedHost(domain) {
-      return exists(/databases/$(database)/documents/config/allowedMediaHosts) &&
-        get(/databases/$(database)/documents/config/allowedMediaHosts).data.hosts.hasAny([domain]);
-    }
+    // ===================================================================
+    // Varsayılan: her şeyi reddet
+    // ===================================================================
 
-    /* ---- İÇERİK DOĞRULAYICI: text || storage media || harici media ---- */
-    function hasMessageContent() {
-      return (request.resource.data.text != null) ||
-             (request.resource.data.media != null) ||                                 // Storage içi
-             (request.resource.data.mediaExternal != null);                           // Harici URL
-    }
-
-    /* ---- EXTERNAL MEDIA GÜVENLİ Mİ? (yalnız Functions set eder) ---- */
-    function externalMediaIsSafe() {
-      return request.resource.data.mediaExternal != null &&
-             request.resource.data.mediaExternal.safe == true &&
-             request.resource.data.mediaExternal.url is string &&
-             request.resource.data.mediaExternal.originDomain is string &&
-             allowedHost(request.resource.data.mediaExternal.originDomain);
-    }
-
-    function withinEditWindowForMessage() {
-      return request.time <= resource.data.editAllowedUntil;
-    }
-
-    // Blocks collection
-    match /blocks/{ownerUid}/targets/{targetUid} {
-      allow read: if emailVerified() &&
-        (request.auth.uid == ownerUid || request.auth.uid == targetUid);
-
-      allow create, update, delete: if emailVerified() && request.auth.uid == ownerUid;
-    }
-
-    // Conversations collection
-    match /conversations/{cid} {
-      allow read: if isMemberOfConversation(cid);
-
-      allow create: if emailVerified()
-        && request.resource.data.members.size() >= 2
-        && request.resource.data.members.hasOnly(
-             [request.auth.uid] + request.resource.data.members
-           )
-        && request.resource.data.createdAt == request.time;
-
-      allow update: if isMemberOfConversation(cid)
-        && (
-          request.resource.data.readPointers[request.auth.uid] == request.time
-          || true
-        );
-
-      allow delete: if isMemberOfConversation(cid);
-
-      // Messages subcollection for conversations
-      match /messages/{mid} {
-        allow read: if isMemberOfConversation(cid);
-
-        /* CREATE (harici medya destekli) */
-        allow create: if isMemberOfConversation(cid)
-          && request.resource.data.senderId == request.auth.uid
-          && hasMessageContent()
-          && request.resource.data.createdAt == request.time
-          && request.resource.data.rateKey == "ok"
-          && (
-            // DM'de iki yönlü blok kontrolü
-            (get(/databases/$(database)/documents/conversations/$(cid)).data.isGroup == false
-              ? isNotBlocked(getCounterpartUid(cid))
-              : true)
-          )
-          && (
-            // Eğer harici medya varsa güvenli onayı şart
-            (request.resource.data.mediaExternal == null) || externalMediaIsSafe()
-          );
-
-        allow update: if isMemberOfConversation(cid) && (
-          // Only-Me delete
-          (
-            request.auth.uid == resource.data.senderId &&
-            onlyChangedKeysInMessage(['deletedFor']) &&
-            request.resource.data.deletedFor.keys().hasOnly([request.auth.uid]) &&
-            request.resource.data.deletedFor[request.auth.uid] == true
-            && fieldUnchangedInMessage('senderId') 
-            && fieldUnchangedInMessage('createdAt') 
-            && fieldUnchangedInMessage('rateKey')
-          )
-          ||
-          // For-Both delete (tombstone)
-          (
-            request.auth.uid == resource.data.senderId &&
-            request.resource.data.tombstone.active == true &&
-            ( !('tombstone' in resource.data) || resource.data.tombstone.active == false ) &&
-            request.resource.data.tombstone.by == request.auth.uid &&
-            request.resource.data.tombstone.at == request.time
-            && fieldUnchangedInMessage('senderId') 
-            && fieldUnchangedInMessage('createdAt') 
-            && fieldUnchangedInMessage('rateKey')
-          )
-          ||
-          // Edit message
-          (
-            request.auth.uid == resource.data.senderId &&
-            // yeni içerik: text veya storage media veya harici media
-            (
-              (request.resource.data.text != null) ||
-              (request.resource.data.media != null) ||
-              (request.resource.data.mediaExternal != null)
-            )
-            &&
-            // tombstone sonrası düzenleme yasak
-            (
-              !('tombstone' in resource.data) || resource.data.tombstone.active == false
-            )
-            &&
-            withinEditWindowForMessage()
-            &&
-            // edited bayrakları
-            request.resource.data.edited.active == true &&
-            request.resource.data.edited.at == request.time &&
-            request.resource.data.edited.by == request.auth.uid &&
-            (
-              !('edited' in resource.data)
-              || request.resource.data.edited.version == (resource.data.edited.version + 1)
-              || (resource.data.edited.version == null && request.resource.data.edited.version == 1)
-            )
-            &&
-            // immutable alanlar
-            fieldUnchangedInMessage('senderId') 
-            && fieldUnchangedInMessage('createdAt') 
-            && fieldUnchangedInMessage('rateKey')
-            &&
-            // editAllowedUntil değiştirilemez
-            fieldUnchangedInMessage('editAllowedUntil')
-            &&
-            // Eğer harici medya düzenleniyorsa yine güvenli onay zorunlu
-            (
-              (request.resource.data.mediaExternal == null) || (
-                request.resource.data.mediaExternal.safe == true &&
-                allowedHost(request.resource.data.mediaExternal.originDomain)
-              )
-            )
-          )
-        );
-
-        allow delete: if isMemberOfConversation(cid) && request.auth.uid == resource.data.senderId;
-      }
-    }
-
-    // ====================================================================
-    // COMPETITIONS - Yarışma Sistemi
-    // ====================================================================
-    
-    // Kategori kontrolü
-    function cat(catId) { 
-      return get(/databases/$(database)/documents/categories/$(catId)).data; 
-    }
-    
-    function comp(compId) { 
-      return get(/databases/$(database)/documents/competitions/$(compId)).data; 
-    }
-    
-    // Yarışma durum & zaman kontrolü
-    function isLive(c) { 
-      return c.status == "live" && request.time >= c.startAt && request.time <= c.endAt; 
-    }
-    
-    function beforeEnd(c) { 
-      return request.time <= c.endAt; 
-    }
-    
-    function isPublic(c) { 
-      return c.visibility == "public"; 
-    }
-    
-    // Yarışma kategorisine admin mi?
-    function isCompetitionAdmin(compData) {
-      return isSuperAdmin() || canModerateCategory(compData.categoryId);
-    }
-
-    // Categories (Yarışma Kategorileri)
-    match /categories/{categoryId} {
-      allow read: if true; // Kategori isimleri herkese açık
-      allow create: if isSuperAdmin();
-      allow update, delete: if canModerateCategory(categoryId);
-    }
-
-    // Competitions (Yarışmalar)
-    match /competitions/{compId} {
-      // Okuma: public yarışmalar herkes, private sadece adminler
-      allow read: if isPublic(resource.data)
-                   || isCompetitionAdmin(resource.data)
-                   || (isSignedIn() && resource.data.createdBy == request.auth.uid);
-
-      // Oluşturma: sadece süper admin veya kategori admini
-      allow create: if isSignedIn()
-        && (isSuperAdmin() || canModerateCategory(request.resource.data.categoryId))
-        && request.resource.data.keys().hasOnly([
-            'title','description','categoryId','subCategoryId','type',
-            'status','startAt','endAt','visibility','createdAt','createdBy',
-            'prize','entryLimitPerUser','requiresApproval','options',
-            'participantCount','totalVotes','winnerId'
-           ])
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.visibility.matches('^(public|private)$')
-        && request.resource.data.type.matches('^(prediction|vote|quiz|upload|tournament)$')
-        && request.resource.data.status.matches('^(draft|live|finished|archived)$')
-        && request.resource.data.startAt < request.resource.data.endAt
-        && request.resource.data.prize.currency == 'CG' 
-        && request.resource.data.prize.amount is number 
-        && request.resource.data.prize.amount >= 0;
-
-      // Güncelleme: sadece adminler, bazı alanlar değişmez
-      allow update: if isSignedIn()
-        && isCompetitionAdmin(resource.data)
-        && (
-              // Değişmez alanlar
-              resource.data.categoryId == request.resource.data.categoryId
-              && resource.data.type == request.resource.data.type
-              && resource.data.prize == request.resource.data.prize
-              && resource.data.startAt == request.resource.data.startAt
-           || resource.data.status == "draft"
-           )
-        // Durum geçişleri: draft -> live -> finished -> archived
-        && (
-              (resource.data.status == "draft" && request.resource.data.status in ["draft","live"]) ||
-              (resource.data.status == "live" && request.resource.data.status in ["live","finished"]) ||
-              (resource.data.status == "finished" && request.resource.data.status in ["finished","archived"]) ||
-              (resource.data.status == "archived" && request.resource.data.status == "archived")
-           )
-        && request.resource.data.startAt < request.resource.data.endAt;
-
-      // Silme: sadece süper admin
-      allow delete: if isSuperAdmin();
-
-      // Competition Entries (Upload yarışma katılımları)
-      match /entries/{entryId} {
-        function C() { return comp(compId); }
-
-        // Okuma: onaylı olanlar herkes, owner kendi entry'si, adminler her şey
-        allow read: if (resource.data.status == "approved" && isPublic(C()))
-                     || (isSignedIn() && resource.data.ownerId == request.auth.uid)
-                     || isCompetitionAdmin(C());
-
-        // Oluşturma: upload tipinde, live, kişi başı 1 (entryId=uid)
-        allow create: if isSignedIn()
-          && C().type == "upload"
-          && isLive(C())
-          && beforeEnd(C())
-          && entryId == request.auth.uid
-          && request.resource.data.keys().hasOnly(['ownerId','caption','mediaRefs','status','createdAt','votes'])
-          && request.resource.data.ownerId == request.auth.uid
-          && request.resource.data.status == "pending"
-          && request.resource.data.mediaRefs.size() > 0
-          && request.resource.data.mediaRefs.size() <= 10;
-
-        // Güncelleme: owner caption/media düzenler, admin status değiştirir
-        allow update: if isSignedIn()
-          && (
-                (resource.data.ownerId == request.auth.uid
-                 && beforeEnd(C())
-                 && request.resource.data.status == resource.data.status
-                 && request.resource.data.ownerId == resource.data.ownerId)
-                ||
-                (isCompetitionAdmin(C())
-                 && request.resource.data.status.matches('^(pending|approved|rejected)$'))
-             );
-
-        // Silme: owner bitişe kadar, admin her zaman
-        allow delete: if (isSignedIn() && resource.data.ownerId == request.auth.uid && beforeEnd(C()))
-                       || isCompetitionAdmin(C());
-      }
-
-      // Competition Votes (Oylama - kişi başı 1)
-      match /votes/{voteUid} {
-        function C() { return comp(compId); }
-
-        allow read: if isSignedIn() && (voteUid == request.auth.uid || isCompetitionAdmin(C()));
-
-        allow create: if isSignedIn()
-          && C().type == "vote" 
-          && isLive(C()) 
-          && voteUid == request.auth.uid
-          && request.resource.data.keys().hasOnly(['optionId','createdAt'])
-          && request.resource.data.optionId is string
-          && !exists(/databases/$(database)/documents/competitions/$(compId)/votes/$(request.auth.uid));
-
-        allow update: if false; // Oy değiştirme kapalı
-        
-        allow delete: if isSignedIn() && voteUid == request.auth.uid && beforeEnd(C());
-      }
-
-      // Competition Predictions (Tahmin - kişi başı 1)
-      match /predictions/{predUid} {
-        function C() { return comp(compId); }
-
-        allow read: if isSignedIn() && (predUid == request.auth.uid || isCompetitionAdmin(C()));
-
-        allow create: if isSignedIn()
-          && C().type == "prediction" 
-          && isLive(C()) 
-          && predUid == request.auth.uid
-          && request.resource.data.keys().hasOnly(['prediction','createdAt'])
-          && !exists(/databases/$(database)/documents/competitions/$(compId)/predictions/$(request.auth.uid));
-
-        allow update: if false;
-        
-        allow delete: if isSignedIn() && predUid == request.auth.uid && beforeEnd(C());
-      }
-
-      // Competition Quiz Answers (Kişi başı 1)
-      match /quizAnswers/{qaUid} {
-        function C() { return comp(compId); }
-
-        allow read: if isSignedIn() && (qaUid == request.auth.uid || isCompetitionAdmin(C()));
-
-        allow create: if isSignedIn()
-          && C().type == "quiz" 
-          && isLive(C()) 
-          && qaUid == request.auth.uid
-          && request.resource.data.keys().hasOnly(['answers','createdAt'])
-          && !('score' in request.resource.data)
-          && !exists(/databases/$(database)/documents/competitions/$(compId)/quizAnswers/$(request.auth.uid));
-
-        allow update: if false;
-        
-        allow delete: if isSignedIn() && qaUid == request.auth.uid && beforeEnd(C());
-      }
-    }
-
-    // ====================================================================
-    // CONFIG - External Media Allowlist & System Configuration
-    // ====================================================================
-    
-    /* ---- Config dokümanı (allowlist) sadece admin/superadmin yazar ---- */
-    match /config/{docId} {
-      allow read: if emailVerified();
-      allow write: if isSuperAdmin() || isModerator();
-    }
-
-    // ====================================================================
-    // DEFAULT RULE - Deny everything else
-    // ====================================================================
-    
     match /{document=**} {
       allow read, write: if false;
     }

@@ -85,8 +85,8 @@ class _TryOnPreviewSheetState extends State<TryOnPreviewSheet> {
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
           color: widget.item.artwork.colors.isNotEmpty
-              ? widget.item.artwork.colors.last.withValues(alpha: 0.45)
-              : Colors.white.withValues(alpha: 0.12),
+              ? widget.item.artwork.colors.last.withOpacity(0.45)
+              : Colors.white.withOpacity(0.12),
         ),
       ),
       child: SafeArea(
@@ -118,7 +118,7 @@ class _TryOnPreviewSheetState extends State<TryOnPreviewSheet> {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
+            color: Colors.white.withOpacity(0.08),
             borderRadius: BorderRadius.circular(14),
           ),
           child: const Icon(Icons.visibility_outlined, color: Colors.white),
@@ -140,7 +140,7 @@ class _TryOnPreviewSheetState extends State<TryOnPreviewSheet> {
               Text(
                 'Deneme süresi: $remainingText',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7),
+                  color: Colors.white.withOpacity(0.7),
                   fontSize: 13,
                 ),
               ),
@@ -163,7 +163,7 @@ class _TryOnPreviewSheetState extends State<TryOnPreviewSheet> {
           child: Container(
             height: 220,
             width: double.infinity,
-            color: Colors.white.withValues(alpha: 0.05),
+            color: Colors.white.withOpacity(0.05),
             child: hasImages
                 ? PageView.builder(
                     controller: _pageController,
@@ -189,7 +189,7 @@ class _TryOnPreviewSheetState extends State<TryOnPreviewSheet> {
             effect: ExpandingDotsEffect(
               dotHeight: 6,
               dotWidth: 6,
-              dotColor: Colors.white.withValues(alpha: 0.25),
+              dotColor: Colors.white.withOpacity(0.25),
               activeDotColor: Colors.white,
             ),
           ),
@@ -203,7 +203,7 @@ class _TryOnPreviewSheetState extends State<TryOnPreviewSheet> {
       child: Icon(
         Icons.image_not_supported_outlined,
         size: 48,
-        color: Colors.white.withValues(alpha: 0.3),
+  color: Colors.white.withOpacity(0.3),
       ),
     );
   }
@@ -273,14 +273,14 @@ class _TryOnPreviewSheetState extends State<TryOnPreviewSheet> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
+  color: Colors.white.withOpacity(0.08),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+  border: Border.all(color: Colors.white.withOpacity(0.12)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: Colors.white.withValues(alpha: 0.9)),
+          Icon(icon, size: 16, color: Colors.white.withOpacity(0.9)),
           const SizedBox(width: 6),
           Text(
             label,
@@ -325,7 +325,7 @@ class _TryOnPreviewSheetState extends State<TryOnPreviewSheet> {
           child: TextButton(
             onPressed: () => Navigator.of(context).maybePop(),
             style: TextButton.styleFrom(
-              foregroundColor: Colors.white.withValues(alpha: 0.8),
+              foregroundColor: Colors.white.withOpacity(0.8),
             ),
             child: const Text('Kapat'),
           ),

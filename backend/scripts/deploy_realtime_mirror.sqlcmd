@@ -1,0 +1,28 @@
+/*
+  Deployment bundle: Realtime Mirror schema + stored procedures
+
+  Usage examples:
+    sqlcmd -S localhost,1433 -d CringeBank -U sa -P "<AdminPassword>" -b -i deploy_realtime_mirror.sqlcmd
+    sqlcmd -S localhost,1433 -d CringeBank -G -b -i deploy_realtime_mirror.sqlcmd
+
+  Requirements:
+    - Run from the `backend/scripts` directory (paths are relative).
+    - Database context must already exist (see provision_sql.sql).
+    - sqlcmd version >= 15 recommended for UTF-8 support.
+*/
+
+:on error exit
+GO
+
+PRINT '🚀 Starting realtime mirror deployment bundle';
+GO
+
+:r .\migrations\20251008_07_create_dm_follow_mirror_tables.sql
+:r .\stored_procedures\sp_StoreMirror_UpsertDmConversation.sql
+:r .\stored_procedures\sp_StoreMirror_UpsertDmMessage.sql
+:r .\stored_procedures\sp_StoreMirror_DeleteDmMessage.sql
+:r .\stored_procedures\sp_StoreMirror_UpsertFollowEdge.sql
+:r .\stored_procedures\sp_StoreMirror_DeleteFollowEdge.sql
+
+PRINT '✅ Realtime mirror deployment bundle completed.';
+GO

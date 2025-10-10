@@ -7,7 +7,7 @@ import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 import '../models/competition_model.dart';
 import '../services/competition_service.dart';
-import '../widgets/animated_bubble_background.dart';
+import '../widgets/cringe_default_background.dart';
 import 'modern_cringe_deposit_screen.dart';
 
 class ModernCompetitionsScreen extends StatefulWidget {
@@ -92,7 +92,7 @@ class _ModernCompetitionsScreenState extends State<ModernCompetitionsScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: AnimatedBubbleBackground(
+      body: CringeDefaultBackground(
         child: SafeArea(
           child: Column(
             children: [

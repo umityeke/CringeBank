@@ -6,8 +6,30 @@ const { google } = require('googleapis');
 const twilio = require('twilio');
 const userSync = require('./user_sync');
 const { PolicyEvaluator } = require('./rbac');
+const { createSearchUsersHandler } = require('./search_users');
+const { createFollowPreviewHandler } = require('./follow_preview');
+const { createEnsureSqlUserHandler } = require('./ensure_user');
+const { createCallableProcedure, listProcedureKeys } = require('./sql_gateway');
+const realtimeMirror = require('./realtime_mirror');
+const { createOnUserCreatedHandler, createOnUserDeletedHandler } = require('./user_sync_triggers');
+const { dailyWalletConsistencyCheck } = require('./scheduled/wallet_consistency_check');
+const { hourlyMetricsCollection } = require('./scheduled/metrics_collection');
 
 admin.initializeApp();
+
+const isFunctionsEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
+const isHostedRuntime = Boolean(process.env.K_SERVICE || process.env.FUNCTION_TARGET);
+const allowProdFlag = process.env.ALLOW_PROD === 'true';
+// Jest loads this module directly during unit tests; treat that runtime as safe to bypass the
+// hosted/emulator guard so tests can execute without requiring ALLOW_PROD.
+const isUnitTestRuntime =
+  process.env.NODE_ENV === 'test' || typeof process.env.JEST_WORKER_ID !== 'undefined';
+
+if (!isFunctionsEmulator && !isHostedRuntime && !isUnitTestRuntime && !allowProdFlag) {
+  throw new Error(
+    'Prod kapalı: Emülatör dışında çalıştırma engellendi. ALLOW_PROD=true ile bilinçli olarak onaylayın.',
+  );
+}
 
 const OTP_EXPIRY_MINUTES = 10;
 const MAX_ATTEMPTS = 5;
@@ -27,6 +49,32 @@ const TRY_ON_CONSTANTS = Object.freeze({
 });
 
 const normalizeItemId = (value) => (value ?? '').toString().trim();
+
+const parseBoolean = (value, defaultValue = false) => {
+  if (value === undefined || value === null) {
+    return defaultValue;
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(normalized)) {
+      return true;
+    }
+    if (['false', '0', 'no', 'off'].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return defaultValue;
+};
 
 const ensureAuthenticatedContext = (context) => {
   if (!context.auth?.uid) {
@@ -152,6 +200,61 @@ exports.rbacCheckPermission = functions.https.onCall(async (data, context) => {
   };
 });
 
+// ====================================================================
+// REALTIME MIRROR TRIGGERS
+// ====================================================================
+
+exports.mirrorDmMessages = functions.firestore
+  .document('conversations/{conversationId}/messages/{messageId}')
+  .onWrite(async (change, context) => {
+    await realtimeMirror.handleDmMessageChange(change, context);
+  });
+
+exports.mirrorDmConversations = functions.firestore
+  .document('conversations/{conversationId}')
+  .onWrite(async (change, context) => {
+    await realtimeMirror.handleDmConversationChange(change, context);
+  });
+
+exports.mirrorFollowEdges = functions.firestore
+  .document('follows/{userId}/targets/{targetId}')
+  .onWrite(async (change, context) => {
+    await realtimeMirror.handleFollowEdgeChange(change, context);
+  });
+
+// Dakikalık cron tetikleyicisi ile Service Bus kuyruğunu boşaltarak SQL aynasını güncel tutar.
+exports.drainRealtimeMirrorQueue = functions
+  .runWith({ timeoutSeconds: 540, memory: '512MB' })
+  .pubsub.schedule('every 1 minutes')
+  .onRun(async () => {
+    let drainer = null;
+
+    try {
+      const config = realtimeMirror.readRealtimeMirrorConfig();
+
+      if (!config.featureFlags.writeMirrorEnabled) {
+        functions.logger.info('realtimeMirror.drainer_skipped', {
+          reason: 'write_mirror_disabled',
+        });
+        return null;
+      }
+
+      drainer = realtimeMirror.createRealtimeMirrorDrainer({ config });
+      const stats = await drainer.drain();
+      functions.logger.info('realtimeMirror.drainer_completed', stats);
+      return stats;
+    } catch (error) {
+      functions.logger.error('realtimeMirror.drainer_error', {
+        error: error?.message,
+      });
+      throw error;
+    } finally {
+      if (drainer) {
+        await drainer.close();
+      }
+    }
+  });
+
 const validateOtpCode = (code) => {
   const normalized = (code ?? '').toString().trim();
 
@@ -188,17 +291,32 @@ const getSmtpConfig = () => {
   const config = functions.config();
   const smtpHost = config.smtp?.host || process.env.SMTP_HOST;
   const smtpPortRaw = config.smtp?.port || process.env.SMTP_PORT;
-  const smtpUser = config.smtp?.user || process.env.SMTP_USER;
-  const smtpPassword = config.smtp?.password || process.env.SMTP_PASSWORD;
+  let smtpUser = config.smtp?.user || process.env.SMTP_USER;
+  const smtpPassword =
+    config.smtp?.password || process.env.SMTP_PASSWORD || process.env.SMTP_APP_PASSWORD;
   const fromEmail = config.smtp?.from_email || process.env.SMTP_FROM_EMAIL;
   const fromName = config.smtp?.from_name || process.env.SMTP_FROM_NAME || 'Cringe Bankası';
 
+  if (!smtpUser && fromEmail) {
+    smtpUser = fromEmail;
+  }
+
   const smtpPort = smtpPortRaw ? Number(smtpPortRaw) : 587;
+
+  const requireTls = parseBoolean(
+    config.smtp?.require_tls ?? process.env.SMTP_REQUIRE_TLS,
+    smtpPort !== 465,
+  );
+
+  const disableTlsVerification = parseBoolean(
+    config.smtp?.disable_tls_verification ?? process.env.SMTP_DISABLE_TLS_VERIFICATION,
+    false,
+  );
 
   if (!smtpHost || !smtpUser || !smtpPassword || !fromEmail) {
     throw new functions.https.HttpsError(
       'failed-precondition',
-      'SMTP ayarları eksik. host, user, password ve from_email gerekli.'
+      'SMTP ayarları eksik. host, user, password ve from_email gerekli.',
     );
   }
 
@@ -209,6 +327,114 @@ const getSmtpConfig = () => {
     smtpPassword,
     fromEmail,
     fromName,
+    requireTls,
+    disableTlsVerification,
+  };
+};
+
+const mapSmtpErrorToHttpsError = (error) => {
+  const errorCode = error?.code ?? null;
+  const responseCode = error?.responseCode ?? null;
+  const message = (error?.message ?? '').toString();
+  const normalizedMessage = message.toLowerCase();
+  const responseBodyMessage = error?.response?.body?.errors?.[0]?.message ?? null;
+
+  const baseDetails = {
+    errorCode,
+    responseCode,
+    command: error?.command ?? null,
+    response: error?.response ?? null,
+    message,
+    providerMessage: responseBodyMessage,
+  };
+
+  const authCodes = new Set([530, 534, 535, 454, 432]);
+  const connectionCodes = new Set([
+    'ECONNECTION',
+    'ETIMEDOUT',
+    'ESOCKET',
+    'ECONNREFUSED',
+    'ENOTFOUND',
+    'EAI_AGAIN',
+    'ECONNRESET',
+    'EPIPE',
+    'ENETUNREACH',
+    'EHOSTUNREACH',
+  ]);
+
+  if (
+    errorCode === 'EAUTH' ||
+    errorCode === 'EAUTHENTICATION' ||
+    (typeof responseCode === 'number' && authCodes.has(responseCode)) ||
+    normalizedMessage.includes('invalid login') ||
+    normalizedMessage.includes('authentication failed')
+  ) {
+    return {
+      code: 'failed-precondition',
+      message:
+        'SMTP kimlik bilgileri doğrulanamadı. Lütfen kullanıcı adı ve parola (veya uygulama şifresi) ayarlarını kontrol edin.',
+      details: {
+        ...baseDetails,
+        reason: 'auth',
+      },
+      logContext: baseDetails,
+    };
+  }
+
+  if (
+    (typeof errorCode === 'string' && connectionCodes.has(errorCode)) ||
+    normalizedMessage.includes('timed out') ||
+    normalizedMessage.includes('connect') ||
+    normalizedMessage.includes('socket') ||
+    normalizedMessage.includes('hang up')
+  ) {
+    return {
+      code: 'unavailable',
+      message: 'SMTP sunucusuna bağlanılamadı. Sunucu adresini, portu ve ağ erişimini kontrol edin.',
+      details: {
+        ...baseDetails,
+        reason: 'connection',
+      },
+      logContext: baseDetails,
+    };
+  }
+
+  if (
+    errorCode === 'EENVELOPE' ||
+    normalizedMessage.includes('recipient address rejected') ||
+    normalizedMessage.includes('invalid address')
+  ) {
+    return {
+      code: 'invalid-argument',
+      message: 'SMTP sunucusu e-posta adresini reddetti. Lütfen e-posta adresinin geçerli olduğundan emin olun.',
+      details: {
+        ...baseDetails,
+        reason: 'envelope',
+      },
+      logContext: baseDetails,
+    };
+  }
+
+  if (responseBodyMessage) {
+    return {
+      code: 'internal',
+      message: responseBodyMessage,
+      details: {
+        ...baseDetails,
+        reason: 'provider',
+      },
+      logContext: baseDetails,
+    };
+  }
+
+  return {
+    code: 'internal',
+    message: 'Doğrulama e-postası gönderilemedi. Lütfen daha sonra tekrar deneyin.',
+    details: {
+      ...baseDetails,
+      reason: 'unknown',
+    },
+    logContext: baseDetails,
   };
 };
 
@@ -220,17 +446,35 @@ const sendOtpCore = async (rawEmail) => {
   }
 
   const normalizedEmail = normalizeEmail(trimmedEmail);
-  const { smtpHost, smtpPort, smtpUser, smtpPassword, fromEmail, fromName } = getSmtpConfig();
+  const {
+    smtpHost,
+    smtpPort,
+    smtpUser,
+    smtpPassword,
+    fromEmail,
+    fromName,
+    requireTls,
+    disableTlsVerification,
+  } = getSmtpConfig();
 
-  const transporter = nodemailer.createTransport({
+  const transporterOptions = {
     host: smtpHost,
     port: smtpPort,
     secure: smtpPort === 465,
+    requireTLS: requireTls,
     auth: {
       user: smtpUser,
       pass: smtpPassword,
     },
-  });
+  };
+
+  if (disableTlsVerification) {
+    transporterOptions.tls = {
+      rejectUnauthorized: false,
+    };
+  }
+
+  const transporter = nodemailer.createTransport(transporterOptions);
 
   const code = generateOtpCode();
   const expiresAt = admin.firestore.Timestamp.fromDate(
@@ -275,13 +519,17 @@ const sendOtpCore = async (rawEmail) => {
       error: error?.response?.body ?? error?.message ?? error,
       statusCode: error?.code ?? error?.response?.statusCode,
     };
-    functions.logger.error('OTP e-postası gönderilemedi', logPayload);
+    const mappedError = mapSmtpErrorToHttpsError(error);
+    functions.logger.error('OTP e-postası gönderilemedi', {
+      ...logPayload,
+      errorCode: mappedError.details?.errorCode ?? null,
+      responseCode: mappedError.details?.responseCode ?? null,
+    });
 
-    const detailsMessage = error?.response?.body?.errors?.[0]?.message ?? error?.message;
     throw new functions.https.HttpsError(
-      'internal',
-      'Doğrulama e-postası gönderilemedi.',
-      detailsMessage,
+      mappedError.code,
+      mappedError.message,
+      mappedError.details,
     );
   }
 
@@ -755,7 +1003,7 @@ exports.verifyEmailOtpHttp = functions.region('europe-west1').https.onRequest(as
   if (req.method !== 'POST') {
     res.status(405).json({
       error: 'method-not-allowed',
-      message: 'Bu uç noktaya yalnızca POST isteği yapılabilir.',
+      message: 'Bu uç nokta yalnızca POST isteklerini kabul eder.',
     });
     return;
   }
@@ -1302,6 +1550,8 @@ exports.iapRefundWebhook = functions
         });
       });
 
+      exports.searchUsers = createSearchUsersHandler(admin);
+
       res.status(200).json({ success: true });
     } catch (error) {
       functions.logger.error('iapRefundWebhook failed', {
@@ -1715,14 +1965,183 @@ exports.deleteCompetition = adminOps.deleteCompetition;
 const setupAdmin = require('./setupAdmin');
 exports.grantSuperAdminOnce = setupAdmin.grantSuperAdminOnce;
 
-// Direct Messaging Functions
+// Direct Messaging Functions (Legacy - Firestore only)
 const messagingFunctions = require('./messaging_functions');
 exports.createConversation = messagingFunctions.createConversation;
-exports.sendMessage = messagingFunctions.sendMessage;
+// exports.sendMessage = messagingFunctions.sendMessage; // Replaced by dmSendMessage (dual-write)
 exports.editMessage = messagingFunctions.editMessage;
 exports.deleteMessage = messagingFunctions.deleteMessage;
 exports.setReadPointer = messagingFunctions.setReadPointer;
 
+// Direct Messaging Functions (New - SQL + Firestore dual-write)
+const dmFunctions = require('./dm/send_message');
+const dmGetMessages = require('./dm/get_messages');
+const dmMarkAsRead = require('./dm/mark_as_read');
+const dmGetConversations = require('./dm/get_conversations');
+exports.dmSendMessage = dmFunctions.sendMessage;
+exports.dmGetMessages = dmGetMessages.getMessages;
+exports.dmMarkAsRead = dmMarkAsRead.markAsRead;
+exports.dmGetConversations = dmGetConversations.getConversations;
+
+// Timeline Functions (SQL + Firestore dual-write)
+const timelineCreateEvent = require('./timeline/create_event');
+const timelineGetFeed = require('./timeline/get_feed');
+const timelineMarkAsRead = require('./timeline/mark_as_read');
+const timelineFollowUser = require('./timeline/follow_user');
+exports.timelineCreateEvent = timelineCreateEvent.createEvent;
+exports.timelineGetUserFeed = timelineGetFeed.getUserFeed;
+exports.timelineMarkAsRead = timelineMarkAsRead.markAsRead;
+exports.timelineFollowUser = timelineFollowUser.followUser;
+
+// Analytics Functions (Scheduled Jobs + API Endpoints)
+const analyticsJobs = require('./analytics/scheduled_jobs');
+const analyticsApi = require('./analytics/get_analytics');
+// Scheduled jobs
+exports.aggregateUserDailyStats = analyticsJobs.aggregateUserDailyStats;
+exports.updateEngagementScores = analyticsJobs.updateEngagementScores;
+exports.detectTrendingContent = analyticsJobs.detectTrendingContent;
+exports.collectSystemMetrics = analyticsJobs.collectSystemMetrics;
+exports.refreshRecommendationCache = analyticsJobs.refreshRecommendationCache;
+// API endpoints
+exports.analyticsGetUserStats = analyticsApi.getUserStats;
+exports.analyticsGetTrendingContent = analyticsApi.getTrendingContent;
+exports.analyticsGetFollowRecommendations = analyticsApi.getFollowRecommendations;
+exports.analyticsGetSystemAnalytics = analyticsApi.getSystemAnalytics;
+exports.analyticsGetUserLeaderboard = analyticsApi.getUserLeaderboard;
+exports.analyticsRefreshMyEngagementScore = analyticsApi.refreshMyEngagementScore;
+
+// Cringe Store callable fonksiyonları
+Object.assign(exports, require('./cringe_store_functions'));
+
 // User synchronization & claims management
 exports.syncUserClaimsOnUserWrite = userSync.syncUserClaimsOnUserWrite;
 exports.refreshUserClaims = userSync.refreshUserClaims;
+
+// ============================================================================
+// USERNAME CHECK - Validate username availability
+// ============================================================================
+exports.usernameCheck = functions
+  .region('europe-west1')
+  .https.onCall(async (data, context) => {
+    const username = (data?.username ?? '').toString().trim().toLowerCase();
+
+    if (!username) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Kullanıcı adı gerekli.'
+      );
+    }
+
+    // Basic validation rules (sync with client-side UsernamePolicies)
+    const minLength = 3;
+    const maxLength = 20;
+    const validPattern = /^[a-z0-9._]+$/;
+
+    const reasons = [];
+    let isValid = true;
+
+    if (username.length < minLength) {
+      isValid = false;
+      reasons.push(`Kullanıcı adı en az ${minLength} karakter olmalı.`);
+    }
+
+    if (username.length > maxLength) {
+      isValid = false;
+      reasons.push(`Kullanıcı adı en fazla ${maxLength} karakter olabilir.`);
+    }
+
+    if (!validPattern.test(username)) {
+      isValid = false;
+      reasons.push('Kullanıcı adı sadece küçük harf, rakam, nokta ve alt çizgi içerebilir.');
+    }
+
+    if (username.startsWith('.') || username.endsWith('.')) {
+      isValid = false;
+      reasons.push('Kullanıcı adı nokta ile başlayamaz veya bitemez.');
+    }
+
+    if (username.includes('..')) {
+      isValid = false;
+      reasons.push('Kullanıcı adında ardışık nokta kullanılamaz.');
+    }
+
+    // If format is invalid, return early
+    if (!isValid) {
+      return {
+        valid: false,
+        available: false,
+        reasons,
+      };
+    }
+
+    // Check availability in Firestore
+    try {
+      const usersRef = admin.firestore().collection('users');
+      const snapshot = await usersRef
+        .where('username', '==', username)
+        .limit(1)
+        .get();
+
+      const isAvailable = snapshot.empty;
+
+      // If authenticated user is checking their own current username, consider it available
+      const currentUid = context.auth?.uid;
+      if (currentUid && !snapshot.empty) {
+        const doc = snapshot.docs[0];
+        if (doc.id === currentUid) {
+          return {
+            valid: true,
+            available: true,
+            reasons: [],
+          };
+        }
+      }
+
+      if (!isAvailable) {
+        reasons.push('Bu kullanıcı adı zaten kullanılıyor.');
+      }
+
+      return {
+        valid: true,
+        available: isAvailable,
+        reasons,
+      };
+    } catch (error) {
+      console.error('usernameCheck error:', error);
+      throw new functions.https.HttpsError(
+        'internal',
+        'Kullanıcı adı kontrolü sırasında hata oluştu.'
+      );
+    }
+  });
+
+function registerSqlGatewayCallables(targetExports) {
+  const hasOwn = Object.prototype.hasOwnProperty;
+  const procedureKeys = listProcedureKeys().slice().sort();
+
+  for (const key of procedureKeys) {
+    if (typeof key !== 'string' || key.length === 0) {
+      continue;
+    }
+
+    const suffix = key.charAt(0).toUpperCase() + key.slice(1);
+    const exportName = `sqlGateway${suffix}`;
+
+    if (hasOwn.call(targetExports, exportName)) {
+      continue;
+    }
+
+    targetExports[exportName] = createCallableProcedure(key);
+  }
+}
+
+exports.searchUsers = createSearchUsersHandler(admin);
+exports.getFollowingPreview = createFollowPreviewHandler(admin);
+exports.ensureSqlUser = createEnsureSqlUserHandler(admin);
+exports.onUserCreated = createOnUserCreatedHandler();
+exports.onUserDeleted = createOnUserDeletedHandler();
+registerSqlGatewayCallables(exports);
+
+// Scheduled Functions (Monitoring & Alerts)
+exports.dailyWalletConsistencyCheck = dailyWalletConsistencyCheck;
+exports.hourlyMetricsCollection = hourlyMetricsCollection;

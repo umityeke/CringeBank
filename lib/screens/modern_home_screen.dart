@@ -8,7 +8,7 @@ import '../screens/direct_message_thread_screen.dart';
 import '../screens/direct_messages_screen.dart';
 import '../services/cringe_entry_service.dart';
 import '../services/user_service.dart';
-import '../widgets/animated_bubble_background.dart';
+import '../widgets/cringe_default_background.dart';
 import '../widgets/modern_cringe_card.dart';
 import '../utils/entry_actions.dart';
 
@@ -30,13 +30,21 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
   String? _selectedMood;
   static const double _headerExpandedHeight = 95;
   final Set<String> _deletingEntryIds = <String>{};
+  late Stream<List<CringeEntry>> _entriesStream;
 
   static const List<_MoodCategory> _moodCategories = [];
 
   @override
   void initState() {
     super.initState();
+    _entriesStream = CringeEntryService.instance.entriesStream;
     _initializeUserStream();
+  }
+
+  void _refreshEntriesStream() {
+    setState(() {
+      _entriesStream = CringeEntryService.instance.entriesStream;
+    });
   }
 
   @override
@@ -94,52 +102,13 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: Colors.black,
-      body: AnimatedBubbleBackground(
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF121B2E), Color(0xFF090C14)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: -120,
-              left: -80,
-              child: Container(
-                width: 240,
-                height: 240,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.orange.withValues(alpha: 0.18),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -100,
-              right: -60,
-              child: Container(
-                width: 220,
-                height: 220,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.pinkAccent.withValues(alpha: 0.12),
-                ),
-              ),
-            ),
-            CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                _buildHeaderAppBar(),
-                _buildFeedHeaderSliver(),
-                _buildPostsFeed(),
-              ],
-            ),
+      body: CringeDefaultBackground(
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            _buildHeaderAppBar(),
+            _buildFeedHeaderSliver(),
+            _buildPostsFeed(),
           ],
         ),
       ),
@@ -218,7 +187,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                   height: 240,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.orange.withValues(alpha: 0.12),
+                    color: Colors.orange.withOpacity(0.12),
                   ),
                 ),
               ),
@@ -230,7 +199,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                   height: 260,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFF4FC3F7).withValues(alpha: 0.08),
+                    color: const Color(0xFF4FC3F7).withOpacity(0.08),
                   ),
                 ),
               ),
@@ -543,7 +512,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.64),
+                                    color: Colors.white.withOpacity(0.64),
                                     letterSpacing: 0.4,
                                   ),
                             ),
@@ -774,7 +743,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: colors.last.withValues(alpha: 0.38),
+            color: colors.last.withOpacity(0.38),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -803,7 +772,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
+  color: Colors.white.withOpacity(0.12),
         borderRadius: BorderRadius.circular(12),
       ),
     );
@@ -858,7 +827,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
               Text(
                 '${_selectedMood!.replaceFirst('#', '').toUpperCase()} modunda paylaşımları gösteriyoruz.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.68),
+                  color: Colors.white.withOpacity(0.68),
                   height: 1.3,
                 ),
               ),
@@ -911,8 +880,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
           gradient: isActive
               ? LinearGradient(
                   colors: [
-                    color.withValues(alpha: 0.7),
-                    color.withValues(alpha: 0.45),
+                    color.withOpacity(0.7),
+                    color.withOpacity(0.45),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -923,8 +892,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: isActive
-                ? Colors.white.withValues(alpha: 0.5)
-                : Colors.white.withValues(alpha: 0.12),
+                ? Colors.white.withOpacity(0.5)
+                : Colors.white.withOpacity(0.12),
           ),
         ),
         child: Row(
@@ -1305,7 +1274,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
 
   Widget _buildPostsFeed() {
     return StreamBuilder<List<CringeEntry>>(
-      stream: CringeEntryService.instance.entriesStream,
+      stream: _entriesStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             (!snapshot.hasData || snapshot.data!.isEmpty)) {
@@ -1352,7 +1321,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen> {
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: () => setState(() {}),
+                      onPressed: _refreshEntriesStream,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFFA726),
                         foregroundColor: Colors.black,

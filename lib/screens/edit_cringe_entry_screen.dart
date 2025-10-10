@@ -159,7 +159,7 @@ class _EditCringeEntryScreenState extends State<EditCringeEntryScreen> {
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: Colors.white.withOpacity(0.1),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
@@ -185,9 +185,9 @@ class _EditCringeEntryScreenState extends State<EditCringeEntryScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                color: AppTheme.primaryColor.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                border: Border.all(color: Colors.white.withOpacity(0.05)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,7 +223,7 @@ class _EditCringeEntryScreenState extends State<EditCringeEntryScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFF1A1A2E),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                border: Border.all(color: Colors.white.withOpacity(0.1)),
               ),
               child: DropdownButtonFormField<CringeCategory>(
                 initialValue: _selectedCategory,
@@ -272,7 +272,7 @@ class _EditCringeEntryScreenState extends State<EditCringeEntryScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFF1A1A2E),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                border: Border.all(color: Colors.white.withOpacity(0.1)),
               ),
               child: Column(
                 children: [
@@ -301,7 +301,7 @@ class _EditCringeEntryScreenState extends State<EditCringeEntryScreen> {
                     max: 10,
                     divisions: 90,
                     activeColor: _getKrepLevelColor(_krepLevel),
-                    inactiveColor: Colors.white.withValues(alpha: 0.1),
+                    inactiveColor: Colors.white.withOpacity(0.1),
                     onChanged: (value) {
                       setState(() => _krepLevel = value);
                     },
@@ -334,10 +334,10 @@ class _EditCringeEntryScreenState extends State<EditCringeEntryScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                color: AppTheme.primaryColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                  color: AppTheme.primaryColor.withOpacity(0.3),
                 ),
               ),
               child: Row(

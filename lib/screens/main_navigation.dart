@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import '../theme/app_theme.dart';
 import '../widgets/modern_bottom_navigation.dart';
 import 'modern_home_screen.dart';
@@ -7,7 +6,6 @@ import 'modern_cringe_deposit_screen.dart';
 import 'simple_profile_screen.dart';
 import 'modern_competitions_screen.dart';
 import 'modern_search_screen.dart';
-import 'admin_test_page.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -58,22 +56,6 @@ class _MainNavigationState extends State<MainNavigation> {
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
       ),
-      // 🛡️ Admin Test Panel (Development only)
-      floatingActionButton: kDebugMode
-          ? FloatingActionButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AdminTestPage(),
-                  ),
-                );
-              },
-              backgroundColor: Colors.deepPurple,
-              tooltip: 'Admin Test Panel',
-              child: const Icon(Icons.admin_panel_settings),
-            )
-          : null,
     );
   }
 }

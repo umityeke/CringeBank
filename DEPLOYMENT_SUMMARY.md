@@ -8,6 +8,7 @@
 ## ✅ Tamamlanan Adımlar
 
 ### 1. Firebase Security Rules
+
 - ✅ **Firestore Rules** - Deploy edildi
   - Conversations: ✅
   - Messages: ✅ (edit, delete, external media support)
@@ -23,12 +24,14 @@
   - Online status: ✅
 
 ### 2. Cloud Functions
+
 - ✅ **sendMessage** (us-central1) - ACTIVE
 - ✅ **editMessage** (us-central1) - ACTIVE
 - ✅ **deleteMessage** (us-central1) - ACTIVE
 - ✅ **setReadPointer** (us-central1) - ACTIVE
 
 ### 3. Code Implementation
+
 - ✅ `messaging_functions.js` - 4 Cloud Function
 - ✅ External URL validation helper functions
 - ✅ Allowlist domain checking
@@ -46,15 +49,18 @@
 Firebase Console açıldı (tarayıcıda). Şu adımları takip et:
 
 #### Adım 1: Collection Oluştur
+
 1. **Collection ID**: `config` yazıp "Next"
 
 #### Adım 2: Document Oluştur
+
 1. **Document ID**: `allowedMediaHosts` yazıp
 2. **Field** ekle:
    - **Field name**: `hosts`
    - **Field type**: `array` seç
    - **Array values**: Şu domain'leri ekle (her biri string):
-     ```
+
+     ```text
      imgur.com
      i.imgur.com
      youtube.com
@@ -65,11 +71,14 @@ Firebase Console açıldı (tarayıcıda). Şu adımları takip et:
      ```
 
 #### Adım 3: Opsiyonel Metadata
+
 Ek field'lar (opsiyonel):
+
 - `description` (string): "Allowed domains for external media in DMs"
 - `updatedBy` (string): "admin"
 
 #### Adım 4: Save
+
 "Save" butonuna tıkla!
 
 ---
@@ -77,17 +86,20 @@ Ek field'lar (opsiyonel):
 ## 🔍 Doğrulama
 
 ### Cloud Functions Kontrolü
+
 ```powershell
 firebase functions:list
 ```
 
 **Beklenen sonuç**: 4 messaging function görünmeli:
+
 - ✅ deleteMessage (us-central1, callable)
 - ✅ editMessage (us-central1, callable)
 - ✅ sendMessage (us-central1, callable)
 - ✅ setReadPointer (us-central1, callable)
 
 ### Firestore Rules Kontrolü
+
 ```powershell
 firebase deploy --only firestore:rules --dry-run
 ```
@@ -97,7 +109,8 @@ firebase deploy --only firestore:rules --dry-run
 ### Test (Allowlist oluşturduktan sonra)
 
 Firestore Console'da kontrol:
-```
+
+```text
 config/allowedMediaHosts → hosts array var mı?
 ```
 
@@ -107,7 +120,7 @@ config/allowedMediaHosts → hosts array var mı?
 
 ### Güvenlik Katmanları
 
-```
+```text
 ┌────────────────────────────────────────┐
 │ 1. Firebase Authentication             │
 │    ✅ email_verified = true required   │
@@ -132,11 +145,13 @@ config/allowedMediaHosts → hosts array var mı?
 ### Mesaj Özellikleri
 
 #### Content Types
+
 1. **Text**: Normal metin mesajları
 2. **Media**: Firebase Storage yüklenen medya
 3. **MediaExternal**: Harici URL'ler (allowlist ile)
 
 #### Message Operations
+
 - **Send**: Content validation + blocking check + rate limit
 - **Edit**: 15 dakika window + ownership + immutable fields
 - **Delete**:
@@ -145,6 +160,7 @@ config/allowedMediaHosts → hosts array var mı?
 - **Read Pointer**: Okundu işaretleme
 
 #### Security Features
+
 - ✅ Email verification zorunlu
 - ✅ Conversation membership kontrolü
 - ✅ Bidirectional blocking
@@ -161,7 +177,8 @@ config/allowedMediaHosts → hosts array var mı?
 ## 📊 Function URLs
 
 ### Messaging Functions
-```
+
+```text
 https://us-central1-cringe-bank.cloudfunctions.net/sendMessage
 https://us-central1-cringe-bank.cloudfunctions.net/editMessage
 https://us-central1-cringe-bank.cloudfunctions.net/deleteMessage
@@ -169,7 +186,8 @@ https://us-central1-cringe-bank.cloudfunctions.net/setReadPointer
 ```
 
 ### Mevcut Functions (değişmedi)
-```
+
+```text
 https://europe-west1-cringe-bank.cloudfunctions.net/sendEmailOtpHttp
 https://europe-west1-cringe-bank.cloudfunctions.net/verifyEmailOtpHttp
 https://europe-west1-cringe-bank.cloudfunctions.net/iapRefundWebhook
@@ -181,6 +199,7 @@ https://us-central1-cringe-bank.cloudfunctions.net/grantSuperAdminOnce
 ## 🧪 Test Senaryoları
 
 ### 1. Basic Messaging ✅
+
 ```dart
 // Text mesaj gönder
 await sendMessage(conversationId: 'conv123', text: 'Merhaba!');
@@ -205,6 +224,7 @@ await sendMessage(
 ```
 
 ### 2. Edit Message ✅
+
 ```dart
 // 15 dakika içinde düzenle
 await editMessage(
@@ -215,6 +235,7 @@ await editMessage(
 ```
 
 ### 3. Delete Message ✅
+
 ```dart
 // Sadece benim için sil
 await deleteMessage(
@@ -232,6 +253,7 @@ await deleteMessage(
 ```
 
 ### 4. Security Tests ✅
+
 ```dart
 // ❌ Email verified olmayan user - REJECTED
 // ❌ Conversation member olmayan user - REJECTED
@@ -247,6 +269,7 @@ await deleteMessage(
 ## 📚 Belgeler
 
 ### Oluşturulan Dosyalar
+
 1. **functions/messaging_functions.js** - Cloud Functions implementation
 2. **docs/MESSAGING_DEPLOYMENT_COMPLETE.md** - Tam deployment guide
 3. **docs/MESSAGING_SECURITY_RULES.md** - Security rules dokümantasyonu
@@ -255,25 +278,29 @@ await deleteMessage(
 6. **database.rules.json** - RTDB rules
 
 ### Referanslar
-- Firebase Console: https://console.firebase.google.com/project/cringe-bank
-- Functions Dashboard: https://console.firebase.google.com/project/cringe-bank/functions
-- Firestore Console: https://console.firebase.google.com/project/cringe-bank/firestore
+
+- Firebase Console: <https://console.firebase.google.com/project/cringe-bank>
+- Functions Dashboard: <https://console.firebase.google.com/project/cringe-bank/functions>
+- Firestore Console: <https://console.firebase.google.com/project/cringe-bank/firestore>
 
 ---
 
 ## ⚠️ Önemli Notlar
 
 ### Allowlist Yönetimi
+
 - **Admin/Superadmin** config dokümanını güncelleyebilir
 - **Tüm kullanıcılar** allowlist'i okuyabilir
 - Yeni domain eklemek için config/allowedMediaHosts'u güncelle
 
 ### Maliyet Optimizasyonu
+
 - External URL validation → HEAD request (minimum data transfer)
 - Allowlist cached in functions (Firestore read minimized)
 - Tombstone prevents unnecessary Storage reads
 
 ### Monitoring
+
 ```powershell
 # Function logs
 firebase functions:log --only sendMessage
@@ -290,6 +317,7 @@ firebase functions:log --only sendMessage,editMessage,deleteMessage,setReadPoint
 ## ✨ Sonraki Adımlar
 
 ### İsteğe Bağlı Geliştirmeler
+
 1. **Push Notifications**: Yeni mesaj bildirimleri
 2. **Message Reactions**: Emoji tepkiler
 3. **Voice Messages**: Ses kaydı desteği
@@ -298,6 +326,7 @@ firebase functions:log --only sendMessage,editMessage,deleteMessage,setReadPoint
 6. **End-to-End Encryption**: Şifreleme
 
 ### Flutter Client Integration
+
 ```dart
 // DirectMessageService'e eklenecek metodlar:
 class DirectMessageService {
@@ -354,13 +383,15 @@ class DirectMessageService {
 
 **Direct Messaging sistemi %95 hazır!**
 
-### Yapılması Gerekenler:
+### Yapılması Gerekenler
+
 1. ✅ Security Rules → DEPLOY EDİLDİ
 2. ✅ Cloud Functions → DEPLOY EDİLDİ
 3. ⏳ **Allowlist Document → MANUEL OLUŞTUR (5 dakika)**
 4. ⏳ Flutter client integration (gerektiğinde)
 
-### Deployment başarılı olduğunda:
+### Deployment başarılı olduğunda
+
 - ✅ Güvenli mesajlaşma sistemi aktif
 - ✅ External URL desteği çalışıyor
 - ✅ Edit/delete özellikleri hazır

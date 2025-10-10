@@ -6,7 +6,8 @@ import '../models/user_model.dart';
 import '../data/cringestore_repository.dart';
 import '../services/cringe_store_service.dart';
 import '../services/user_service.dart';
-import '../widgets/animated_bubble_background.dart';
+import '../theme/app_theme.dart';
+import '../widgets/cringe_default_background.dart';
 import '../widgets/store_product_card.dart';
 import 'store_product_detail_screen.dart';
 
@@ -39,8 +40,10 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: AnimatedBubbleBackground(
+      backgroundColor: AppTheme.backgroundColor,
+      body: CringeDefaultBackground(
+        bubbleCount: 26,
+        bubbleColor: Colors.white.withOpacity(0.08),
         child: SafeArea(
           child: StreamBuilder<User?>(
             stream: _userService.userDataStream,
@@ -92,7 +95,7 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.1),
+                                    color: Colors.white.withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(
@@ -139,9 +142,8 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
                                     'Filtreler',
                                     style: theme.textTheme.titleMedium
                                         ?.copyWith(
-                                          color: Colors.white.withValues(
-                                            alpha: 0.7,
-                                          ),
+                                          color:
+                                              Colors.white.withOpacity(0.7),
                                           fontWeight: FontWeight.w600,
                                         ),
                                   ),
@@ -237,18 +239,18 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
               label: Text(chip.label),
               selected: isSelected,
               onSelected: (_) => _changeSellerFilter(chip.value),
-              selectedColor: Colors.orangeAccent.withValues(alpha: 0.25),
+              selectedColor: Colors.orangeAccent.withOpacity(0.25),
               labelStyle: TextStyle(
                 color: isSelected ? Colors.orangeAccent : Colors.white70,
                 fontWeight: FontWeight.w600,
               ),
-              backgroundColor: Colors.white.withValues(alpha: 0.05),
+              backgroundColor: Colors.white.withOpacity(0.05),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
                 side: BorderSide(
-                  color: isSelected
-                      ? Colors.orangeAccent.withValues(alpha: 0.7)
-                      : Colors.white.withValues(alpha: 0.05),
+          color: isSelected
+            ? Colors.orangeAccent.withOpacity(0.7)
+            : Colors.white.withOpacity(0.05),
                 ),
               ),
             );
@@ -272,7 +274,7 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
           child: Text(
             group.title.toUpperCase(),
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.38),
+              color: Colors.white.withOpacity(0.38),
               fontSize: 11,
               letterSpacing: 0.8,
               fontWeight: FontWeight.w600,
@@ -303,18 +305,18 @@ class _CringeStoreScreenState extends State<CringeStoreScreen> {
       label: Text(label),
       selected: isSelected,
       onSelected: (_) => _changeCategoryFilter(id),
-      selectedColor: Colors.deepPurpleAccent.withValues(alpha: 0.25),
+  selectedColor: Colors.deepPurpleAccent.withOpacity(0.25),
       labelStyle: TextStyle(
         color: isSelected ? Colors.deepPurpleAccent : Colors.white70,
         fontWeight: FontWeight.w600,
       ),
-      backgroundColor: Colors.white.withValues(alpha: 0.05),
+  backgroundColor: Colors.white.withOpacity(0.05),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: isSelected
-              ? Colors.deepPurpleAccent.withValues(alpha: 0.7)
-              : Colors.white.withValues(alpha: 0.04),
+      color: isSelected
+        ? Colors.deepPurpleAccent.withOpacity(0.7)
+        : Colors.white.withOpacity(0.04),
         ),
       ),
     );
@@ -384,7 +386,7 @@ class _WalletSummaryCard extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+  border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -394,7 +396,7 @@ class _WalletSummaryCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orangeAccent.withValues(alpha: 0.1),
+                  color: Colors.orangeAccent.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: const Icon(
@@ -420,7 +422,7 @@ class _WalletSummaryCard extends StatelessWidget {
                     Text(
                       'Cüzdanını ve sahip olduğun ürünleri buradan yönetebilirsin.',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.72),
+                        color: Colors.white.withOpacity(0.72),
                         height: 1.35,
                       ),
                     ),
@@ -475,16 +477,16 @@ class _WalletStatTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+  color: Colors.white.withOpacity(0.04),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+  border: Border.all(color: Colors.white.withOpacity(0.06)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.16),
+              color: accent.withOpacity(0.16),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(icon, color: accent, size: 22),
@@ -497,7 +499,7 @@ class _WalletStatTile extends StatelessWidget {
                 Text(
                   label,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
+                    color: Colors.white.withOpacity(0.6),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -534,9 +536,9 @@ class _ProductSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+  color: Colors.white.withOpacity(0.04),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+  border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -544,7 +546,7 @@ class _ProductSkeleton extends StatelessWidget {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
+                color: Colors.white.withOpacity(0.06),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(20),
                   topRight: Radius.circular(20),
@@ -561,7 +563,7 @@ class _ProductSkeleton extends StatelessWidget {
                   height: 18,
                   width: 140,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
+                    color: Colors.white.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
@@ -570,7 +572,7 @@ class _ProductSkeleton extends StatelessWidget {
                   height: 16,
                   width: 100,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.06),
+                    color: Colors.white.withOpacity(0.06),
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
@@ -578,7 +580,7 @@ class _ProductSkeleton extends StatelessWidget {
                 Container(
                   height: 26,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.05),
+                    color: Colors.white.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -606,7 +608,7 @@ class _EmptyState extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
+                color: Colors.white.withOpacity(0.06),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -630,7 +632,7 @@ class _EmptyState extends StatelessWidget {
               'Filtreleri genişlet veya yeni ürünler eklenmesi için marketplace\'i takip et.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: Colors.white.withOpacity(0.7),
                 height: 1.4,
               ),
             ),
@@ -656,7 +658,7 @@ class _ErrorState extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.redAccent.withValues(alpha: 0.12),
+                color: Colors.redAccent.withOpacity(0.12),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -680,7 +682,7 @@ class _ErrorState extends StatelessWidget {
               'Bağlantını kontrol et ve yenile. Sorun devam ederse ekibe haber ver.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: Colors.white.withOpacity(0.7),
                 height: 1.4,
               ),
             ),

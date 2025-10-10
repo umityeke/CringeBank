@@ -8,10 +8,11 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../data/store_catalog.dart';
 import '../models/cringe_entry.dart';
 import '../models/user_model.dart';
+import '../models/user_permission_extensions.dart';
 import '../services/cringe_entry_service.dart';
 import '../services/store_service.dart';
 import '../services/user_service.dart';
-import '../widgets/animated_bubble_background.dart';
+import '../widgets/cringe_default_background.dart';
 import '../widgets/modern_cringe_card.dart';
 import '../utils/entry_actions.dart';
 import '../utils/safe_haptics.dart';
@@ -46,9 +47,9 @@ class _BadgeChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: background.withValues(alpha: 0.2),
+  color: background.withOpacity(0.2),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: background.withValues(alpha: 0.6)),
+  border: Border.all(color: background.withOpacity(0.6)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -421,7 +422,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                 ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
-                  side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
+                  side: BorderSide(color: Colors.white.withOpacity(0.4)),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
               ),
@@ -429,6 +430,56 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildAdminRoleBadge({required bool isSuperAdmin}) {
+    final tooltipText = isSuperAdmin
+        ? 'Süper admin panelini aç'
+        : 'Admin panelini aç';
+
+    return Tooltip(
+      message: tooltipText,
+      child: Semantics(
+        label: tooltipText,
+        button: true,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(28),
+          onTap: () {
+            Navigator.of(context).pushNamed('/admin');
+          },
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [Color(0xFF5E35B1), Color(0xFF7E57C2)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF5E35B1).withOpacity(0.35),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+              border: Border.all(
+                color: Colors.white.withOpacity(0.18),
+                width: 1.5,
+              ),
+            ),
+            child: Center(
+              child: Icon(
+                Icons.workspace_premium_rounded,
+                color: Colors.white,
+                size: 26,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -514,8 +565,8 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
             backgroundColor: Colors.black,
-            body: AnimatedBubbleBackground(
-              child: const Center(
+            body: const CringeDefaultBackground(
+              child: Center(
                 child: CircularProgressIndicator(color: Colors.orange),
               ),
             ),
@@ -541,7 +592,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
   Widget _buildLoginScreen() {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: AnimatedBubbleBackground(
+      body: CringeDefaultBackground(
         child: SafeArea(
           child: Center(
             child: Container(
@@ -550,7 +601,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -608,7 +659,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
   Widget _buildUserNotFoundScreen() {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: AnimatedBubbleBackground(
+      body: CringeDefaultBackground(
         child: SafeArea(
           child: Center(
             child: Container(
@@ -617,7 +668,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                border: Border.all(color: Colors.white.withOpacity(0.12)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -656,128 +707,85 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     final isOwnProfile = _isViewingOwnProfile(user);
     return Scaffold(
       backgroundColor: Colors.black,
-      body: AnimatedBubbleBackground(
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF121B2E), Color(0xFF090C14)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
+      body: CringeDefaultBackground(
+        child: SafeArea(
+          child: CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              SliverAppBar(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                pinned: true,
+                centerTitle: false,
+                iconTheme: const IconThemeData(color: Colors.white70),
+                title: Image.asset(
+                  'assets/images/logo.png',
+                  height: 32,
+                  width: 120,
+                  fit: BoxFit.contain,
                 ),
-              ),
-            ),
-            Positioned(
-              top: -120,
-              left: -80,
-              child: Container(
-                width: 240,
-                height: 240,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.orange.withValues(alpha: 0.18),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -100,
-              right: -60,
-              child: Container(
-                width: 220,
-                height: 220,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.pinkAccent.withValues(alpha: 0.12),
-                ),
-              ),
-            ),
-            SafeArea(
-              child: CustomScrollView(
-                physics: const BouncingScrollPhysics(),
-                slivers: [
-                  SliverAppBar(
-                    backgroundColor: Colors.transparent,
-                    elevation: 0,
-                    pinned: true,
-                    centerTitle: false,
-                    iconTheme: const IconThemeData(color: Colors.white70),
-                    title: Image.asset(
-                      'assets/images/logo.png',
-                      height: 32,
-                      width: 120,
-                      fit: BoxFit.contain,
-                    ),
-                    actions: [
-                      Container(
-                        margin: const EdgeInsets.only(
-                          right: 8,
-                          top: 8,
-                          bottom: 8,
-                        ),
-                        child: ElevatedButton.icon(
-                          icon: const Icon(
-                            Icons.store_rounded,
-                            size: 18,
-                            color: Colors.black,
-                          ),
-                          label: const Text(
-                            'Cringe Store',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                              color: Colors.black,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            elevation: 3,
-                          ),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const CringeStoreScreen(),
-                              ),
-                            );
-                          },
+                actions: [
+                  Container(
+                    margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+                    child: ElevatedButton.icon(
+                      icon: const Icon(
+                        Icons.store_rounded,
+                        size: 18,
+                        color: Colors.black,
+                      ),
+                      label: const Text(
+                        'Cringe Store',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: Colors.black,
                         ),
                       ),
-                    ],
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildHeaderCard(user, isOwnProfile: isOwnProfile),
-                          const SizedBox(height: 12),
-                          _buildStatsGrid(user),
-                          const SizedBox(height: 16),
-                          _buildUserEntriesSection(
-                            user,
-                            isOwnProfile: isOwnProfile,
-                          ),
-                          const SizedBox(height: 32),
-                        ],
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        elevation: 3,
                       ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CringeStoreScreen(),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeaderCard(user, isOwnProfile: isOwnProfile),
+                      const SizedBox(height: 12),
+                      _buildStatsGrid(user),
+                      const SizedBox(height: 16),
+                      _buildUserEntriesSection(
+                        user,
+                        isOwnProfile: isOwnProfile,
+                      ),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -793,8 +801,15 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
     final badgeEffects = _storeService.resolveBadgeEffects(user);
     final nameColor = _storeService.resolveNameColor(user);
     final backgroundGlow = backgroundEffect.backgroundGlow ?? const <Color>[];
-  final canEditProfile = _canEditProfile(user);
-  final showOwnerActions = isOwnProfile && canEditProfile;
+    final canEditProfile = _canEditProfile(user);
+    final showOwnerActions = isOwnProfile && canEditProfile;
+
+    final targetHasAdminBadge = user.isAdminRole;
+    final viewer = UserService.instance.currentUser;
+    final viewerHasAdminAccess = viewer?.isAdminRole == true;
+    final showAdminBadge =
+        targetHasAdminBadge &&
+        (viewerHasAdminAccess || (isOwnProfile && targetHasAdminBadge));
 
     const baseGradient = LinearGradient(
       colors: [Color(0xFF1C1A24), Color(0xFF14111C)],
@@ -811,7 +826,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                 (backgroundGlow.isNotEmpty
                         ? backgroundGlow.first
                         : Colors.orange)
-                    .withValues(alpha: 0.25),
+                    .withOpacity(0.25),
             blurRadius: 42,
             spreadRadius: 2,
             offset: const Offset(0, 28),
@@ -834,7 +849,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                     gradient: RadialGradient(
                       colors: [
                         ...backgroundGlow.map(
-                          (color) => color.withValues(alpha: 0.35),
+                          (color) => color.withOpacity(0.35),
                         ),
                         Colors.transparent,
                       ],
@@ -848,7 +863,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.04),
+                    color: Colors.white.withOpacity(0.04),
                   ),
                 ),
               ),
@@ -884,9 +899,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                                 shadows: nameColor != null
                                     ? [
                                         Shadow(
-                                          color: nameColor.withValues(
-                                            alpha: 0.35,
-                                          ),
+                                          color: nameColor.withOpacity(0.35),
                                           blurRadius: 16,
                                         ),
                                       ]
@@ -899,7 +912,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                                 Text(
                                   '@${user.username}',
                                   style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.7),
+                                    color: Colors.white.withOpacity(0.7),
                                   ),
                                 ),
                                 if (user.isVerified) ...[
@@ -925,6 +938,10 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                           ],
                         ),
                       ),
+                      if (showAdminBadge) ...[
+                        const SizedBox(width: 16),
+                        _buildAdminRoleBadge(isSuperAdmin: user.isSuperAdmin),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -932,7 +949,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                     Text(
                       user.bio,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.84),
+                        color: Colors.white.withOpacity(0.84),
                         height: 1.5,
                       ),
                     )
@@ -940,7 +957,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                     Text(
                       'Profiline birkaç cümle ile renk kat. Kendini tanıt, ilgi alanlarını paylaş.',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.6),
+                        color: Colors.white.withOpacity(0.6),
                         fontStyle: FontStyle.italic,
                         height: 1.5,
                       ),
@@ -949,7 +966,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                     Text(
                       'Bu kullanıcı henüz profilini doldurmadı.',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.55),
+                        color: Colors.white.withOpacity(0.55),
                         fontStyle: FontStyle.italic,
                         height: 1.5,
                       ),
@@ -981,7 +998,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.white,
                               side: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.35),
+                                color: Colors.white.withOpacity(0.35),
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               textStyle: const TextStyle(
@@ -1047,7 +1064,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  ...glowColors.map((color) => color.withValues(alpha: 0.35)),
+                  ...glowColors.map((color) => color.withOpacity(0.35)),
                   Colors.transparent,
                 ],
                 radius: 0.9,
@@ -1062,7 +1079,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
             gradient: frameGradient,
             boxShadow: [
               BoxShadow(
-                color: glowColor.withValues(alpha: 0.35),
+                color: glowColor.withOpacity(0.35),
                 blurRadius: 32,
                 offset: const Offset(0, 12),
               ),
@@ -1073,7 +1090,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.45),
+                color: Colors.white.withOpacity(0.45),
                 width: 2.4,
               ),
             ),
@@ -1362,9 +1379,8 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
             children: [
               CircleAvatar(
                 radius: 8,
-                backgroundColor: (stat['color'] as Color).withValues(
-                  alpha: 0.18,
-                ),
+                backgroundColor:
+                    (stat['color'] as Color).withOpacity(0.12),
                 child: Icon(
                   stat['icon'] as IconData,
                   color: stat['color'] as Color,
@@ -1383,7 +1399,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
               Text(
                 stat['label'] as String,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7),
+                  color: Colors.white.withOpacity(0.7),
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0,
@@ -1527,7 +1543,7 @@ class _SimpleProfileScreenState extends State<SimpleProfileScreen> {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.orange.withValues(alpha: 0.18),
+              color: Colors.orange.withOpacity(0.18),
             ),
             child: Icon(icon, color: Colors.orangeAccent, size: 28),
           ),

@@ -232,24 +232,62 @@ class CringeEntryService {
 
   List<Query<Map<String, dynamic>>> _buildHomeFeedQueries() {
     final queries = <Query<Map<String, dynamic>>>[];
-    final collection = _firestore.collection('cringe_entries');
+    final currentUserId = _auth.currentUser?.uid;
 
-    queries.add(
-      collection
-          .where('status', isEqualTo: 'approved')
+    void addCollectionQueries({
+      required String collectionName,
+      String? approvedField,
+      List<String> ownerFields = const ['ownerId'],
+      bool includeOwnerQueries = true,
+    }) {
+      final collection = _firestore.collection(collectionName);
+
+      Query<Map<String, dynamic>> approvedQuery = collection;
+      if (approvedField != null && approvedField.isNotEmpty) {
+        approvedQuery = approvedQuery.where(
+          approvedField,
+          isEqualTo: 'approved',
+        );
+      }
+
+      approvedQuery = approvedQuery
           .orderBy('createdAt', descending: true)
-          .limit(100),
+          .limit(100);
+      queries.add(approvedQuery);
+
+      if (includeOwnerQueries &&
+          currentUserId != null &&
+          currentUserId.isNotEmpty) {
+        for (final field in ownerFields) {
+          final ownerQuery = collection
+              .where(field, isEqualTo: currentUserId)
+              .orderBy('createdAt', descending: true)
+              .limit(100);
+          queries.add(ownerQuery);
+        }
+      }
+    }
+
+    // Primary collection
+    addCollectionQueries(
+      collectionName: 'cringe_entries',
+      approvedField: 'status',
+      ownerFields: const ['ownerId'],
     );
 
-    final currentUserId = _auth.currentUser?.uid;
-    if (currentUserId != null && currentUserId.isNotEmpty) {
-      queries.add(
-        collection
-            .where('ownerId', isEqualTo: currentUserId)
-            .orderBy('createdAt', descending: true)
-            .limit(100),
-      );
-    }
+    // Legacy collection compatibility
+    addCollectionQueries(
+      collectionName: 'posts',
+      approvedField: 'status',
+      ownerFields: const ['ownerId', 'userId'],
+    );
+
+    // Legacy moderationStatus fallback
+    addCollectionQueries(
+      collectionName: 'posts',
+      approvedField: 'moderationStatus',
+      includeOwnerQueries: false,
+    );
 
     return queries;
   }
@@ -280,6 +318,9 @@ class CringeEntryService {
     return Stream.multi((controller) {
       streamStatusNotifier.value = CringeStreamStatus.connecting;
 
+      var controllerClosed = false;
+      bool isStreamActive() => !controllerClosed && controller.hasListener;
+
       // Emit initial data immediately (filtered for permissions)
       final initialFiltered = _filterHomeFeedEntries(initialData);
       controller.add(initialFiltered);
@@ -300,7 +341,11 @@ class CringeEntryService {
         }
 
         subscription = _combineEntryStreams(queries)
-            .timeout(const Duration(seconds: 30))
+            .timeout(
+              const Duration(seconds: 30),
+              onTimeout: (sink) =>
+                  _handleEnterpriseTimeout(sink, isStreamActive),
+            )
             .listen(
               (entries) => _handleHomeFeedEntries(entries, controller),
               onError: (error) => _handleEnterpriseError(error, controller),
@@ -318,7 +363,12 @@ class CringeEntryService {
       }
 
       // Cleanup with enterprise logging
+      controller.onListen = () {
+        controllerClosed = false;
+      };
+
       controller.onCancel = () {
+        controllerClosed = true;
         print('🧹 CLEANUP: Enterprise stream resources being released');
         subscription?.cancel();
         healthCheckTimer?.cancel();
@@ -423,6 +473,68 @@ class CringeEntryService {
     });
   }
 
+  void _handleEnterpriseTimeout(
+    EventSink<List<CringeEntry>> sink,
+    bool Function() isStreamActive,
+  ) {
+    if (!isStreamActive()) {
+      debugPrint(
+        'ℹ️ TIMEOUT HANDLER: Stream inactive, skipping timeout handling.',
+      );
+      return;
+    }
+
+    timeoutExceptionCountNotifier.value =
+        timeoutExceptionCountNotifier.value + 1;
+    streamStatusNotifier.value = CringeStreamStatus.degraded;
+    streamHintNotifier.value =
+        'Bağlantı beklenenden yavaş. Önbelleğe alınan veriler gösteriliyor.';
+
+    unawaited(
+      _logAnalyticsEvent(
+        'cringe_entries_stream_timeout',
+        parameters: {
+          'timeout_count': timeoutExceptionCountNotifier.value,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      ),
+    );
+
+    unawaited(
+      _getCachedEntriesWithTTL()
+          .then((cachedData) {
+            if (cachedData.isEmpty) {
+              return;
+            }
+
+            if (!isStreamActive()) {
+              debugPrint(
+                'ℹ️ TIMEOUT HANDLER: Listener removed before cache emit.',
+              );
+              return;
+            }
+
+            try {
+              sink.add(cachedData);
+            } catch (error, stackTrace) {
+              if (error is StateError &&
+                  error.message.contains('Sink not available')) {
+                debugPrint(
+                  'ℹ️ TIMEOUT HANDLER: Sink closed before cache emit, suppressing.',
+                );
+                return;
+              }
+
+              debugPrint('⚠️ TIMEOUT CACHE EMIT FAILED: $error\n$stackTrace');
+            }
+          })
+          .catchError((error, stackTrace) {
+            debugPrint('⚠️ TIMEOUT CACHE ERROR: $error\n$stackTrace');
+            return null;
+          }),
+    );
+  }
+
   // Enterprise caching with TTL
   Future<List<CringeEntry>> _getCachedEntriesWithTTL() async {
     print('💾 CACHE: Checking enterprise cache with TTL validation');
@@ -476,6 +588,8 @@ class CringeEntryService {
     const maxRetries = 3;
 
     while (retryCount < maxRetries) {
+      var allQueriesPermissionDenied = true;
+
       try {
         print('🔄 RETRY ATTEMPT: ${retryCount + 1}/$maxRetries');
 
@@ -483,16 +597,30 @@ class CringeEntryService {
         final entryMap = <String, CringeEntry>{};
 
         for (final query in queries) {
-          final snapshot = await query
-              .limit(50)
-              .get()
-              .timeout(const Duration(seconds: 10));
+          try {
+            final snapshot = await query
+                .limit(50)
+                .get()
+                .timeout(const Duration(seconds: 10));
 
-          for (final doc in snapshot.docs) {
-            final data = doc.data();
-            data['id'] = doc.id;
-            final entry = CringeEntry.fromFirestore(data);
-            entryMap[doc.id] = entry;
+            for (final doc in snapshot.docs) {
+              final data = doc.data();
+              data['id'] = doc.id;
+              final entry = CringeEntry.fromFirestore(data);
+              entryMap[doc.id] = entry;
+            }
+
+            allQueriesPermissionDenied = false;
+          } on FirebaseException catch (error, stackTrace) {
+            if (error.code == 'permission-denied') {
+              debugPrint(
+                '⚠️ FETCH WARNING: Skipping home feed query due to permissions: $query -> $error',
+              );
+              debugPrintStack(stackTrace: stackTrace);
+              continue;
+            }
+
+            rethrow;
           }
         }
 
@@ -503,6 +631,16 @@ class CringeEntryService {
         print('✅ FETCH SUCCESS: Retrieved ${entries.length} home feed entries');
         return entries;
       } catch (e) {
+        if (e is FirebaseException && e.code == 'permission-denied') {
+          // If all queries failed due to permission issues, break out gracefully
+          if (allQueriesPermissionDenied) {
+            print(
+              '⚠️ PERMISSION WARNING: All home feed queries denied. Returning empty list.',
+            );
+            return const <CringeEntry>[];
+          }
+        }
+
         retryCount++;
         print('⚠️ RETRY $retryCount FAILED: $e');
 
@@ -692,38 +830,73 @@ class CringeEntryService {
       onListen: () {
         for (var index = 0; index < queries.length; index++) {
           final query = queries[index];
-          final subscription = query.snapshots().listen((snapshot) {
-            final currentDocIds = <String>{};
+          late final StreamSubscription subscription;
+          subscription = query.snapshots().listen(
+            (snapshot) {
+              final currentDocKeys = <String>{};
 
-            for (final doc in snapshot.docs) {
-              final data = doc.data();
-              data['id'] = doc.id;
-              final entry = CringeEntry.fromFirestore(data);
-              entryMap[doc.id] = entry;
-              sourceMap.putIfAbsent(doc.id, () => <int>{}).add(index);
-              currentDocIds.add(doc.id);
-            }
-
-            final pendingRemoval = <String>[];
-            sourceMap.forEach((docId, sources) {
-              if (!sources.contains(index)) return;
-              if (!currentDocIds.contains(docId)) {
-                sources.remove(index);
-                if (sources.isEmpty) {
-                  pendingRemoval.add(docId);
-                }
+              for (final doc in snapshot.docs) {
+                final docKey = doc.reference.path;
+                final data = doc.data();
+                data['id'] = doc.id;
+                final entry = CringeEntry.fromFirestore(data);
+                entryMap[docKey] = entry;
+                sourceMap.putIfAbsent(docKey, () => <int>{}).add(index);
+                currentDocKeys.add(docKey);
               }
-            });
 
-            for (final docId in pendingRemoval) {
-              sourceMap.remove(docId);
-              entryMap.remove(docId);
-            }
+              final pendingRemoval = <String>[];
+              sourceMap.forEach((docKey, sources) {
+                if (!sources.contains(index)) return;
+                if (!currentDocKeys.contains(docKey)) {
+                  sources.remove(index);
+                  if (sources.isEmpty) {
+                    pendingRemoval.add(docKey);
+                  }
+                }
+              });
 
-            final sortedEntries = entryMap.values.toList()
-              ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-            controller.add(sortedEntries);
-          }, onError: controller.addError);
+              for (final docKey in pendingRemoval) {
+                sourceMap.remove(docKey);
+                entryMap.remove(docKey);
+              }
+
+              final sortedEntries = entryMap.values.toList()
+                ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+              controller.add(sortedEntries);
+            },
+            onError: (error, stackTrace) async {
+              if (error is FirebaseException &&
+                  error.code == 'permission-denied') {
+                debugPrint(
+                  '⚠️ STREAM WARNING: Permission denied for query index $index. Removing from home feed merge.',
+                );
+
+                await subscription.cancel();
+                subscriptions.remove(subscription);
+
+                final pendingRemoval = <String>[];
+                sourceMap.forEach((docKey, sources) {
+                  if (sources.remove(index) && sources.isEmpty) {
+                    pendingRemoval.add(docKey);
+                  }
+                });
+
+                for (final docKey in pendingRemoval) {
+                  sourceMap.remove(docKey);
+                  entryMap.remove(docKey);
+                }
+
+                final sortedEntries = entryMap.values.toList()
+                  ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+                controller.add(sortedEntries);
+
+                return;
+              }
+
+              controller.addError(error, stackTrace);
+            },
+          );
 
           subscriptions.add(subscription);
         }

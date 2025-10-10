@@ -76,14 +76,30 @@ const db = admin.firestore();
 
 // ==================== SQL SERVER CONNECTION ====================
 
+const SQL_ENCRYPT = (() => {
+  const value = (process.env.SQL_ENCRYPT || '').toLowerCase();
+  if (value === '0' || value === 'false') {
+    return false;
+  }
+  if (value === '1' || value === 'true') {
+    return true;
+  }
+  return true;
+})();
+
+const SQL_TRUST_SERVER_CERTIFICATE = (() => {
+  const value = (process.env.SQL_TRUST_SERVER_CERTIFICATE || '').toLowerCase();
+  return value === '1' || value === 'true';
+})();
+
 const sqlConfig = {
   user: process.env.SQL_USER,
   password: process.env.SQL_PASSWORD,
   server: process.env.SQL_SERVER,
   database: process.env.SQL_DATABASE,
   options: {
-    encrypt: true,
-    trustServerCertificate: false,
+    encrypt: SQL_ENCRYPT,
+    trustServerCertificate: SQL_TRUST_SERVER_CERTIFICATE,
     enableArithAbort: true,
   },
   pool: {
@@ -331,7 +347,7 @@ async function migrateEscrows(pool, dryRun = false) {
       request.input('OrderPublicId', mssql.NVarChar(64), toSafeString(data.orderId, 64));
       request.input('BuyerAuthUid', mssql.NVarChar(64), toSafeString(data.buyerId || data.buyerAuthUid, 64));
       request.input('SellerAuthUid', mssql.NVarChar(64), toSafeString(data.sellerId || data.sellerAuthUid, 64));
-      request.input('State', mssql.NVarChar(32), toSafeString(data.state, 32) || 'LOCKED');
+  request.input('EscrowState', mssql.NVarChar(32), toSafeString(data.state, 32) || 'LOCKED');
       request.input('LockedAmountGold', mssql.Int, toSafeInt(data.lockedAmountGold || data.amount));
       request.input('ReleasedAmountGold', mssql.Int, toSafeInt(data.releasedAmountGold));
       request.input('RefundedAmountGold', mssql.Int, toSafeInt(data.refundedAmountGold));
@@ -425,7 +441,7 @@ async function validateMigration(pool) {
       query: `
         SELECT COUNT(*) AS cnt 
         FROM StoreOrders o
-        INNER JOIN StoreEscrows e ON o.OrderPublicId = e.OrderPublicId
+        INNER JOIN StoreEscrows e ON o.OrderId = e.OrderId
       `,
     },
   ];

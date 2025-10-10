@@ -70,7 +70,7 @@ BEGIN
         e.ReleasedAt AS EscrowReleasedAt,
         p.Title AS ProductTitle,
         p.Category AS ProductCategory,
-        p.ImageUrls AS ProductImageUrls,
+        p.ImagesJson AS ProductImageUrls,
         p.SellerType AS ProductSellerType
     FROM dbo.StoreOrders o
     LEFT JOIN dbo.StoreEscrows e ON o.OrderId = e.OrderId

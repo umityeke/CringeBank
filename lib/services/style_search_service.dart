@@ -6,6 +6,11 @@ import '../models/user_model.dart';
 import '../utils/search_normalizer.dart';
 import 'cringe_search_service.dart';
 
+typedef MentionSuggestionFetcher = Future<List<User>> Function(
+  String query, {
+  int limit,
+});
+
 class StyleSearchSection<T> {
   final List<T> items;
   final int totalCount;
@@ -220,6 +225,30 @@ class StyleSearchService {
       recentSearches: CringeSearchService.recentSearches,
       suggestions: suggestions,
     );
+  }
+
+  static Future<List<User>> fetchMentionSuggestions(
+    String query, {
+    int limit = 6,
+  }) async {
+    final normalizedQuery = query.trim();
+    if (normalizedQuery.isEmpty) {
+      return const <User>[];
+    }
+
+    try {
+      await CringeSearchService.initialize();
+      final result = await CringeSearchService.searchUsers(
+        query: normalizedQuery,
+        limit: limit,
+      );
+      if (result.users.isEmpty) {
+        return const <User>[];
+      }
+      return result.users.take(limit).toList(growable: false);
+    } catch (_) {
+      return const <User>[];
+    }
   }
 
   static StyleSearchSection<StyleSearchHashtag> _buildHashtagSection(

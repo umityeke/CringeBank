@@ -1,4 +1,4 @@
-import 'package:cringe_bankasi/services/messaging_feature_service.dart';
+import 'package:cringebank/services/messaging_feature_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

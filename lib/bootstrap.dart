@@ -4,9 +4,11 @@ import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'firebase_options.dart';
+import 'core/di/service_locator.dart';
 import 'services/advanced_ai_service.dart';
 import 'services/cringe_entry_service.dart';
 import 'services/cringe_search_service.dart';
@@ -91,12 +93,14 @@ Future<void> _runAppWithGuards(Widget app) async {
       CringeSearchService.initialize(),
     ]);
 
+    await configureDependencies();
+
     await UserService.instance.initialize();
     _setupPostAuthInitializers();
 
     await FirebaseFirestore.instance.waitForPendingWrites();
 
-    runApp(app);
+    runApp(ProviderScope(child: app));
   }, _logSevereError);
 }
 

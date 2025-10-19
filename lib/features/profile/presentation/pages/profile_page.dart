@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cringebank/core/config/theme_mode_controller.dart';
+import 'package:cringebank/core/config/locale_controller.dart';
 import 'package:cringebank/core/session/session_providers.dart';
 import 'package:cringebank/features/login/application/login_providers.dart';
+import 'package:cringebank/shared/extensions/build_context_extensions.dart';
 import 'package:cringebank/shared/widgets/app_card.dart';
 
 import '../../domain/models/profile_activity.dart';
@@ -146,6 +148,8 @@ class _ProfileContent extends ConsumerWidget {
                 const SizedBox(height: 20),
                 _InsightsStrip(insights: profile.insights),
                 const SizedBox(height: 20),
+                const _LocalePreferenceSection(),
+                const SizedBox(height: 16),
                 const _ThemePreferenceSection(),
                 const SizedBox(height: 16),
                 const _TagApprovalSection(),
@@ -549,6 +553,142 @@ class _PendingTagTile extends StatelessWidget {
   }
 }
 
+class _LocalePreferenceSection extends ConsumerWidget {
+  const _LocalePreferenceSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final locale = ref.watch(localeControllerProvider);
+    final controller = ref.read(localeControllerProvider.notifier);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    String describe(Locale target) {
+      switch (target.languageCode) {
+        case 'tr':
+          return l10n.localePreferenceOptionTr;
+        case 'en':
+          return l10n.localePreferenceOptionEn;
+        default:
+          return target.toLanguageTag();
+      }
+    }
+
+    Future<void> handleChange(Locale target) async {
+      final sameLanguage =
+          locale.languageCode == target.languageCode &&
+          (locale.countryCode ?? '') == (target.countryCode ?? '');
+      if (sameLanguage) {
+        return;
+      }
+
+      await controller.setLocale(target);
+      final languageName = describe(target);
+      scaffoldMessenger.hideCurrentSnackBar();
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text(l10n.localeChangeSnack(languageName))),
+      );
+    }
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.localePreferenceTitle, style: theme.textTheme.titleMedium),
+          const SizedBox(height: 6),
+          Text(
+            l10n.localePreferenceDescription,
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          _LocaleTile(
+            locale: const Locale('tr', 'TR'),
+            groupValue: locale,
+            title: l10n.localePreferenceOptionTr,
+            onChanged: handleChange,
+          ),
+          const SizedBox(height: 8),
+          _LocaleTile(
+            locale: const Locale('en', 'US'),
+            groupValue: locale,
+            title: l10n.localePreferenceOptionEn,
+            onChanged: handleChange,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocaleTile extends StatelessWidget {
+  const _LocaleTile({
+    required this.locale,
+    required this.groupValue,
+    required this.title,
+    required this.onChanged,
+  });
+
+  final Locale locale;
+  final Locale groupValue;
+  final String title;
+  final Future<void> Function(Locale locale) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isSelected =
+        locale.languageCode == groupValue.languageCode &&
+        (locale.countryCode ?? '') == (groupValue.countryCode ?? '');
+
+    return InkWell(
+      onTap: isSelected ? null : () => unawaited(onChanged(locale)),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? theme.colorScheme.primaryContainer
+              : theme.colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outlineVariant,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.language,
+              size: 20,
+              color: isSelected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: isSelected ? FontWeight.w600 : null,
+                ),
+              ),
+            ),
+            Icon(
+              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: isSelected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ThemePreferenceSection extends ConsumerWidget {
   const _ThemePreferenceSection();
 
@@ -557,6 +697,7 @@ class _ThemePreferenceSection extends ConsumerWidget {
     final themeMode = ref.watch(themeModeControllerProvider);
     final controller = ref.read(themeModeControllerProvider.notifier);
     final theme = Theme.of(context);
+    final l10n = context.l10n;
 
     Future<void> handleChange(ThemeMode mode) {
       return controller.setThemeMode(mode);
@@ -566,34 +707,34 @@ class _ThemePreferenceSection extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Tema Tercihi', style: theme.textTheme.titleMedium),
+          Text(l10n.themePreferenceTitle, style: theme.textTheme.titleMedium),
           const SizedBox(height: 6),
           Text(
-            'Uygulama temasını cihaz ayarına bırakabilir veya manuel olarak seçebilirsin.',
+            l10n.themePreferenceDescription,
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 12),
           _ThemeModeTile(
             mode: ThemeMode.system,
             groupValue: themeMode,
-            title: 'Otomatik',
-            subtitle: 'Cihazının gece/gündüz moduna uyum sağlar.',
+            title: l10n.themePreferenceSystem,
+            subtitle: l10n.themePreferenceSystemSubtitle,
             icon: Icons.smartphone,
             onChanged: handleChange,
           ),
           _ThemeModeTile(
             mode: ThemeMode.light,
             groupValue: themeMode,
-            title: 'Gündüz',
-            subtitle: 'Beyaz zemin ve turuncu vurgulu CG paleti.',
+            title: l10n.themePreferenceLight,
+            subtitle: l10n.themePreferenceLightSubtitle,
             icon: Icons.wb_sunny_outlined,
             onChanged: handleChange,
           ),
           _ThemeModeTile(
             mode: ThemeMode.dark,
             groupValue: themeMode,
-            title: 'Gece',
-            subtitle: 'Siyah zemin ve amber vurgulu CG paleti.',
+            title: l10n.themePreferenceDark,
+            subtitle: l10n.themePreferenceDarkSubtitle,
             icon: Icons.nightlight_round,
             onChanged: handleChange,
           ),

@@ -4,11 +4,11 @@ import 'dart:developer' as developer;
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 
 import '../utils/platform_info.dart';
 
 import 'telemetry/callable_latency_tracker.dart';
+import 'telemetry/trace_http_client.dart';
 
 enum EmailOtpFailureReason {
   invalidCode,
@@ -100,6 +100,7 @@ class EmailOtpService {
   static final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
     region: 'europe-west1',
   );
+  static final TraceHttpClient _traceClient = TraceHttpClient.shared;
 
   // Emulator mode: use localhost URLs when kDebugMode
   static String get _sendOtpHttpEndpoint => kDebugMode
@@ -175,12 +176,12 @@ class EmailOtpService {
   }
 
   static Future<String?> _sendOtpViaHttp(String email) async {
-    http.Response response;
+    TraceHttpResponse traceResponse;
     try {
-      response = await http.post(
+      traceResponse = await _traceClient.postJson(
         Uri.parse(_sendOtpHttpEndpoint),
-        headers: const {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email}),
+        jsonBody: {'email': email},
+        operation: 'emailOtp.send',
       );
     } catch (error, stack) {
       final logMsg = 'sendEmailOtpHttp isteği gönderilemedi: $error\n$stack';
@@ -190,6 +191,8 @@ class EmailOtpService {
       print(logMsg);
       rethrow;
     }
+
+    final response = traceResponse.response;
 
     Map<String, dynamic>? payload;
     Map<String, dynamic>? nonJsonDetails;
@@ -345,11 +348,13 @@ class EmailOtpService {
     String email,
     String code,
   ) async {
-    final response = await http.post(
+    final traceResponse = await _traceClient.postJson(
       Uri.parse(_registrationVerifyOtpHttpEndpoint),
-      headers: const {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email, 'code': code}),
+      jsonBody: {'email': email, 'code': code},
+      operation: 'emailOtp.verifyHttp',
     );
+
+    final response = traceResponse.response;
 
     Map<String, dynamic>? payload;
     if (response.body.isNotEmpty) {

@@ -1,4 +1,4 @@
-import 'package:cringe_bankasi/utils/platform_info.dart';
+import 'package:cringebank/utils/platform_info.dart';
 import 'i_crash_reporting_service.dart';
 import 'firebase_crash_reporting_service.dart';
 import 'null_crash_reporting_service.dart';

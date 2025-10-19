@@ -480,7 +480,11 @@ class _LoginFlowPageState extends ConsumerState<LoginFlowPage> {
     LoginState state,
     LoginController controller,
   ) {
-    final notices = _buildNotices(context, state);
+    final baseNotices = _buildNotices(context, state);
+    final notices = [
+      ...baseNotices,
+      ..._buildTotpNotices(state),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -729,13 +733,20 @@ class _LoginFlowPageState extends ConsumerState<LoginFlowPage> {
     LoginState state,
     LoginController controller,
   ) {
-    final notices = _buildNotices(context, state);
+    final baseNotices = _buildNotices(context, state);
     final now = DateTime.now();
     final canResend = state.otp.canResend(now);
     final secondsLeft = !canResend && state.otp.resendAvailableAt != null
         ? math.max(0, state.otp.resendAvailableAt!.difference(now).inSeconds)
         : 0;
-    final attempts = state.otp.attemptsRemaining;
+    final notices = [
+      ...baseNotices,
+      ..._buildOtpNotices(
+        state: state,
+        canResend: canResend,
+        secondsLeft: secondsLeft,
+      ),
+    ];
     final channelLabel = state.otp.channel != null
         ? _mfaChannelLabel(state.otp.channel!)
         : 'OTP';
@@ -763,15 +774,6 @@ class _LoginFlowPageState extends ConsumerState<LoginFlowPage> {
           onSubmitted: controller.verifyOtp,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           maxLength: 6,
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Kalan deneme: $attempts',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.78),
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-          ),
         ),
         const SizedBox(height: 20),
         _buildPrimaryButton(
@@ -830,15 +832,6 @@ class _LoginFlowPageState extends ConsumerState<LoginFlowPage> {
           onSubmitted: controller.verifyTotp,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           maxLength: 6,
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Kalan deneme: ${state.totp.attemptsRemaining}',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.78),
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-          ),
         ),
         const SizedBox(height: 20),
         _buildPrimaryButton(
@@ -1195,24 +1188,81 @@ class _LoginFlowPageState extends ConsumerState<LoginFlowPage> {
     );
   }
 
+  Widget _buildNotice({
+    required _NoticeVariant variant,
+    required IconData icon,
+    required String headline,
+    String? message,
+  }) {
+    final palette = _noticePalette(variant);
+    return _NoticeBanner(
+      icon: icon,
+      headline: headline,
+      message: message,
+      background: palette.background,
+      iconColor: palette.iconColor,
+      borderColor: palette.border,
+    );
+  }
+
   List<Widget> _buildNotices(BuildContext context, LoginState state) {
     final notices = <Widget>[];
+    final lock = state.lockInfo;
 
-    if (state.lockInfo != null) {
-      final lock = state.lockInfo!;
+    if (lock != null) {
+      final countdown = _formatLockCountdown(lock.until);
+      final reason = lock.reason.trim();
+      final buffer = StringBuffer('Giris denemeleri gecici olarak durduruldu.');
+      if (reason.isNotEmpty) {
+        buffer.write(' Sebep: $reason.');
+      }
+      if (countdown == 'simdi') {
+        buffer.write(' Simdi tekrar deneyebilirsin.');
+      } else {
+        buffer.write(' $countdown sonra tekrar dene.');
+      }
       notices.add(
-        _NoticeBanner(
+        _buildNotice(
+          variant: _NoticeVariant.danger,
           icon: Icons.lock_clock,
           headline: 'Hesabin kilitlendi',
-          message:
-              'Giris denemeleri gecici olarak durduruldu. ${_formatLockCountdown(lock.until)} sonra tekrar dene.',
+          message: buffer.toString(),
         ),
       );
+    } else {
+      if (state.captchaRequired) {
+        notices.add(
+          _buildNotice(
+            variant: _NoticeVariant.warning,
+            icon: Icons.verified_user_outlined,
+            headline: 'Ek guvenlik dogrulamasi',
+            message:
+                'Cok sayida basarisiz deneme tespit edildi. Devam etmek icin guvenlik dogrulamasini tamamla.',
+          ),
+        );
+      }
+
+      if (state.failedAttempts > 0) {
+        final remaining = math.max(0, 5 - state.failedAttempts);
+        final variant = remaining <= 1 ? _NoticeVariant.danger : _NoticeVariant.warning;
+        final message = remaining > 0
+            ? 'Son deneme basarisiz oldu. $remaining deneme hakkin kaldi.'
+            : 'Son deneme basarisiz oldu. Dikkatli ol, hesap kilitlenebilir.';
+        notices.add(
+          _buildNotice(
+            variant: variant,
+            icon: Icons.warning_amber_outlined,
+            headline: 'Basarisiz giris denemeleri',
+            message: message,
+          ),
+        );
+      }
     }
 
-    if (state.requiresVerification && state.lockInfo == null) {
+    if (state.requiresVerification && lock == null) {
       notices.add(
-        _NoticeBanner(
+        _buildNotice(
+          variant: _NoticeVariant.info,
           icon: Icons.mark_email_unread_outlined,
           headline: 'Dogrulama bekleniyor',
           message:
@@ -1221,18 +1271,78 @@ class _LoginFlowPageState extends ConsumerState<LoginFlowPage> {
       );
     }
 
-    if (state.failedAttempts > 0 && state.lockInfo == null) {
+    if (state.requiresDeviceVerification) {
       notices.add(
-        _NoticeBanner(
-          icon: Icons.warning_amber_outlined,
-          headline: 'Basarisiz giris denemesi',
+        _buildNotice(
+          variant: _NoticeVariant.info,
+          icon: Icons.phonelink_lock_outlined,
+          headline: 'Yeni cihaz dogrulamasi gerekiyor',
           message:
-              'Son deneme basarisiz oldu. ${math.max(0, 5 - state.failedAttempts)} deneme hakkin kaldi.',
-          background: const Color(0xFFB91C1C).withOpacity(0.12),
+              'Yeni bir cihazdan giris yaptin. Guvenlik mailindeki onayi tamamlayana kadar giris tamamlanmayacak.',
         ),
       );
     }
 
+    return notices;
+  }
+
+  List<Widget> _buildOtpNotices({
+    required LoginState state,
+    required bool canResend,
+    required int secondsLeft,
+  }) {
+    final notices = <Widget>[];
+    final attempts = state.otp.attemptsRemaining;
+    if (attempts < 5) {
+      final variant = attempts <= 1 ? _NoticeVariant.danger : _NoticeVariant.warning;
+      final headline = attempts <= 1 ? 'Son OTP hakkin' : 'OTP deneme limitine yaklastin';
+      final message = attempts <= 1
+          ? 'Yanlis girersen giris gecici olarak kilitlenebilir.'
+          : '$attempts deneme hakkin kaldi. Limit asilirsa hesap gecici olarak kilitlenebilir.';
+      notices.add(
+        _buildNotice(
+          variant: variant,
+          icon: Icons.security_outlined,
+          headline: headline,
+          message: message,
+        ),
+      );
+    }
+
+    if (!canResend && secondsLeft > 0) {
+      notices.add(
+        _buildNotice(
+          variant: _NoticeVariant.info,
+          icon: Icons.schedule_send_outlined,
+          headline: 'OTP yeniden gonderme siniri',
+          message: '$secondsLeft saniye sonra yeni bir kod isteyebilirsin.',
+        ),
+      );
+    }
+
+    return notices;
+  }
+
+  List<Widget> _buildTotpNotices(LoginState state) {
+    final notices = <Widget>[];
+    final attempts = state.totp.attemptsRemaining;
+    if (attempts < 5) {
+      final variant = attempts <= 1 ? _NoticeVariant.danger : _NoticeVariant.warning;
+      final headline = attempts <= 1
+          ? 'Son dogrulama hakkin'
+          : 'Dogrulama deneme limitine yaklastin';
+      final message = attempts <= 1
+          ? 'Yanlis girersen giris gecici olarak kilitlenebilir.'
+          : '$attempts deneme hakkin kaldi. Limit asilirsa hesap kilitlenebilir.';
+      notices.add(
+        _buildNotice(
+          variant: variant,
+          icon: Icons.shield_outlined,
+          headline: headline,
+          message: message,
+        ),
+      );
+    }
     return notices;
   }
 
@@ -1601,35 +1711,85 @@ class _MfaOptionTile extends StatelessWidget {
   }
 }
 
+enum _NoticeVariant {
+  info,
+  warning,
+  danger,
+}
+
+class _NoticePalette {
+  const _NoticePalette({
+    required this.background,
+    required this.border,
+    required this.iconColor,
+  });
+
+  final Color background;
+  final Color border;
+  final Color iconColor;
+}
+
+_NoticePalette _noticePalette(_NoticeVariant variant) {
+  switch (variant) {
+    case _NoticeVariant.danger:
+      const base = Color(0xFFDC2626);
+      return _NoticePalette(
+        background: base.withOpacity(0.18),
+        border: base.withOpacity(0.45),
+        iconColor: const Color(0xFFFCA5A5),
+      );
+    case _NoticeVariant.warning:
+      const base = Color(0xFFF59E0B);
+      return _NoticePalette(
+        background: base.withOpacity(0.16),
+        border: base.withOpacity(0.4),
+        iconColor: const Color(0xFFFCD34D),
+      );
+    case _NoticeVariant.info:
+      const base = Color(0xFF2563EB);
+      return _NoticePalette(
+        background: base.withOpacity(0.14),
+        border: base.withOpacity(0.35),
+        iconColor: const Color(0xFF93C5FD),
+      );
+  }
+}
+
 class _NoticeBanner extends StatelessWidget {
   const _NoticeBanner({
     required this.icon,
     required this.headline,
     this.message,
     this.background,
+    this.iconColor,
+    this.borderColor,
   });
 
   final IconData icon;
   final String headline;
   final String? message;
   final Color? background;
+  final Color? iconColor;
+  final Color? borderColor;
 
   @override
   Widget build(BuildContext context) {
     final color = background ?? Colors.white.withOpacity(0.06);
+    final iconShade = iconColor ?? Colors.white.withOpacity(0.9);
+    final borderShade = borderColor ?? Colors.white.withOpacity(0.12);
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: borderShade),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.white.withOpacity(0.9)),
+          Icon(icon, color: iconShade),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

@@ -35,28 +35,28 @@
 - [x] Caption içinde hashtag/@mention typeahead bileşenlerini geliştir.
 - [x] Medya üstü etiketleme (tap to tag) arayüzünü oluştur.
 - [x] Etiket onay kuyruğunu (flag’li mod) kullanıcı ayarlarıyla bağla.
-- [ ] Engellenen kullanıcı/banlı hashtag kurallarını UI doğrulamalarıyla uygula.
-- [ ] İndeks güncellemeleri için gerekli API çağrılarını TraceHttpClient ile çalıştır.
-- [ ] İlgili widget/integration testlerini tamamla.
+- [x] Engellenen kullanıcı/banlı hashtag kurallarını UI doğrulamalarıyla uygula.
+- [x] İndeks güncellemeleri için gerekli API çağrılarını TraceHttpClient ile çalıştır.
+- [x] İlgili widget/integration testlerini tamamla.
 
 ## 5. UI Bileşenleri ve Tema
 
-- [ ] `shared/widgets` ve tema rehberindeki bileşenleri proje geneline entegre et.
-- [ ] CgThemeExtension üzerinden koyu/açık tema varyantlarını uygula.
-- [ ] Yerelleştirme (TR ve çoklu dil) desteğini UI’da etkinleştir.
-- [ ] Erişilebilirlik (A11Y) kriterleri için odak, kontrast ve screen reader etiketlerini doğrula.
+- [x] `shared/widgets` ve tema rehberindeki bileşenleri proje geneline entegre et.
+- [x] CgThemeExtension üzerinden koyu/açık tema varyantlarını uygula.
+- [x] Yerelleştirme (TR ve çoklu dil) desteğini UI’da etkinleştir.
+- [x] Erişilebilirlik (A11Y) kriterleri için odak, kontrast ve screen reader etiketlerini doğrula _(Modern Deposit ekranı için kategori/post tipi kartları, seviye slider’ı ve fotoğraf seçiciye odak & semantik iyileştirmeleri tamamlandı).
 
 ## 6. Durum Yönetimi ve DI
 
-- [ ] Her modül için Riverpod provider’larını `features/*/application` altında tanımla.
-- [ ] GetIt servis kayıtlarını `core/di/service_locator.dart` içinde tamamla.
-- [ ] Mock ve gerçek repository implementasyonlarını UI katmanına bağla.
+- [x] Her modül için Riverpod provider'larını `features/*/application` altında tanımla _(app, auth, notifications, store ve wallet modülleri için sağlayıcı katmanı eklendi).
+- [x] GetIt servis kayıtlarını `core/di/service_locator.dart` içinde tamamla _(TaggingPolicyService ve CringeStore bağımlılıkları GetIt üzerinden erişilebilir hale getirildi).
+- [x] Mock ve gerçek repository implementasyonlarını UI katmanına bağla _(CringeStore ürünleri, cüzdan ve sipariş akışı artık repository stream'lerine bağlı çalışıyor)._
 
 ## 7. Telemetri, Rate Limit ve Güvenlik Entegrasyonları
 
-- [ ] TelemetryService event çağrılarını (kayıt, login, feed, etiketleme) UI aksiyonlarına ekle.
-- [ ] TraceHttpClient kullanarak tüm HTTP çağrılarına W3C header propagasyonu uygula.
-- [ ] Rate limit uyarıları ve güvenlik mesajlarını (OTP limit, captcha, kilit) UI’da standartlaştır.
+- [x] TelemetryService event çağrılarını (kayıt, login, feed, etiketleme) UI aksiyonlarına ekle.
+- [x] TraceHttpClient kullanarak tüm HTTP çağrılarına W3C header propagasyonu uygula.
+- [x] Rate limit uyarıları ve güvenlik mesajlarını (OTP limit, captcha, kilit) UI’da standartlaştır.
 
 ## 8. Test Stratejisi
 

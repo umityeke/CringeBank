@@ -9,12 +9,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
+import '../core/legal/legal_consent_util.dart';
+import '../core/legal/legal_versions.dart';
 import '../models/user_model.dart';
 import '../utils/search_normalizer.dart';
 import '../utils/username_policies.dart';
 import '../utils/store_feature_flags.dart';
 import 'telemetry/callable_latency_tracker.dart';
+import 'telemetry/trace_http_client.dart';
 
 class UsernameCheckResult {
   const UsernameCheckResult({
@@ -99,6 +101,7 @@ class UserService {
   );
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   final DeviceInfoPlugin _deviceInfoPlugin = DeviceInfoPlugin();
+  final TraceHttpClient _traceHttpClient = TraceHttpClient.shared;
 
   Map<String, dynamic> _normalizeCallableResponse(dynamic data) {
     if (data is Map<String, dynamic>) {
@@ -1132,6 +1135,7 @@ class UserService {
 
     await loadUserData(uid);
     await _logAuthActivity(firebaseUser, 'REGISTER');
+    await _applyInitialLegalMetadata(uid);
     print('registrationFinalize completed successfully for $uid');
     return true;
   }
@@ -1167,17 +1171,19 @@ class UserService {
   Future<Map<String, dynamic>> _registrationFinalizeViaHttp(
     Map<String, dynamic> payload,
   ) async {
-    http.Response response;
+    TraceHttpResponse traceResponse;
     try {
-      response = await http.post(
+      traceResponse = await _traceHttpClient.postJson(
         Uri.parse(_registrationFinalizeHttpEndpoint),
-        headers: const {'Content-Type': 'application/json'},
-        body: jsonEncode(payload),
+        jsonBody: payload,
+        operation: 'registration.finalizeHttp',
       );
     } catch (error) {
       print('registrationFinalizeHttp request failed: $error');
       rethrow;
     }
+
+    final response = traceResponse.response;
 
     Map<String, dynamic>? decoded;
     if (response.body.isNotEmpty) {
@@ -1276,6 +1282,30 @@ class UserService {
       }
     } catch (e) {
       print('Load user data error: $e');
+    }
+  }
+
+  Future<void> _applyInitialLegalMetadata(String uid) async {
+    try {
+      final docRef = _firestore.collection('users').doc(uid);
+      final snapshot = await docRef.get();
+      final existing = snapshot.data();
+      final updates = buildInitialLegalUpdate(
+        existingData: existing,
+        claimsVersion: ClaimsVersioning.minimum,
+        termsVersion: LegalVersions.termsOfService,
+        privacyVersion: LegalVersions.privacyPolicy,
+      );
+
+      if (updates.isEmpty) {
+        return;
+      }
+
+      updates['legalConsentUpdatedAt'] = FieldValue.serverTimestamp();
+      await docRef.set(updates, SetOptions(merge: true));
+    } catch (error, stack) {
+      debugPrint('⚠️ INITIAL LEGAL METADATA FAILED: $error');
+      debugPrint('STACK: $stack');
     }
   }
 

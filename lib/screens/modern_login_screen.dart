@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/user_service.dart';
+import '../shared/extensions/build_context_extensions.dart';
 import 'registration_flow_screen.dart';
 
 class ModernLoginScreen extends StatefulWidget {
@@ -144,10 +145,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    Colors.black.withOpacity(0.25),
-                    Colors.transparent,
-                  ],
+                  colors: [Colors.black.withOpacity(0.25), Colors.transparent],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -174,8 +172,8 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
   }
 
   Widget _buildLoginCard(BuildContext context, double cardWidth) {
-  final cardColor = Colors.white.withOpacity(0.04);
-  final borderColor = Colors.white.withOpacity(0.08);
+    final cardColor = Colors.white.withOpacity(0.04);
+    final borderColor = Colors.white.withOpacity(0.08);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
@@ -222,7 +220,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         const SizedBox(height: 40),
         Transform.translate(
           offset: Offset(0, -liftAmount),
-          child: _buildFormSection(context),
+          child: AutofillGroup(child: _buildFormSection(context)),
         ),
         SizedBox(height: liftAmount),
       ],
@@ -230,13 +228,15 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
   }
 
   Widget _buildFormSection(BuildContext context) {
+    final l10n = context.l10n;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text(
-          'Email',
-          style: TextStyle(
+        Text(
+          l10n.emailLabel,
+          style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
             color: Colors.white,
@@ -245,15 +245,17 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         const SizedBox(height: 10),
         _buildInputField(
           controller: _usernameController,
-          hintText: 'E-posta adresini gir',
+          hintText: l10n.emailHint,
           textInputAction: TextInputAction.next,
           keyboardType: TextInputType.emailAddress,
+          autofillHints: const [AutofillHints.email],
+          semanticLabel: l10n.emailLabel,
           icon: Icons.alternate_email,
         ),
         const SizedBox(height: 18),
-        const Text(
-          'Şifre',
-          style: TextStyle(
+        Text(
+          l10n.passwordLabel,
+          style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
             color: Colors.white,
@@ -262,9 +264,11 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         const SizedBox(height: 10),
         _buildInputField(
           controller: _passwordController,
-          hintText: 'Şifreni gir',
+          hintText: l10n.passwordHint,
           obscureText: true,
           textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.password],
+          semanticLabel: l10n.passwordLabel,
           icon: Icons.lock_outline,
         ),
         const SizedBox(height: 16),
@@ -288,16 +292,18 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
     bool obscureText = false,
     TextInputAction textInputAction = TextInputAction.next,
     TextInputType? keyboardType,
+    Iterable<String>? autofillHints,
+    String? semanticLabel,
   }) {
-  final borderColor = Colors.white.withOpacity(0.12);
+    final borderColor = Colors.white.withOpacity(0.12);
     const focusedBorderColor = Color(0xFF2D79F3);
 
     return Container(
       height: 56,
       decoration: BoxDecoration(
-  borderRadius: BorderRadius.circular(16),
-  border: Border.all(color: borderColor, width: 1.4),
-  color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor, width: 1.4),
+        color: Colors.white.withOpacity(0.06),
       ),
       child: Row(
         children: [
@@ -305,29 +311,35 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
           Icon(icon, size: 20, color: Colors.white.withOpacity(0.7)),
           const SizedBox(width: 12),
           Expanded(
-            child: TextField(
-              controller: controller,
-              obscureText: obscureText,
-              textInputAction: textInputAction,
-              keyboardType: keyboardType,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-              cursorColor: focusedBorderColor,
-              decoration: InputDecoration(
-                hintText: hintText,
-                border: InputBorder.none,
-                hintStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontWeight: FontWeight.w500,
+            child: Semantics(
+              label: semanticLabel ?? hintText,
+              textField: true,
+              child: TextField(
+                controller: controller,
+                obscureText: obscureText,
+                textInputAction: textInputAction,
+                keyboardType: keyboardType,
+                autofillHints: autofillHints,
+                enableSuggestions: !obscureText,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
                 ),
+                cursorColor: focusedBorderColor,
+                decoration: InputDecoration(
+                  hintText: hintText,
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(
+                    color: Colors.white.withOpacity(0.5),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                onSubmitted: (value) {
+                  if (textInputAction == TextInputAction.done) {
+                    _handleLogin();
+                  }
+                },
               ),
-              onSubmitted: (value) {
-                if (textInputAction == TextInputAction.done) {
-                  _handleLogin();
-                }
-              },
             ),
           ),
         ],
@@ -389,45 +401,60 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
   }
 
   Widget _buildRememberForgotRow(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(
-          height: 20,
-          width: 20,
-          child: Checkbox(
-            value: _rememberMe,
-            onChanged: _handleRememberMeToggle,
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            activeColor: const Color(0xFF2879F3),
-          ),
-        ),
-        const SizedBox(width: 8),
-        const Text(
-          'Beni Hatırla',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.white,
-          ),
-        ),
-        const Spacer(),
-        TextButton(
-          onPressed: _handleForgotPassword,
-          style: TextButton.styleFrom(
-            padding: EdgeInsets.zero,
-            minimumSize: Size.zero,
-          ),
-          child: const Text(
-            'Şifremi Unuttum',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF2D79F3),
-              decoration: TextDecoration.none,
+    final l10n = context.l10n;
+
+    return MergeSemantics(
+      child: Row(
+        children: [
+          Semantics(
+            label: l10n.rememberMe,
+            toggled: _rememberMe,
+            child: SizedBox(
+              height: 20,
+              width: 20,
+              child: Checkbox(
+                value: _rememberMe,
+                onChanged: _handleRememberMeToggle,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                activeColor: const Color(0xFF2879F3),
+              ),
             ),
           ),
-        ),
-      ],
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => _handleRememberMeToggle(!_rememberMe),
+            child: Text(
+              l10n.rememberMe,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          const Spacer(),
+          Semantics(
+            button: true,
+            label: l10n.forgotPassword,
+            child: TextButton(
+              onPressed: _handleForgotPassword,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+              ),
+              child: Text(
+                l10n.forgotPassword,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF2D79F3),
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -440,6 +467,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
     String? errorText;
     bool isSubmitting = false;
     bool requestSent = false;
+    final l10n = context.l10n;
 
     await showDialog<void>(
       context: context,
@@ -452,9 +480,9 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
-              title: const Text(
-                'Şifremi Unuttum',
-                style: TextStyle(
+              title: Text(
+                l10n.forgotPasswordDialogTitle,
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
                 ),
@@ -472,7 +500,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'E-posta adresini gir, sıfırlama bağlantısı gönderelim.',
+                    l10n.forgotPasswordDialogMessage,
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.7),
                       fontSize: 13,
@@ -490,7 +518,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                       fontWeight: FontWeight.w600,
                     ),
                     decoration: InputDecoration(
-                      labelText: 'E-posta adresi',
+                      labelText: l10n.forgotPasswordDialogEmailLabel,
                       labelStyle: TextStyle(
                         color: Colors.white.withOpacity(0.7),
                       ),
@@ -531,7 +559,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                       : () {
                           Navigator.of(dialogContext).pop();
                         },
-                  child: const Text('İptal'),
+                  child: Text(l10n.commonCancel),
                 ),
                 FilledButton(
                   onPressed: isSubmitting
@@ -540,7 +568,8 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                           final email = emailController.text.trim();
                           if (email.isEmpty) {
                             setState(
-                              () => errorText = 'Lütfen e-posta adresini gir.',
+                              () => errorText =
+                                  l10n.forgotPasswordDialogEmailRequired,
                             );
                             return;
                           }
@@ -549,7 +578,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                           if (!RegExp(emailPattern).hasMatch(email)) {
                             setState(
                               () => errorText =
-                                  'Lütfen geçerli bir e-posta adresi gir.',
+                                  l10n.forgotPasswordDialogEmailInvalid,
                             );
                             return;
                           }
@@ -570,8 +599,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                           } else {
                             setState(() {
                               isSubmitting = false;
-                              errorText =
-                                  'Şifre sıfırlama isteği gönderilemedi. Lütfen tekrar dene.';
+                              errorText = l10n.forgotPasswordDialogError;
                             });
                           }
                         },
@@ -597,7 +625,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                             ),
                           ),
                         )
-                      : const Text('Gönder'),
+                      : Text(l10n.forgotPasswordDialogSubmit),
                 ),
               ],
             );
@@ -610,11 +638,13 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
 
     if (!mounted) return;
     if (requestSent) {
-      _showInfo('Şifre sıfırlama bağlantısı e-postana gönderildi.');
+      _showInfo(l10n.forgotPasswordSnackSuccess);
     }
   }
 
   Widget _buildSignInButton() {
+    final l10n = context.l10n;
+
     return SizedBox(
       width: double.infinity,
       child: MouseRegion(
@@ -666,9 +696,9 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
-                  : const Text(
-                      'Giriş Yap',
-                      style: TextStyle(
+                  : Text(
+                      l10n.signInCta,
+                      style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
@@ -682,45 +712,38 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
   }
 
   Widget _buildOrDivider() {
+    final l10n = context.l10n;
+
     return Row(
       children: [
         Expanded(
-          child: Container(
-            height: 1,
-            color: Colors.white.withOpacity(0.1),
-          ),
+          child: Container(height: 1, color: Colors.white.withOpacity(0.1)),
         ),
         const SizedBox(width: 12),
         Text(
-          'ya da',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
-            fontSize: 13,
-          ),
+          l10n.orDivider,
+          style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Container(
-            height: 1,
-            color: Colors.white.withOpacity(0.1),
-          ),
+          child: Container(height: 1, color: Colors.white.withOpacity(0.1)),
         ),
       ],
     );
   }
 
   Widget _buildSocialButtons(BuildContext context) {
+    final l10n = context.l10n;
+
     return Column(
       children: [
         _buildSocialButton(
           icon: Icons.g_translate,
-          label: 'Google ile giriş yap',
+          label: l10n.googleSignIn,
           onPressed: () {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Google ile giriş yakında eklenecek.'),
-                ),
+                SnackBar(content: Text(l10n.googleSignInComingSoon)),
               );
             }
           },
@@ -728,13 +751,11 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
         const SizedBox(height: 0),
         _buildSocialButton(
           icon: Icons.apple,
-          label: 'Apple ile giriş yap',
+          label: l10n.appleSignIn,
           onPressed: () {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Apple ile giriş yakında eklenecek.'),
-                ),
+                SnackBar(content: Text(l10n.appleSignInComingSoon)),
               );
             }
           },
@@ -748,41 +769,50 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
     required String label,
     required VoidCallback onPressed,
   }) {
-    return SizedBox(
-      width: double.infinity,
-      height: 54,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: Colors.white.withOpacity(0.16)),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          foregroundColor: Colors.white,
-          backgroundColor: Colors.white.withOpacity(0.04),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 22),
-            const SizedBox(width: 10),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+    return Semantics(
+      button: true,
+      label: label,
+      child: SizedBox(
+        width: double.infinity,
+        height: 54,
+        child: OutlinedButton(
+          onPressed: onPressed,
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: Colors.white.withOpacity(0.16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-          ],
+            foregroundColor: Colors.white,
+            backgroundColor: Colors.white.withOpacity(0.04),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 22),
+              const SizedBox(width: 10),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildSignUpRow(BuildContext context) {
+    final l10n = context.l10n;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'Hesabın yok mu?',
+          l10n.signUpPrompt,
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w400,
@@ -796,9 +826,9 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
               MaterialPageRoute(builder: (_) => const RegistrationFlowScreen()),
             );
           },
-          child: const Text(
-            'Hemen kayıt ol',
-            style: TextStyle(
+          child: Text(
+            l10n.signUpCta,
+            style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
               color: Color(0xFF2D79F3),
@@ -816,15 +846,16 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
 
     final emailInput = _usernameController.text.trim();
     final passwordInput = _passwordController.text.trim();
+    final l10n = context.l10n;
 
     if (emailInput.isEmpty || passwordInput.isEmpty) {
-      _showError('Lütfen tüm alanları doldurun');
+      _showError(l10n.loginEmptyFields);
       return;
     }
 
     const emailPattern = r'^[^@\s]+@[^@\s]+\.[^@\s]+$';
     if (!RegExp(emailPattern).hasMatch(emailInput)) {
-      _showError('Lütfen geçerli bir e-posta adresi girin');
+      _showError(l10n.loginInvalidEmail);
       return;
     }
 
@@ -844,14 +875,14 @@ class _ModernLoginScreenState extends State<ModernLoginScreen>
       }
 
       if (!success) {
-        _showError('Kullanıcı adı veya şifre hatalı!');
+        _showError(l10n.loginInvalidCredentials);
       } else {
         await _updateRememberedCredentials();
         if (!mounted) return;
         Navigator.of(context).pushReplacementNamed('/main');
       }
     } catch (e) {
-      _showError('Bir hata oluştu: $e');
+      _showError(l10n.loginGenericError('$e'));
     }
 
     if (mounted) {

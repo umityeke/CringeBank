@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cringe_bankasi/models/cringe_entry.dart';
-import 'package:cringe_bankasi/services/cringe_entry_service.dart';
+import 'package:cringebank/models/cringe_entry.dart';
+import 'package:cringebank/services/cringe_entry_service.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:firebase_storage/firebase_storage.dart';

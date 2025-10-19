@@ -1,4 +1,4 @@
-import 'package:cringe_bankasi/services/telemetry/sql_mirror_latency_monitor.dart';
+import 'package:cringebank/services/telemetry/sql_mirror_latency_monitor.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

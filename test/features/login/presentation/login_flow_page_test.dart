@@ -724,7 +724,14 @@ void main() {
           find.text('SMS uzerinden bir kod gonderdik. Kod 6 haneli.'),
           findsOneWidget,
         );
-        expect(find.text('Kalan deneme: 2'), findsOneWidget);
+        expect(find.text('OTP deneme limitine yaklastin'), findsOneWidget);
+        expect(
+          find.text(
+            '2 deneme hakkin kaldi. Limit asilirsa hesap gecici olarak kilitlenebilir.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('OTP yeniden gonderme siniri'), findsOneWidget);
         expect(find.textContaining('Yeniden gondermek icin'), findsOneWidget);
 
         final otpField = tester.widget<TextField>(find.byType(TextField));
@@ -862,7 +869,13 @@ void main() {
       expect(totpFieldFinder, findsOneWidget);
       final totpField = tester.widget<TextField>(totpFieldFinder);
       expect(totpField.enabled, isTrue);
-      expect(find.text('Kalan deneme: 3'), findsOneWidget);
+      expect(find.text('Dogrulama deneme limitine yaklastin'), findsOneWidget);
+      expect(
+        find.text(
+          '3 deneme hakkin kaldi. Limit asilirsa hesap kilitlenebilir.',
+        ),
+        findsOneWidget,
+      );
 
   final verifyFinder = find.widgetWithText(AppButton, 'Kodu dogrula');
       expect(verifyFinder, findsOneWidget);

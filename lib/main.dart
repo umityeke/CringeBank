@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cringebank/l10n/app_localizations.dart';
 
 import 'bootstrap.dart';
 import 'services/user_service.dart';
@@ -10,24 +12,34 @@ import 'screens/main_navigation.dart';
 import 'screens/admin_test_page.dart';
 import 'screens/admin/admin_panel_screen.dart';
 import 'theme/app_theme.dart';
+import 'core/config/theme_mode_controller.dart';
+import 'core/config/locale_controller.dart';
+import 'shared/extensions/build_context_extensions.dart';
 
 Future<void> main() async {
   await bootstrap(const CringeBankApp());
 }
 
-class CringeBankApp extends StatelessWidget {
+class CringeBankApp extends ConsumerWidget {
   const CringeBankApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeControllerProvider);
+    final locale = ref.watch(localeControllerProvider);
+
     return MaterialApp(
       title: 'CringeBank',
+      onGenerateTitle: (context) => context.l10n.appTitle,
       theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
+      locale: locale,
       scrollBehavior: const _NoScrollbarScrollBehavior(),
       debugShowCheckedModeBanner: false,
-      locale: const Locale('tr', 'TR'),
-      supportedLocales: const [Locale('tr', 'TR'), Locale('en', 'US')],
+      supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const [
+        AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -39,13 +51,12 @@ class CringeBankApp extends StatelessWidget {
             return const SplashScreen();
           }
 
-          // Firebase Auth user varsa veya UserService'te user varsa giriş yapmış sayılır
-          bool isLoggedIn = snapshot.hasData || UserService.instance.isLoggedIn;
+          final isLoggedIn =
+              snapshot.hasData || UserService.instance.isLoggedIn;
           if (isLoggedIn) {
             return const MainNavigation();
-          } else {
-            return const ModernLoginScreen();
           }
+          return const ModernLoginScreen();
         },
       ),
       routes: {
@@ -161,9 +172,9 @@ class _SplashScreenState extends State<SplashScreen>
               const SizedBox(height: 32),
               FadeTransition(
                 opacity: _opacityAnimation,
-                child: const Text(
-                  'Cringe Bankası',
-                  style: TextStyle(
+                child: Text(
+                  context.l10n.splashTitle,
+                  style: const TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -173,9 +184,9 @@ class _SplashScreenState extends State<SplashScreen>
               const SizedBox(height: 16),
               FadeTransition(
                 opacity: _opacityAnimation,
-                child: const Text(
-                  'En utanç verici anlarınızın değeri burada',
-                  style: TextStyle(fontSize: 16, color: Colors.white70),
+                child: Text(
+                  context.l10n.splashSubtitle,
+                  style: const TextStyle(fontSize: 16, color: Colors.white70),
                 ),
               ),
             ],

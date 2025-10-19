@@ -1,0 +1,58 @@
+{
+  "@@locale": "tr",
+  "appTitle": "CringeBank",
+  "splashTitle": "Cringe Bankası",
+  "splashSubtitle": "En utanç verici anlarınızın değeri burada",
+  "emailLabel": "E-posta",
+  "emailHint": "E-posta adresini gir",
+  "passwordLabel": "Şifre",
+  "passwordHint": "Şifreni gir",
+  "rememberMe": "Beni hatırla",
+  "forgotPassword": "Şifremi unuttum",
+  "forgotPasswordDialogTitle": "Şifremi Unuttum",
+  "forgotPasswordDialogMessage": "E-posta adresini yaz, sıfırlama bağlantısını gönderelim.",
+  "forgotPasswordDialogEmailLabel": "E-posta adresi",
+  "forgotPasswordDialogEmailRequired": "Lütfen e-posta adresini gir.",
+  "forgotPasswordDialogEmailInvalid": "Lütfen geçerli bir e-posta adresi gir.",
+  "forgotPasswordDialogError": "Şifre sıfırlama isteği gönderilemedi. Lütfen tekrar dene.",
+  "forgotPasswordDialogSubmit": "Gönder",
+  "commonCancel": "İptal",
+  "forgotPasswordSnackSuccess": "Şifre sıfırlama bağlantısı e-postana gönderildi.",
+  "signInCta": "Giriş Yap",
+  "orDivider": "ya da",
+  "googleSignIn": "Google ile giriş yap",
+  "googleSignInComingSoon": "Google ile giriş yakında eklenecek.",
+  "appleSignIn": "Apple ile giriş yap",
+  "appleSignInComingSoon": "Apple ile giriş yakında eklenecek.",
+  "signUpPrompt": "Hesabın yok mu?",
+  "signUpCta": "Hemen kayıt ol",
+  "loginEmptyFields": "Lütfen tüm alanları doldurun",
+  "loginInvalidEmail": "Lütfen geçerli bir e-posta adresi girin",
+  "loginInvalidCredentials": "Kullanıcı adı veya şifre hatalı!",
+  "loginGenericError": "Bir hata oluştu: {error}",
+  "@loginGenericError": {
+    "description": "Beklenmeyen giriş hatası mesajı.",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "themePreferenceTitle": "Tema Tercihi",
+  "themePreferenceDescription": "Uygulama temasını cihaz ayarına bırakabilir veya manuel seçebilirsin.",
+  "themePreferenceSystem": "Otomatik",
+  "themePreferenceSystemSubtitle": "Cihazının gece/gündüz moduna uyum sağlar.",
+  "themePreferenceLight": "Gündüz",
+  "themePreferenceLightSubtitle": "Aydınlık yüzeyler ve sıcak vurgu gradyanları.",
+  "themePreferenceDark": "Gece",
+  "themePreferenceDarkSubtitle": "Koyu yüzeyler ve canlı neon vurguları.",
+  "localePreferenceTitle": "Dil",
+  "localePreferenceDescription": "Arayüzde kullanılacak dili seç.",
+  "localePreferenceOptionTr": "Türkçe",
+  "localePreferenceOptionEn": "İngilizce",
+  "localeChangeSnack": "{language} diline geçildi",
+  "@localeChangeSnack": {
+    "description": "Dil değiştirildiğinde gösterilen bildirim.",
+    "placeholders": {
+      "language": {}
+    }
+  }
+}

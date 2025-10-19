@@ -36,7 +36,10 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 add_definitions(-DUNICODE -D_UNICODE)
 
 if(MSVC)
-  add_compile_options(/FS)
+  add_compile_options(
+    "$<$<COMPILE_LANGUAGE:C>:/FS>"
+    "$<$<COMPILE_LANGUAGE:CXX>:/FS>"
+  )
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /FS")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /FS")
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded)
@@ -59,7 +62,12 @@ function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_definitions(${TARGET} PRIVATE "_HAS_EXCEPTIONS=0")
   target_compile_definitions(${TARGET} PRIVATE "$<$<CONFIG:Debug>:_DEBUG>")
   if(MSVC)
-    target_compile_options(${TARGET} PRIVATE /FS)
+    target_compile_options(
+      ${TARGET}
+      PRIVATE
+        $<$<COMPILE_LANGUAGE:C>:/FS>
+        $<$<COMPILE_LANGUAGE:CXX>:/FS>
+    )
   endif()
 endfunction()
 

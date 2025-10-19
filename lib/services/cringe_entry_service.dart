@@ -11,7 +11,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/cringe_comment.dart';
 import '../models/cringe_entry.dart';
 import '../models/user_model.dart';
+import '../utils/tag_parser.dart';
 import 'connectivity_service.dart';
+import 'search_index_updater.dart';
 import 'user_service.dart';
 
 enum CringeStreamStatus { initializing, connecting, healthy, degraded, error }
@@ -127,6 +129,23 @@ class CringeEntryService {
     return entry.copyWith(
       baslik: normalizedTitle,
       aciklama: normalizedDescription,
+    );
+  }
+
+  CringeEntry _enrichEntryMetadata(CringeEntry entry) {
+    final normalizedTags = <String>{};
+    for (final tag in entry.etiketler) {
+      final sanitized = TagParser.sanitizeHashtag(tag);
+      if (sanitized.isNotEmpty) {
+        normalizedTags.add(sanitized);
+      }
+    }
+
+    normalizedTags.addAll(TagParser.extractHashtags(entry.baslik));
+    normalizedTags.addAll(TagParser.extractHashtags(entry.aciklama));
+
+    return entry.copyWith(
+      etiketler: normalizedTags.toList(growable: false),
     );
   }
 
@@ -1016,7 +1035,7 @@ class CringeEntryService {
   // 🏢 ENTERPRISE LEVEL CRINGE ENTRY CREATION WITH ADVANCED FEATURES
   // Features: Validation, Analytics, Monitoring, Audit Trail, Performance Optimization
   Future<bool> addEntry(CringeEntry entry) async {
-    final normalizedEntry = _normalizeEntry(entry);
+  final normalizedEntry = _enrichEntryMetadata(_normalizeEntry(entry));
     final transactionId = DateTime.now().millisecondsSinceEpoch.toString();
     final stopwatch = Stopwatch()..start();
 
@@ -1054,6 +1073,12 @@ class CringeEntryService {
         docRef.id,
         normalizedEntry,
         transactionId,
+      );
+
+      unawaited(
+        SearchIndexUpdater.instance.upsertEntry(
+          normalizedEntry.copyWith(id: docRef.id),
+        ),
       );
 
       final elapsedTime = stopwatch.elapsedMilliseconds;
@@ -1990,8 +2015,10 @@ class CringeEntryService {
 
     final transactionId =
         'upd_${DateTime.now().millisecondsSinceEpoch.toString()}';
-    final normalizedEntry = _normalizeEntry(
-      entry.copyWith(userId: ownerId.isNotEmpty ? ownerId : currentUserId),
+    final normalizedEntry = _enrichEntryMetadata(
+      _normalizeEntry(
+        entry.copyWith(userId: ownerId.isNotEmpty ? ownerId : currentUserId),
+      ),
     );
     final updateData = await _prepareEnterpriseUpdateData(
       normalizedEntry,
@@ -2004,6 +2031,12 @@ class CringeEntryService {
       currentUserId,
       updateData,
       transactionId,
+    );
+
+    unawaited(
+      SearchIndexUpdater.instance.upsertEntry(
+        normalizedEntry.copyWith(id: entry.id),
+      ),
     );
 
     return true;
@@ -2020,6 +2053,15 @@ class CringeEntryService {
     if (!snapshot.exists) {
       return false;
     }
+
+  final snapshotData = snapshot.data();
+  final existingTags = snapshotData != null
+    ? (snapshotData['etiketler'] is Iterable
+      ? (snapshotData['etiketler'] as Iterable)
+        .whereType<String>()
+        .toList(growable: false)
+      : const <String>[])
+    : const <String>[];
 
     // Firestore rules expect 'ownerId', but some old docs might only have 'userId'
     var ownerId =
@@ -2042,6 +2084,14 @@ class CringeEntryService {
     final targetUserId = ownerId.isNotEmpty ? ownerId : currentUserId;
     await _decrementUserStats(targetUserId, transactionId);
     await _logAuditTrailDelete(entryId, currentUserId, transactionId);
+
+    unawaited(
+      SearchIndexUpdater.instance.deleteEntry(
+        entryId,
+        ownerId: targetUserId,
+        hashtags: existingTags,
+      ),
+    );
 
     return true;
   }

@@ -10,13 +10,16 @@ import '../models/competition_model.dart';
 import '../widgets/animated_bubble_background.dart';
 import '../services/competition_service.dart';
 import '../services/cringe_entry_service.dart';
+import '../services/tagging_policy_service.dart';
 import '../services/user_service.dart';
+import '../shared/widgets/app_button.dart';
 
 class ModernCringeDepositScreen extends StatefulWidget {
   final CringeEntry? existingEntry;
   final VoidCallback? onCringeSubmitted;
   final VoidCallback? onCloseRequested;
   final Competition? competition;
+  final CompetitionService? competitionServiceOverride;
 
   const ModernCringeDepositScreen({
     super.key,
@@ -24,6 +27,7 @@ class ModernCringeDepositScreen extends StatefulWidget {
     this.onCringeSubmitted,
     this.onCloseRequested,
     this.competition,
+    this.competitionServiceOverride,
   });
 
   @override
@@ -50,6 +54,15 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
   bool _isAnonymous = false;
   bool _isSubmitting = false;
 
+  TaggingPolicy? _taggingPolicy;
+  bool _isLoadingTaggingPolicy = false;
+  String? _taggingPolicyError;
+  List<_TaggingViolation> _taggingViolations = const <_TaggingViolation>[];
+  static final RegExp _hashtagPattern = RegExp(r'#([A-Za-z0-9_çğıöşüÇĞİÖŞÜ]+)');
+  static final RegExp _mentionPattern = RegExp(
+    r'@([A-Za-z0-9_\.çğıöşüÇĞİÖŞÜ]+)',
+  );
+
   // Fotoğraf için yeni değişkenler
   Uint8List? _selectedImageBytes;
   String? _selectedImageName;
@@ -62,7 +75,8 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
   @override
   void initState() {
     super.initState();
-    _competitionService = CompetitionService();
+    _competitionService =
+        widget.competitionServiceOverride ?? CompetitionService();
     _controller = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
@@ -94,16 +108,119 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
       _existingImageUrls = List<String>.from(entry.imageUrls);
     }
 
+    _descriptionController.addListener(_handleDescriptionChanged);
+    _loadTaggingPolicy();
+
     _controller.forward();
   }
 
   @override
   void dispose() {
+    _descriptionController.removeListener(_handleDescriptionChanged);
     _controller.dispose();
     _submitController.dispose();
     _descriptionController.dispose();
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _handleDescriptionChanged() {
+    final violations = _computeTaggingViolations(_descriptionController.text);
+    setState(() {
+      _taggingViolations = List<_TaggingViolation>.unmodifiable(violations);
+    });
+  }
+
+  Future<void> _loadTaggingPolicy() async {
+    setState(() {
+      _isLoadingTaggingPolicy = true;
+      _taggingPolicyError = null;
+    });
+
+    try {
+      final policy = await TaggingPolicyService.instance.fetchPolicy(
+        forceRefresh: false,
+      );
+      if (!mounted) return;
+      setState(() {
+        _taggingPolicy = policy;
+        _isLoadingTaggingPolicy = false;
+        _taggingPolicyError = null;
+        _taggingViolations = List<_TaggingViolation>.unmodifiable(
+          _computeTaggingViolations(_descriptionController.text),
+        );
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingTaggingPolicy = false;
+        if (_taggingPolicy == null) {
+          _taggingPolicyError =
+              'Etiketleme politikası şu anda yüklenemedi. Lütfen yeniden deneyin.';
+        }
+      });
+    }
+  }
+
+  List<_TaggingViolation> _computeTaggingViolations(String rawText) {
+    final policy = _taggingPolicy;
+    if (policy == null) {
+      return const <_TaggingViolation>[];
+    }
+
+    if (rawText.trim().isEmpty) {
+      return const <_TaggingViolation>[];
+    }
+
+    final content = rawText.toLowerCase();
+    final results = <_TaggingViolation>[];
+
+    final bannedHashtags = policy.bannedHashtags
+        .map((value) => value.trim().toLowerCase())
+        .where((value) => value.isNotEmpty)
+        .toSet();
+    final seenHashtags = <String>{};
+    for (final match in _hashtagPattern.allMatches(content)) {
+      final normalized = (match.group(1) ?? '').trim().toLowerCase();
+      if (normalized.isEmpty) continue;
+      if (!seenHashtags.add(normalized)) continue;
+      if (bannedHashtags.contains(normalized)) {
+        results.add(
+          _TaggingViolation(
+            type: _TaggingViolationType.hashtag,
+            message:
+                '#$normalized etiketi topluluk kuralları gereği engellendi.',
+            offendingValue: normalized,
+          ),
+        );
+      }
+    }
+
+    final blockedUsernames = policy.blockedUsernames
+        .map((value) => value.trim().toLowerCase())
+        .where((value) => value.isNotEmpty)
+        .toSet();
+    final seenMentions = <String>{};
+    for (final match in _mentionPattern.allMatches(content)) {
+      final normalized = (match.group(1) ?? '').trim().toLowerCase();
+      if (normalized.isEmpty) continue;
+      if (!seenMentions.add(normalized)) continue;
+      if (blockedUsernames.contains(normalized)) {
+        results.add(
+          _TaggingViolation(
+            type: _TaggingViolationType.mention,
+            message: '@$normalized kullanıcısını etiketleyemezsin.',
+            offendingValue: normalized,
+          ),
+        );
+      }
+    }
+
+    if (results.isEmpty) {
+      return const <_TaggingViolation>[];
+    }
+
+    return List<_TaggingViolation>.unmodifiable(results);
   }
 
   void _handleBackNavigation() {
@@ -478,6 +595,64 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                   maxLines: 8,
                   maxLength: _getMaxTextLength(),
                 ),
+                if (_isLoadingTaggingPolicy)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      children: [
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.orangeAccent,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Etiketleme kuralları yükleniyor...',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (_taggingPolicyError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      _taggingPolicyError!,
+                      style: TextStyle(
+                        color: Colors.redAccent.withOpacity(0.9),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                if (_taggingViolations.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: _taggingViolations
+                          .map(
+                            (violation) => Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text(
+                                violation.message,
+                                style: TextStyle(
+                                  color: Colors.redAccent.withOpacity(0.9),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -500,36 +675,12 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                   runSpacing: 8,
                   children: CringeCategory.values.map((category) {
                     final isSelected = _selectedCategory == category;
-                    return GestureDetector(
-                      onTap: () => setState(() => _selectedCategory = category),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          color: isSelected
-                              ? Colors.orange.withOpacity(0.8)
-                              : Colors.white.withOpacity(0.1),
-                          border: Border.all(
-                            color: isSelected
-                                ? Colors.orange
-                                : Colors.white.withOpacity(0.2),
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          _getCategoryText(category),
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                      ),
+                    return _SelectableCategoryChip(
+                      label: _getCategoryText(category),
+                      selected: isSelected,
+                      semanticsHint: 'Bu kategoriyi seç',
+                      onPressed: () =>
+                          setState(() => _selectedCategory = category),
                     );
                   }).toList(),
                 ),
@@ -602,25 +753,35 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                   ],
                 ),
                 const SizedBox(height: 20),
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: _getSeverityColor(),
-                    inactiveTrackColor: Colors.white.withOpacity(0.2),
-                    thumbColor: _getSeverityColor(),
-                    overlayColor: _getSeverityColor().withOpacity(0.2),
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 12,
+                Semantics(
+                  label: 'Utanç seviyesi seçici',
+                  value: _getSeveritySemanticValue(),
+                  increasedValue: 'Seviyeyi artır',
+                  decreasedValue: 'Seviyeyi azalt',
+                  hint:
+                      'Sağ ve sol tuşlarıyla veya sürükleyerek değeri değiştir',
+                  onIncrease: _handleSeveritySemanticIncrease,
+                  onDecrease: _handleSeveritySemanticDecrease,
+                  child: ExcludeSemantics(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: _getSeverityColor(),
+                        inactiveTrackColor: Colors.white.withOpacity(0.2),
+                        thumbColor: _getSeverityColor(),
+                        overlayColor: _getSeverityColor().withOpacity(0.2),
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 12,
+                        ),
+                        trackHeight: 8,
+                      ),
+                      child: Slider(
+                        value: _severity.toDouble(),
+                        onChanged: _handleSeverityChanged,
+                        min: 1,
+                        max: 10,
+                        divisions: 9,
+                      ),
                     ),
-                    trackHeight: 8,
-                  ),
-                  child: Slider(
-                    value: _severity.toDouble(),
-                    onChanged: (value) {
-                      setState(() => _severity = value.round());
-                    },
-                    min: 1,
-                    max: 10,
-                    divisions: 9,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -782,55 +943,9 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                     ),
                   ),
                 ] else ...[
-                  // Fotoğraf seçme butonu
-                  GestureDetector(
-                    onTap: _isImageLoading ? null : _pickImage,
-                    child: Container(
-                      width: double.infinity,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
-                          style: BorderStyle.solid,
-                        ),
-                        color: Colors.white.withOpacity(0.05),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (_isImageLoading)
-                            const CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            )
-                          else ...[
-                            Icon(
-                              Icons.add_photo_alternate_outlined,
-                              size: 40,
-                              color: Colors.white.withOpacity(0.7),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Fotoğraf Ekle',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.7),
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Dokunarak fotoğraf seçin',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.5),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
+                  _ImagePickerCard(
+                    isLoading: _isImageLoading,
+                    onPressed: _isImageLoading ? null : _pickImage,
                   ),
                 ],
               ],
@@ -989,33 +1104,70 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
           ),
         ),
         const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          maxLines: maxLines,
-          maxLength: maxLength,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-            filled: true,
-            fillColor: Colors.white.withOpacity(0.1),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.orange, width: 2),
-            ),
-            counterStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
-          ),
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: controller,
+          builder: (context, value, _) {
+            return Semantics(
+              container: true,
+              textField: true,
+              label: label,
+              hint: hint,
+              value: value.text.isEmpty ? null : value.text,
+              child: TextField(
+                controller: controller,
+                maxLines: maxLines,
+                maxLength: maxLength,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: hint,
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.1),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.white.withOpacity(0.2),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.white.withOpacity(0.2),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Colors.orange,
+                      width: 2,
+                    ),
+                  ),
+                  counterStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+                ),
+              ),
+            );
+          },
         ),
       ],
     );
+  }
+
+  bool _isPrimaryButtonEnabled() {
+    if (_isSubmitting) {
+      return false;
+    }
+
+    if (_currentStep == 0) {
+      final text = _descriptionController.text.trim();
+      if (text.isEmpty) {
+        return false;
+      }
+      if (_taggingViolations.isNotEmpty) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   Widget _buildNavigationButtons() {
@@ -1023,6 +1175,7 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
     final primaryLabel = isLastStep
         ? (_isEditing ? 'Güncelle' : 'Paylaş')
         : 'İleri';
+    final bool isPrimaryEnabled = _isPrimaryButtonEnabled();
 
     return AnimatedBuilder(
       animation: _scaleAnimation,
@@ -1053,55 +1206,21 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
                 children: [
                   if (_currentStep > 0) ...[
                     Expanded(
-                      child: OutlinedButton(
-                        onPressed: _goToPreviousStep,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          backgroundColor: Colors.white.withOpacity(0.1),
-                          side: BorderSide(
-                            color: Colors.orange.withOpacity(0.4),
-                            width: 1.5,
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: const Text('Geri'),
+                      child: AppButton.secondary(
+                        label: 'Geri',
+                        onPressed: _isSubmitting ? null : _goToPreviousStep,
+                        fullWidth: true,
                       ),
                     ),
                     const SizedBox(width: 16),
                   ],
                   Expanded(
                     flex: 2,
-                    child: ElevatedButton(
-                      onPressed: _isSubmitting ? null : _handleNext,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        elevation: 8,
-                        shadowColor: Colors.orange.withOpacity(0.4),
-                      ),
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Text(
-                              primaryLabel,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
+                    child: AppButton.primary(
+                      label: primaryLabel,
+                      onPressed: isPrimaryEnabled ? _handleNext : null,
+                      isLoading: _isSubmitting,
+                      fullWidth: true,
                     ),
                   ),
                 ],
@@ -1126,10 +1245,11 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         );
         return;
       }
-      if (_descriptionController.text.trim().isEmpty) {
+      if (_taggingViolations.isNotEmpty) {
+        final message = _taggingViolations.first.message;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Lütfen bir açıklama girin'),
+          SnackBar(
+            content: Text(message),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -1380,6 +1500,27 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
     return 'Çok fazla utanç verici';
   }
 
+  String _getSeveritySemanticValue() {
+    return '$_severity / 10 - ${_getSeverityText()}';
+  }
+
+  void _handleSeverityChanged(double value) {
+    final next = value.round().clamp(1, 10);
+    if (next != _severity) {
+      setState(() => _severity = next);
+    }
+  }
+
+  void _handleSeveritySemanticIncrease() {
+    if (_severity >= 10) return;
+    setState(() => _severity = (_severity + 1).clamp(1, 10));
+  }
+
+  void _handleSeveritySemanticDecrease() {
+    if (_severity <= 1) return;
+    setState(() => _severity = (_severity - 1).clamp(1, 10));
+  }
+
   Widget _buildCompetitionBanner(Competition competition) {
     return _buildGlassCard(
       child: Column(
@@ -1527,73 +1668,12 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
         final isSelected = _selectedPostType == type;
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: GestureDetector(
-            onTap: () => setState(() => _selectedPostType = type),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: isSelected
-                    ? Colors.orange.withOpacity(0.3)
-                    : Colors.white.withOpacity(0.05),
-                border: Border.all(
-                  color: isSelected
-                      ? Colors.orange
-                      : Colors.white.withOpacity(0.1),
-                  width: 2,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isSelected
-                          ? Colors.orange.withOpacity(0.3)
-                          : Colors.white.withOpacity(0.1),
-                    ),
-                    child: Icon(
-                      _getPostTypeIcon(type),
-                      color: isSelected ? Colors.orange : Colors.white70,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _getPostTypeTitle(type),
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? Colors.white : Colors.white70,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _getPostTypeDescription(type),
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.white.withOpacity(0.6),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (isSelected)
-                    const Icon(
-                      Icons.check_circle,
-                      color: Colors.orange,
-                      size: 24,
-                    ),
-                ],
-              ),
-            ),
+          child: _PostTypeOptionCard(
+            icon: _getPostTypeIcon(type),
+            title: _getPostTypeTitle(type),
+            description: _getPostTypeDescription(type),
+            selected: isSelected,
+            onPressed: () => setState(() => _selectedPostType = type),
           ),
         );
       }).toList(),
@@ -1676,3 +1756,367 @@ class _ModernCringeDepositScreenState extends State<ModernCringeDepositScreen>
     }
   }
 }
+
+@immutable
+class _PostTypeOptionCard extends StatefulWidget {
+  const _PostTypeOptionCard({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  State<_PostTypeOptionCard> createState() => _PostTypeOptionCardState();
+}
+
+class _PostTypeOptionCardState extends State<_PostTypeOptionCard> {
+  bool _focused = false;
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final borderRadius = BorderRadius.circular(12);
+    final bool selected = widget.selected;
+    final baseColor = selected
+        ? Colors.orange.withOpacity(0.32)
+        : Colors.white.withOpacity(_hovered ? 0.08 : 0.05);
+    final borderColor = selected
+        ? Colors.orange
+        : Colors.white.withOpacity(_focused ? 0.35 : 0.16);
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: widget.title,
+      hint: selected ? 'Seçili post tipi' : 'Bu post tipini seç',
+      child: FocusableActionDetector(
+        onShowFocusHighlight: (value) {
+          if (_focused != value) {
+            setState(() => _focused = value);
+          }
+        },
+        onShowHoverHighlight: (value) {
+          if (_hovered != value) {
+            setState(() => _hovered = value);
+          }
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          decoration: BoxDecoration(
+            borderRadius: borderRadius,
+            color: baseColor,
+            border: Border.all(color: borderColor, width: 2),
+            boxShadow: _focused
+                ? [
+                    BoxShadow(
+                      color: Colors.orange.withOpacity(0.28),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                    ),
+                  ]
+                : const [],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: borderRadius,
+            child: InkWell(
+              borderRadius: borderRadius,
+              onTap: widget.onPressed,
+              focusColor: Colors.white.withOpacity(0.10),
+              splashColor: Colors.orange.withOpacity(0.12),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: selected
+                            ? Colors.orange.withOpacity(0.35)
+                            : Colors.white.withOpacity(0.12),
+                      ),
+                      child: Icon(
+                        widget.icon,
+                        color: selected ? Colors.orange : Colors.white70,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.title,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: selected ? Colors.white : Colors.white70,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            widget.description,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.white.withOpacity(0.68),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (selected)
+                      const Icon(
+                        Icons.check_circle,
+                        color: Colors.orange,
+                        size: 24,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+@immutable
+class _SelectableCategoryChip extends StatefulWidget {
+  const _SelectableCategoryChip({
+    required this.label,
+    required this.selected,
+    required this.onPressed,
+    required this.semanticsHint,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
+  final String semanticsHint;
+
+  @override
+  State<_SelectableCategoryChip> createState() =>
+      _SelectableCategoryChipState();
+}
+
+class _SelectableCategoryChipState extends State<_SelectableCategoryChip> {
+  bool _focused = false;
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final borderRadius = BorderRadius.circular(20);
+    final bool selected = widget.selected;
+    final backgroundColor = selected
+        ? Colors.orange.withOpacity(0.85)
+        : Colors.white.withOpacity(_hovered ? 0.18 : 0.10);
+    final borderColor = selected
+        ? Colors.orange
+        : Colors.white.withOpacity(_focused ? 0.45 : 0.24);
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: widget.label,
+      hint: selected ? 'Seçili kategori' : widget.semanticsHint,
+      child: FocusableActionDetector(
+        onShowFocusHighlight: (value) {
+          if (_focused != value) {
+            setState(() => _focused = value);
+          }
+        },
+        onShowHoverHighlight: (value) {
+          if (_hovered != value) {
+            setState(() => _hovered = value);
+          }
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          decoration: BoxDecoration(
+            borderRadius: borderRadius,
+            color: backgroundColor,
+            border: Border.all(color: borderColor, width: 1.5),
+            boxShadow: _focused
+                ? [
+                    BoxShadow(
+                      color: Colors.orange.withOpacity(0.30),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : const [],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: borderRadius,
+            child: InkWell(
+              borderRadius: borderRadius,
+              onTap: widget.onPressed,
+              focusColor: Colors.white.withOpacity(0.10),
+              splashColor: Colors.orange.withOpacity(0.15),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                child: Text(
+                  widget.label,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+@immutable
+class _ImagePickerCard extends StatefulWidget {
+  const _ImagePickerCard({required this.isLoading, required this.onPressed});
+
+  final bool isLoading;
+  final VoidCallback? onPressed;
+
+  @override
+  State<_ImagePickerCard> createState() => _ImagePickerCardState();
+}
+
+class _ImagePickerCardState extends State<_ImagePickerCard> {
+  bool _focused = false;
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final borderRadius = BorderRadius.circular(12);
+    final bool isDisabled = widget.onPressed == null;
+    final baseColor = Colors.white.withOpacity(_hovered ? 0.08 : 0.05);
+    final borderColor = Colors.white.withOpacity(_focused ? 0.45 : 0.30);
+
+    return Semantics(
+      button: true,
+      enabled: !isDisabled,
+      label: 'Fotoğraf ekle',
+      hint: widget.isLoading
+          ? 'Fotoğraf seçimi yükleniyor'
+          : 'Dosya seçmek için etkinleştir',
+      child: FocusableActionDetector(
+        onShowFocusHighlight: (value) {
+          if (_focused != value) {
+            setState(() => _focused = value);
+          }
+        },
+        onShowHoverHighlight: (value) {
+          if (_hovered != value) {
+            setState(() => _hovered = value);
+          }
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          height: 120,
+          decoration: BoxDecoration(
+            borderRadius: borderRadius,
+            color: baseColor,
+            border: Border.all(color: borderColor, width: 1.2),
+            boxShadow: _focused
+                ? [
+                    BoxShadow(
+                      color: Colors.orange.withOpacity(0.25),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : const [],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: borderRadius,
+            child: InkWell(
+              borderRadius: borderRadius,
+              onTap: isDisabled ? null : widget.onPressed,
+              focusColor: Colors.white.withOpacity(0.12),
+              splashColor: Colors.orange.withOpacity(0.18),
+              child: Center(
+                child: widget.isLoading
+                    ? const CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.add_photo_alternate_outlined,
+                            size: 40,
+                            color: Colors.white.withOpacity(0.7),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Fotoğraf Ekle',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.75),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Dosya seçmek için dokunun',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.55),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+@immutable
+class _TaggingViolation {
+  const _TaggingViolation({
+    required this.type,
+    required this.message,
+    required this.offendingValue,
+  });
+
+  final _TaggingViolationType type;
+  final String message;
+  final String offendingValue;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is _TaggingViolation &&
+        other.type == type &&
+        other.message == message &&
+        other.offendingValue == offendingValue;
+  }
+
+  @override
+  int get hashCode => Object.hash(type, message, offendingValue);
+}
+
+enum _TaggingViolationType { hashtag, mention }

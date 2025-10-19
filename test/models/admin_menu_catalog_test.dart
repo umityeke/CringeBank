@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cringe_bankasi/models/admin_menu_definition.dart';
-import 'package:cringe_bankasi/models/admin_permissions.dart';
+import 'package:cringebank/models/admin_menu_definition.dart';
+import 'package:cringebank/models/admin_permissions.dart';
 
 void main() {
   group('AdminMenuCatalog.resolveMenu', () {

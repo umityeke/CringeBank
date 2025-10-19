@@ -1,4 +1,4 @@
-import 'package:cringe_bankasi/utils/platform_info.dart';
+import 'package:cringebank/utils/platform_info.dart';
 import 'i_notification_service.dart';
 import 'null_notification_service.dart';
 

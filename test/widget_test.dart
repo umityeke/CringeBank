@@ -7,7 +7,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:cringe_bankasi/main.dart';
+import 'package:cringebank/main.dart';
 
 void main() {
   // Production pipeline does not provision Firebase emulators; keep the smoke test skipped.

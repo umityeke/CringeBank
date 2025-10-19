@@ -1,0 +1,58 @@
+{
+  "@@locale": "en",
+  "appTitle": "CringeBank",
+  "splashTitle": "Cringe Bank",
+  "splashSubtitle": "Where your most cringe moments gain value",
+  "emailLabel": "Email",
+  "emailHint": "Enter your email address",
+  "passwordLabel": "Password",
+  "passwordHint": "Enter your password",
+  "rememberMe": "Remember me",
+  "forgotPassword": "Forgot password",
+  "forgotPasswordDialogTitle": "Forgot Password",
+  "forgotPasswordDialogMessage": "Enter your email address and we'll send you a reset link.",
+  "forgotPasswordDialogEmailLabel": "Email address",
+  "forgotPasswordDialogEmailRequired": "Please enter your email address.",
+  "forgotPasswordDialogEmailInvalid": "Please enter a valid email address.",
+  "forgotPasswordDialogError": "We couldn't send the reset request. Please try again.",
+  "forgotPasswordDialogSubmit": "Send",
+  "commonCancel": "Cancel",
+  "forgotPasswordSnackSuccess": "Password reset link sent to your email.",
+  "signInCta": "Sign In",
+  "orDivider": "or",
+  "googleSignIn": "Continue with Google",
+  "googleSignInComingSoon": "Google sign-in is coming soon.",
+  "appleSignIn": "Continue with Apple",
+  "appleSignInComingSoon": "Apple sign-in is coming soon.",
+  "signUpPrompt": "Don't have an account?",
+  "signUpCta": "Sign up now",
+  "loginEmptyFields": "Please fill in all fields",
+  "loginInvalidEmail": "Please enter a valid email address",
+  "loginInvalidCredentials": "Invalid username or password!",
+  "loginGenericError": "Something went wrong: {error}",
+  "@loginGenericError": {
+    "description": "Shown when an unexpected login error occurs.",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "themePreferenceTitle": "Theme Preference",
+  "themePreferenceDescription": "Automatically match your device or pick a theme manually.",
+  "themePreferenceSystem": "Automatic",
+  "themePreferenceSystemSubtitle": "Follows your device's dark and light mode settings.",
+  "themePreferenceLight": "Light",
+  "themePreferenceLightSubtitle": "Bright surfaces with warm accent gradients.",
+  "themePreferenceDark": "Dark",
+  "themePreferenceDarkSubtitle": "Deep surfaces with vibrant neon accents.",
+  "localePreferenceTitle": "Language",
+  "localePreferenceDescription": "Choose the language used throughout the interface.",
+  "localePreferenceOptionTr": "Turkish",
+  "localePreferenceOptionEn": "English",
+  "localeChangeSnack": "Language switched to {language}",
+  "@localeChangeSnack": {
+    "description": "Snackbar shown after changing the locale.",
+    "placeholders": {
+      "language": {}
+    }
+  }
+}

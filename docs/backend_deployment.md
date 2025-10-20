@@ -3,30 +3,37 @@
 ## 1. Ön Koşullar
 
 - .NET 9 SDK
-- SQL Server 2019+ (Managed Instance, Azure SQL veya container)
-- Azure Key Vault / Docker secrets (opsiyonel fakat önerilir)
+- Azure CLI ve Azure aboneliğine erişim
+- Azure SQL Database (serverless veya managed instance)
+- Azure Key Vault (secret yönetimi)
+- Azure App Service veya Azure Container Apps (API barındırma)
 - Uygulamanın çalışacağı ortam için domain + TLS sertifikası
 
 ## 2. Veritabanı Kurulumu
 
-1. SQL sunucusunda `CringeBank` isminde veritabanı oluşturun.
-2. Uygulama için güçlü bir parola seçerek `sqladmin` login ve kullanıcıyı tanımlayın:
+1. Kaynak grubu ve Azure SQL sunucusunu oluşturun (Managed Identity etkin):
 
-```sql
-CREATE LOGIN sqladmin WITH PASSWORD = '<GüçlüParola>', CHECK_POLICY = ON;
-GO
-IF DB_ID('CringeBank') IS NULL CREATE DATABASE CringeBank;
-GO
-USE CringeBank;
-GO
-CREATE USER sqladmin FOR LOGIN sqladmin;
-ALTER ROLE db_owner ADD MEMBER sqladmin;
-GO
-ALTER DATABASE CringeBank SET READ_COMMITTED_SNAPSHOT ON;
-GO
+```powershell
+az group create -n rg-cringebank-backend -l westeurope
+az sql server create -g rg-cringebank-backend -n cringebank-sql --enable-public-network false --identity assigned
+az sql db create -g rg-cringebank-backend -s cringebank-sql -n CringeBank --service-objective HS_Gen5_2 --auto-pause-delay 60
 ```
 
-> Parolayı saklamak için Key Vault veya gizli değişken yöneticisi kullanın. Script'i gerektiğinde `IF NOT EXISTS` kontrolleriyle zenginleştirebilirsiniz.
+2. Azure AD yönetici kullanıcısını atayın ve uygulama Managed Identity'sini yetkilendirin:
+
+```powershell
+az sql server ad-admin create -g rg-cringebank-backend -s cringebank-sql -u "CringeBank Admin" -i <AAD ObjectId>
+```
+
+3. Azure Data Studio veya SSMS üzerinden Managed Identity için veritabanı kullanıcısı oluşturun:
+
+```sql
+CREATE USER [cringebank-api-mi] FROM EXTERNAL PROVIDER;
+ALTER ROLE db_datareader ADD MEMBER [cringebank-api-mi];
+ALTER ROLE db_datawriter ADD MEMBER [cringebank-api-mi];
+```
+
+> Bağlantılar AAD token'ları ile sağlanır. Uygulama tarafında `Authentication=ActiveDirectoryDefault` içeren connection string kullanın.
 
 ## 3. Konfigürasyon Yönetimi
 
@@ -37,7 +44,7 @@ cd backend/src/CringeBank.Api
 
 dotnet user-secrets init
 
-dotnet user-secrets set "ConnectionStrings:Sql" "Server=<sunucu>;Database=CringeBank;User Id=sqladmin;Password=<GüçlüParola>;Encrypt=True;TrustServerCertificate=True;"
+dotnet user-secrets set "ConnectionStrings:Sql" "Server=tcp:<sql-server-name>.database.windows.net,1433;Database=CringeBank;Authentication=ActiveDirectoryDefault;Encrypt=True;"
 
 dotnet user-secrets set "Jwt:Key" "<64+ karakterlik yeni bir anahtar>"
 ```
@@ -57,7 +64,7 @@ services:
   api:
     image: ghcr.io/umityeke/cringebank-api:latest
     environment:
-      CRINGEBANK__CONNECTIONSTRINGS__SQL: "Server=<host>;Database=CringeBank;User Id=sqladmin;Password=<GüçlüParola>;Encrypt=True;TrustServerCertificate=True;"
+      CRINGEBANK__CONNECTIONSTRINGS__SQL: "Server=tcp:<sql-server-name>.database.windows.net,1433;Database=CringeBank;Authentication=ActiveDirectoryManagedIdentity;Encrypt=True;"
       CRINGEBANK__JWT__KEY: "<64+ karakterlik anahtar>"
       ASPNETCORE_ENVIRONMENT: "Production"
     ports:
@@ -93,12 +100,12 @@ dotnet ef database update --project src/CringeBank.Infrastructure/CringeBank.Inf
 
 ## 7. Güvenlik Kontrolleri
 
-- Güçlü parola & MFA zorunluluğu
-- `sa` hesabını devre dışı bırakın
-- Firewall ile veritabanını sadece uygulama katmanına açın
+- Azure AD tabanlı kimlik doğrulama, MFA zorunluluğu
+- Managed Identity ve rol bazlı erişim (db_datareader/db_datawriter)
+- Firewall kuralları veya Private Endpoint ile erişimi kısıtlayın
 - TLS sertifikası ile HTTPS trafik sağlayın
 - JWT anahtarını düzenli aralıklarla yenileyin
-- Migration yetkisini belirli servis hesabıyla sınırlandırın
+- Migration yetkisini belirli servis hesaplarına sınırlandırın
 
 ## 8. Sürüm Yükseltme Adımları
 

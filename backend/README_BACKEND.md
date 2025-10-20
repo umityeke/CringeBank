@@ -1,16 +1,24 @@
-# CringeBank Backend (.NET 8 + MSSQL)
+# CringeBank Backend (.NET 8 + Azure SQL)
 
 ## Hızlı Başlangıç
 
-1. SQL Server örneğini ayağa kaldırın (lokalde Docker kullanılabilir `docker compose up -d`).
-2. Uygulamanın bağlantı bilgisini **User Secrets** veya ortam değişkeni üzerinden tanımlayın.
+1. Azure CLI ile tenants hesabınıza giriş yapın ve aboneliği seçin:
+
+```powershell
+az login
+az account set --subscription "<Azure Subscription GUID>"
+```
+
+1. Azure SQL Database için bağlantı dizgesini **User Secrets** altında saklayın. Managed Identity/Azure AD ile bağlanacaksanız örnek dizge şu şekilde olabilir:
 
 ```powershell
 dotnet user-secrets init --project src/CringeBank.Api/CringeBank.Api.csproj
-dotnet user-secrets set "ConnectionStrings:Sql" "Server=<sunucu>;Database=CringeBank;User Id=sqladmin;Password=<güçlü-şifre>;Encrypt=True;TrustServerCertificate=True;"
+dotnet user-secrets set "ConnectionStrings:Sql" "Server=tcp:<sql-server-name>.database.windows.net,1433;Database=CringeBank;Authentication=ActiveDirectoryDefault;Encrypt=True;"
 ```
 
-> Alternatif olarak, CI/CD ya da container senaryolarında `CRINGEBANK__CONNECTIONSTRINGS__SQL` ortam değişkenini kullanabilirsiniz.
+> Üretim ve CI/CD ortamlarında `CRINGEBANK__CONNECTIONSTRINGS__SQL` değerini Azure Key Vault referansı ya da App Service konfigurasyonu üzerinden sağlayın. Kullanıcı adı/parola yerine Azure AD kimlik doğrulaması tercih edilir.
+
+Yerel geliştirme için bu adımları otomatikleştirmek isterseniz `scripts/setup_dev_backend.ps1` betiğini çağırabilirsiniz. Betik, Azure SQL bağlantı dizgesini ve JWT anahtarını sorup `dotnet user-secrets` altında saklar.
 
 ## Uygulama Ayarları
 
@@ -70,29 +78,33 @@ dotnet test
 dotnet format
 ```
 
-## SQL Başlangıç Script'i
+## Azure SQL Provisyonu
 
-Docker konteyneri veya yeni bir sunucu hazırlarken aşağıdaki script'i kendi parola politikanıza göre güncelleyip çalıştırabilirsiniz (SSMS veya `sqlcmd`):
+Kaynaklar Infrastructure as Code (Bicep/Terraform) ile tanımlanmalıdır. Örnek bir dağıtım senaryosu:
+
+1. Kaynak grubu ve Azure SQL sunucusu oluşturun (Managed Identity aktif):
+
+```powershell
+az group create -n rg-cringebank-backend -l westeurope
+az sql server create -g rg-cringebank-backend -n cringebank-sql --enable-public-network false --identity assigned
+az sql db create -g rg-cringebank-backend -s cringebank-sql -n CringeBank --service-objective HS_Gen5_2 --auto-pause-delay 60
+```
+
+1. Azure AD yönetici ve uygulama Managed Identity'sini yetkilendirin:
+
+```powershell
+az sql server ad-admin create -g rg-cringebank-backend -s cringebank-sql -u "CringeBank Admin" -i <AAD ObjectId>
+```
+
+1. SSMS/Azure Data Studio içerisinden Managed Identity için kullanıcı oluşturun:
 
 ```sql
-IF NOT EXISTS (SELECT * FROM sys.server_principals WHERE name = 'sqladmin')
-BEGIN
-  CREATE LOGIN sqladmin WITH PASSWORD = '<GüçlüBirParolaGiriniz>', CHECK_POLICY = ON;
-END
-GO
-IF DB_ID('CringeBank') IS NULL CREATE DATABASE CringeBank;
-GO
-USE CringeBank;
-GO
-IF NOT EXISTS (SELECT * FROM sys.database_principals WHERE name = 'sqladmin')
-BEGIN
-  CREATE USER sqladmin FOR LOGIN sqladmin;
-  ALTER ROLE db_owner ADD MEMBER sqladmin;
-END
-GO
-ALTER DATABASE CringeBank SET READ_COMMITTED_SNAPSHOT ON;
-GO
+CREATE USER [cringebank-api-mi] FROM EXTERNAL PROVIDER;
+ALTER ROLE db_datareader ADD MEMBER [cringebank-api-mi];
+ALTER ROLE db_datawriter ADD MEMBER [cringebank-api-mi];
 ```
+
+Outbox, change tracking veya ek şema güncellemeleri `db/schema` klasöründeki script'ler üzerinden yönetilir.
 
 ## Realtime Mirror Dağıtımı
 

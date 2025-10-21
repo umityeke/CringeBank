@@ -111,5 +111,29 @@ void main() {
       expect(find.text('Feed Page'), findsOneWidget);
       expect(router.routeInformationProvider.value.uri.path, '/feed');
     });
+
+    testWidgets('yasaklı kullanıcı adı girildiğinde uyarı mesajı görünür',
+        (tester) async {
+      final controller = RegistrationController(userService: _MockUserService());
+
+      await tester.pumpWidget(_buildTestApp(controller: controller));
+      await tester.pump();
+
+      controller.state = controller.state.copyWith(
+        step: RegistrationFlowStep.profile,
+        sessionId: 'session-123',
+      );
+
+      await tester.pump();
+
+      controller.updateUsername('adminmaster');
+
+      await tester.pump();
+
+      expect(
+        find.text('Bu kullanıcı adı yasaklı listede. Lütfen farklı bir isim seç.'),
+        findsWidgets,
+      );
+    });
   });
 }

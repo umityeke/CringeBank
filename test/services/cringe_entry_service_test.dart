@@ -31,6 +31,7 @@ void main() {
       auth: mockAuth,
       storage: mockStorage,
       analytics: mockAnalytics,
+      enableConnectivityMonitoring: false,
     );
 
     service = CringeEntryService.instance;

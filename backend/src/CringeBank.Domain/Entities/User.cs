@@ -1,10 +1,11 @@
 using System;
 using CringeBank.Domain.Abstractions;
+using CringeBank.Domain.Events.Users;
 using CringeBank.Domain.Enums;
 
 namespace CringeBank.Domain.Entities;
 
-public sealed class User : Entity, IAggregateRoot
+public sealed class User : AggregateRoot
 {
     private User()
     {
@@ -64,6 +65,12 @@ public sealed class User : Entity, IAggregateRoot
         DateTimeOffset? lastLoginAtUtc,
         string? lastSeenAppVersion)
     {
+        var hasSignificantChange = !string.Equals(Email, email, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(DisplayName, displayName ?? string.Empty, StringComparison.Ordinal)
+            || EmailVerified != emailVerified
+            || ClaimsVersion != claimsVersion
+            || !Nullable.Equals(LastLoginAtUtc, lastLoginAtUtc);
+
         Email = email;
         PhoneNumber = phoneNumber;
         DisplayName = displayName ?? string.Empty;
@@ -73,25 +80,48 @@ public sealed class User : Entity, IAggregateRoot
         LastLoginAtUtc = lastLoginAtUtc;
         LastSeenAppVersion = lastSeenAppVersion;
         Touch();
+
+        if (hasSignificantChange)
+        {
+            RaiseDomainEvent(new UserCoreProfileUpdatedDomainEvent(Id, FirebaseUid, Email, DisplayName, EmailVerified, LastLoginAtUtc));
+        }
     }
 
     public void MarkSynced(DateTimeOffset syncedAtUtc)
     {
         LastSyncedAtUtc = syncedAtUtc;
         Touch(syncedAtUtc);
+
+        RaiseDomainEvent(new UserSynchronizationCompletedDomainEvent(Id, FirebaseUid, LastSyncedAtUtc));
     }
 
     public void SetStatus(UserStatus status)
     {
+        if (Status == status)
+        {
+            return;
+        }
+
+        var previousStatus = Status;
+
         Status = status;
         Touch();
+
+        RaiseDomainEvent(new UserStatusChangedDomainEvent(Id, FirebaseUid, previousStatus, Status));
     }
 
     public void SetDisabled(bool isDisabled, DateTimeOffset? timestamp)
     {
+        if (IsDisabled == isDisabled && Nullable.Equals(DisabledAtUtc, timestamp))
+        {
+            return;
+        }
+
         IsDisabled = isDisabled;
         DisabledAtUtc = isDisabled ? timestamp ?? DateTimeOffset.UtcNow : null;
         Touch();
+
+        RaiseDomainEvent(new UserDisabledStatusChangedDomainEvent(Id, FirebaseUid, IsDisabled, DisabledAtUtc));
     }
 
     public void SetDeleted(DateTimeOffset? timestamp)
@@ -99,9 +129,16 @@ public sealed class User : Entity, IAggregateRoot
         DeletedAtUtc = timestamp ?? DateTimeOffset.UtcNow;
         if (DeletedAtUtc != null)
         {
-            Status = UserStatus.Deleted;
+            if (Status != UserStatus.Deleted)
+            {
+                var previousStatus = Status;
+                Status = UserStatus.Deleted;
+                RaiseDomainEvent(new UserStatusChangedDomainEvent(Id, FirebaseUid, previousStatus, Status));
+            }
         }
 
         Touch();
+
+        RaiseDomainEvent(new UserDeletedDomainEvent(Id, FirebaseUid, DeletedAtUtc));
     }
 }

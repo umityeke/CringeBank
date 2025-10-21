@@ -20,27 +20,59 @@ dotnet user-secrets set "ConnectionStrings:Sql" "Server=tcp:<sql-server-name>.da
 
 Yerel geliştirme için bu adımları otomatikleştirmek isterseniz `scripts/setup_dev_backend.ps1` betiğini çağırabilirsiniz. Betik, Azure SQL bağlantı dizgesini ve JWT anahtarını sorup `dotnet user-secrets` altında saklar.
 
+> Ortak ortam değişkenlerini örneklemek için `env/backend.env.template` dosyasını baz alabilirsiniz. Dosyayı kopyalayıp gizli değerleri doldurun ve CI pipeline'larında yükleyin.
+
+Managed Identity ile ilgili ayrıntılı onboarding adımları için `docs/backend_managed_identity_guide.md` dosyasına göz atın.
+
 ## Uygulama Ayarları
 
 `src/CringeBank.Api/appsettings.Development.json`
 
 ```json
 {
-  "ConnectionStrings": {
-    "Sql": ""
+  "Logging": {
+    "LogLevel": {
+      "Default": "Debug",
+      "Microsoft.AspNetCore": "Information"
+    }
   },
-  "Jwt": {
-    "Issuer": "cringebank",
-    "Audience": "cringebank.app",
-    "Key": "CHANGE_ME_SUPER_LONG_SECRET",
-    "AccessMinutes": 15,
-    "RefreshDays": 30
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Debug",
+      "Override": {
+        "Microsoft": "Information",
+        "Microsoft.Hosting.Lifetime": "Information"
+      }
+    }
+  },
+  "Cors": {
+    "AllowedOrigins": [
+      "http://localhost:5173",
+      "http://localhost:5273"
+    ]
   },
   "Swagger": { "Enabled": true }
 }
 ```
 
 `appsettings.Production.json` dosyası varsayılan olarak boş connection string ve dosya tabanlı Serilog loglamasıyla gelir. Üretimde değerler kullanıcı gizleri veya ortam değişkenlerinden besleneceği için dosyayı yalnızca CORS gibi davranışsal ayarları değiştirmek için düzenleyin.
+
+### Konfigürasyon katmanları
+
+- `appsettings.json`: Ortak varsayılan değerler (loglama, JWT issuer/audience, Swagger varsayılanı).
+- `appsettings.Development.json`: Lokal geliştirme için CORS izinleri ve Swagger açılışı.
+- `appsettings.Staging.json`: Staging ortamı özel ayarları (CORS, JWT refresh süresi).
+- `appsettings.Production.json`: Production loglama ve JWT refresh süresi.
+
+Gizli değerler (örn. `ConnectionStrings:Sql`, `Jwt:Key`) JSON dosyalarında yer almaz; bunları `dotnet user-secrets`, App Service ayarları veya Key Vault referansları ile sağlayın.
+
+Firebase App Check doğrulaması için `Authentication:AppCheck` bölümünde `Enabled`, `ProjectNumber` ve `AppId` değerlerini yapılandırın. Yerel geliştirmede `Enabled=false` bırakıp yalnızca token üretimi doğrulandığında etkinleştirin.
+
+Hazırlık denetimleri `/health/ready` endpointinden JSON olarak alınabilir; SQL bağlantısı, Firebase Auth ve App Check bağımlılıklarının bireysel durumları raporlanır. `/health/live` ise yalnızca basit canlılık yanıtı döndürür.
+
+Serilog loglarının Seq sunucusuna aktarılması için `Telemetry:Seq:Url` değerini doldurun (örn. `http://localhost:5341`). Gerekirse `Telemetry:Seq:MinimumLevel` ile eşik değerini, `Telemetry:Seq:ApiKey` ile doğrulamayı yapılandırabilirsiniz.
+
+Dağıtım sırasında OpenTelemetry traciğini aktive etmek için `Telemetry:Tracing` bölümünü kullanın. Varsayılan olarak konsol exporteri açıktır; OTLP kullanmak isterseniz `Exporter=otlp` yapıp `OtlpEndpoint` ve gerekirse `OtlpHeaders` değerlerini girin. `ServiceNamespace`, `ServiceVersion` ve `ServiceInstanceId` alanları export edilen span meta verilerini tutarlamak için kullanılabilir.
 
 ## EF Core Migration Komutları
 
@@ -82,7 +114,18 @@ dotnet format
 
 Kaynaklar Infrastructure as Code (Bicep/Terraform) ile tanımlanmalıdır. Örnek bir dağıtım senaryosu:
 
-1. Kaynak grubu ve Azure SQL sunucusu oluşturun (Managed Identity aktif):
+1. `infra/azure/main.bicep` şablonunu resource group düzeyinde dağıtın:
+
+```powershell
+az deployment group create `
+  --resource-group rg-cringebank-backend `
+  --template-file infra/azure/main.bicep `
+  --parameters namePrefix=cringebank environment=dev `
+  --parameters sqlAdministratorPassword="<GüçlüParola>" `
+  --parameters sqlAdAdminLogin="CringeBank Admin" sqlAdAdminObjectId="<AAD ObjectId>"
+```
+
+1. Manuel işlem tercih edilirse kaynak grubu ve Azure SQL sunucusu oluşturun (Managed Identity aktif):
 
 ```powershell
 az group create -n rg-cringebank-backend -l westeurope

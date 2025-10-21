@@ -195,7 +195,12 @@ class _FeedPageState extends ConsumerState<FeedPage> {
                 );
               }
               var visibleCount = lazyLoaderState.visibleCount.clamp(0, entries.length);
-              lazyLoader.syncWithTotal(entries.length);
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) {
+                  return;
+                }
+                lazyLoader.syncWithTotal(entries.length);
+              });
               final latestState = ref.read(feedLazyLoaderProvider(_selectedSegment));
               if (latestState.visibleCount != lazyLoaderState.visibleCount) {
                 visibleCount = latestState.visibleCount.clamp(0, entries.length);

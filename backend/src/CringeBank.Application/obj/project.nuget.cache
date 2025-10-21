@@ -1,12 +1,19 @@
 {
   "version": 2,
-  "dgSpecHash": "X0L2hVlEzCI=",
+  "dgSpecHash": "nZYgB1UiLDU=",
   "success": true,
   "projectFilePath": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Application\\CringeBank.Application.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Ümit YEKE\\.nuget\\packages\\fluentvalidation\\11.9.0\\fluentvalidation.11.9.0.nupkg.sha512",
+    "C:\\Users\\Ümit YEKE\\.nuget\\packages\\fluentvalidation.dependencyinjectionextensions\\11.9.0\\fluentvalidation.dependencyinjectionextensions.11.9.0.nupkg.sha512",
+    "C:\\Users\\Ümit YEKE\\.nuget\\packages\\mapster\\7.4.0\\mapster.7.4.0.nupkg.sha512",
+    "C:\\Users\\Ümit YEKE\\.nuget\\packages\\mapster.core\\1.2.1\\mapster.core.1.2.1.nupkg.sha512",
     "C:\\Users\\Ümit YEKE\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\9.0.0\\microsoft.extensions.dependencyinjection.abstractions.9.0.0.nupkg.sha512",
-    "C:\\Users\\Ümit YEKE\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\9.0.0\\microsoft.extensions.logging.abstractions.9.0.0.nupkg.sha512"
+    "C:\\Users\\Ümit YEKE\\.nuget\\packages\\microsoft.extensions.dependencymodel\\8.0.1\\microsoft.extensions.dependencymodel.8.0.1.nupkg.sha512",
+    "C:\\Users\\Ümit YEKE\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\9.0.0\\microsoft.extensions.logging.abstractions.9.0.0.nupkg.sha512",
+    "C:\\Users\\Ümit YEKE\\.nuget\\packages\\scrutor\\5.0.1\\scrutor.5.0.1.nupkg.sha512",
+    "C:\\Users\\Ümit YEKE\\.nuget\\packages\\system.text.encodings.web\\8.0.0\\system.text.encodings.web.8.0.0.nupkg.sha512",
+    "C:\\Users\\Ümit YEKE\\.nuget\\packages\\system.text.json\\8.0.4\\system.text.json.8.0.4.nupkg.sha512"
   ],
   "logs": []
 }

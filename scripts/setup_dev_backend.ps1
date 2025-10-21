@@ -8,7 +8,7 @@ Param(
 
 $ErrorActionPreference = 'Stop'
 
-function Ensure-Command {
+function Test-CommandAvailability {
     param([string]$Name)
     if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
         throw "Gerekli arac bulunamadi: $Name"
@@ -25,7 +25,7 @@ function New-RandomSecret {
 $repoRoot = Split-Path $PSScriptRoot -Parent
 Set-Location $repoRoot
 
-Ensure-Command -Name 'dotnet'
+Test-CommandAvailability -Name 'dotnet'
 
 $projectFullPath = Resolve-Path -Path (Join-Path $repoRoot $Project) -ErrorAction Stop
 
@@ -49,11 +49,10 @@ if (-not $SqlConnectionString) {
     $prompt += 'Azure SQL baglanti dizgisini girin (ornegin:'
     $prompt += 'Server=tcp<server-name>.database.windows.net,1433;Database=CringeBank;Encrypt=True;'
     $prompt += 'Authentication=ActiveDirectoryDefault;)'
-    $input = Read-Host ($prompt -join " `n")
-    if ([string]::IsNullOrWhiteSpace($input)) {
+    $SqlConnectionString = Read-Host ($prompt -join " `n")
+    if ([string]::IsNullOrWhiteSpace($SqlConnectionString)) {
         throw 'Azure SQL baglanti dizgisi bos birakilamaz.'
     }
-    $SqlConnectionString = $input
 }
 
 if (-not $JwtKey) {

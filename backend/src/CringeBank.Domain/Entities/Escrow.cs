@@ -4,7 +4,7 @@ using CringeBank.Domain.Enums;
 
 namespace CringeBank.Domain.Entities;
 
-public sealed class Escrow : Entity, IAggregateRoot
+public sealed class Escrow : AggregateRoot
 {
     private Escrow()
     {

@@ -4,7 +4,7 @@ using CringeBank.Domain.Enums;
 
 namespace CringeBank.Domain.Entities;
 
-public sealed class Wallet : Entity, IAggregateRoot
+public sealed class Wallet : AggregateRoot
 {
     private Wallet()
     {

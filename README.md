@@ -193,8 +193,11 @@ Ayrıntılı dağıtım adımları için [Deployment Notes → /search/users](./
 
 ## Faydalı Kaynaklar
 
+- [Uygulama İçindekiler özeti](docs/uygulama_icindekiler.txt)
 - [Firebase kullanıcı senkronizasyonu rollout kılavuzu](docs/user_sync_rollout.md)
 - [CringeStore backend implementasyonu](docs/CRINGESTORE_IMPLEMENTATION.md)
 - [Firebase SSOT mimarisi](docs/cringe_entry_share_type_migration.md)
+- [Telemetri event şeması](docs/telemetry_events.md) ve [redaction rehberi](docs/telemetry_redaction_guide.md)
+- [Geliştirme ortamı .env şablonu](env/.env.template)
 
 

@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using CringeBank.Application.Abstractions.Mapping;
 using CringeBank.Application.Users;
 using CringeBank.Domain.Entities;
 using CringeBank.Domain.Enums;
@@ -14,16 +15,18 @@ public sealed class UserSynchronizationService : IUserSynchronizationService
 {
     private readonly CringeBankDbContext _dbContext;
     private readonly ILogger<UserSynchronizationService> _logger;
+    private readonly IObjectMapper _mapper;
 
     private static readonly Action<ILogger, string, Exception?> LogUserCreated = LoggerMessage.Define<string>(
         LogLevel.Information,
         new EventId(2000, nameof(LogUserCreated)),
         "Yeni kullanıcı senkronize edildi: {FirebaseUid}.");
 
-    public UserSynchronizationService(CringeBankDbContext dbContext, ILogger<UserSynchronizationService> logger)
+    public UserSynchronizationService(CringeBankDbContext dbContext, ILogger<UserSynchronizationService> logger, IObjectMapper mapper)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
     }
 
     public async Task<UserSynchronizationResult> SynchronizeAsync(FirebaseUserProfile profile, CancellationToken cancellationToken = default)
@@ -63,18 +66,6 @@ public sealed class UserSynchronizationService : IUserSynchronizationService
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return new UserSynchronizationResult(
-            user.Id,
-            user.FirebaseUid,
-            user.Email,
-            user.EmailVerified,
-            user.ClaimsVersion,
-            user.Status,
-            string.IsNullOrWhiteSpace(user.DisplayName) ? null : user.DisplayName,
-            user.ProfileImageUrl,
-            user.PhoneNumber,
-            user.LastLoginAtUtc,
-            user.LastSyncedAtUtc,
-            user.LastSeenAppVersion);
+        return _mapper.Map<UserSynchronizationResult>(user);
     }
 }

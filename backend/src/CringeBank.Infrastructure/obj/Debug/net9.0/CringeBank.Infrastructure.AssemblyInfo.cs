@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CringeBank.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+87c3057288a878655972dcdc852217fa52093956")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d417bbe9d3788a080376ed4ed82fd22208ce07c0")]
 [assembly: System.Reflection.AssemblyProductAttribute("CringeBank.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CringeBank.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

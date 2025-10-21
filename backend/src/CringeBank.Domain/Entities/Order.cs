@@ -4,7 +4,7 @@ using CringeBank.Domain.Enums;
 
 namespace CringeBank.Domain.Entities;
 
-public sealed class Order : Entity, IAggregateRoot
+public sealed partial class Order : AggregateRoot
 {
     private Order()
     {

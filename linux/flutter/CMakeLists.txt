@@ -21,6 +21,7 @@ endfunction()
 
 # === Flutter Library ===
 # System-level dependencies.
+set(PKG_CONFIG_EXECUTABLE "C:/Users/Ümit YEKE/AppData/Local/Microsoft/WinGet/Links/pkg-config.exe")
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
 pkg_check_modules(GLIB REQUIRED IMPORTED_TARGET glib-2.0)

@@ -11,7 +11,18 @@
 
 ## 2. Veritabanı Kurulumu
 
-1. Kaynak grubu ve Azure SQL sunucusunu oluşturun (Managed Identity etkin):
+1. IaC ile dağıtım (önerilen)
+
+```powershell
+az deployment group create `
+  --resource-group rg-cringebank-backend `
+  --template-file infra/azure/main.bicep `
+  --parameters namePrefix=cringebank environment=dev `
+  --parameters sqlAdministratorPassword="<GüçlüParola>" `
+  --parameters sqlAdAdminLogin="CringeBank Admin" sqlAdAdminObjectId="<AAD ObjectId>"
+```
+
+2. Manuel kurulum tercih ederseniz kaynak grubu ve Azure SQL sunucusunu oluşturun (Managed Identity etkin):
 
 ```powershell
 az group create -n rg-cringebank-backend -l westeurope
@@ -19,13 +30,13 @@ az sql server create -g rg-cringebank-backend -n cringebank-sql --enable-public-
 az sql db create -g rg-cringebank-backend -s cringebank-sql -n CringeBank --service-objective HS_Gen5_2 --auto-pause-delay 60
 ```
 
-2. Azure AD yönetici kullanıcısını atayın ve uygulama Managed Identity'sini yetkilendirin:
+3. Azure AD yönetici kullanıcısını atayın ve uygulama Managed Identity'sini yetkilendirin:
 
 ```powershell
 az sql server ad-admin create -g rg-cringebank-backend -s cringebank-sql -u "CringeBank Admin" -i <AAD ObjectId>
 ```
 
-3. Azure Data Studio veya SSMS üzerinden Managed Identity için veritabanı kullanıcısı oluşturun:
+4. Azure Data Studio veya SSMS üzerinden Managed Identity için veritabanı kullanıcısı oluşturun:
 
 ```sql
 CREATE USER [cringebank-api-mi] FROM EXTERNAL PROVIDER;
@@ -57,6 +68,8 @@ Aşağıdaki değişkenler uygulama sürecine enjekte edilmelidir:
 - `CRINGEBANK__JWT__KEY`
 - `ASPNETCORE_ENVIRONMENT=Production`
 
+> Örnek değerler için `env/backend.env.template` dosyasını referans alın. Dosyayı kopyalayıp gizli anahtarları doldurun ve CI/CD pipeline'ında güvenli şekilde yükleyin.
+
 Container örneği:
 
 ```yaml
@@ -70,6 +83,13 @@ services:
     ports:
       - "5000:8080"
 ```
+
+### Konfigürasyon katmanları
+
+- `appsettings.json` ortak varsayılanları içerir (loglama, JWT issuer/audience vb.).
+- `appsettings.Development.json`, `appsettings.Staging.json`, `appsettings.Production.json` ortam bazlı ayarları override eder.
+- `ConnectionStrings:Sql` ve `Jwt:Key` gibi gizli değerler JSON dosyalarında tutulmaz; bunları user-secrets, App Service Application Settings veya Key Vault referansları ile sağlayın.
+- Managed Identity ile Azure SQL ve Key Vault bağlantısını yapılandırmak için `docs/backend_managed_identity_guide.md` rehberini izleyin.
 
 ## 4. Build ve Migration
 

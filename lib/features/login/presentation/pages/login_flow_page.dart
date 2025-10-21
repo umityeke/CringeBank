@@ -52,7 +52,8 @@ class _LoginFlowPageState extends ConsumerState<LoginFlowPage> {
   _resetConfirmPasswordController =
     TextEditingController(text: initial.passwordReset.confirmPassword);
 
-    _bubbleProgressSeed = math.Random().nextDouble();
+  // Deterministic seed keeps the animated background stable for goldens.
+  _bubbleProgressSeed = math.Random(42).nextDouble();
 
     _bubbles = [
       _BubbleConfig(
@@ -804,7 +805,12 @@ class _LoginFlowPageState extends ConsumerState<LoginFlowPage> {
     LoginState state,
     LoginController controller,
   ) {
-    final notices = _buildNotices(context, state);
+    final baseNotices = _buildNotices(context, state);
+    final totpNotices = _buildTotpNotices(state);
+    final notices = [
+      ...baseNotices,
+      ...totpNotices,
+    ];
     final fallbackChannels = state.availableMfaChannels
         .where((channel) => channel != MfaChannel.totp)
         .toList(growable: false);

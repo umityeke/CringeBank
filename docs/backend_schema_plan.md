@@ -1,6 +1,6 @@
 # CringeBank SQL Schema Plan
 
-**Last updated:** 2025-10-06
+**Last updated:** 2025-10-20
 
 This document captures the first-pass relational model for the new CringeBank backend (SQL Server 2017+). It follows the architectural brief and is meant to be the source of truth while generating EF Core entities and migrations.
 
@@ -236,6 +236,15 @@ Similar to post media.
 
 Unique: `(message_id, user_id, receipt_type)`.
 
+## Chat Şeması Özeti
+
+- **Conversation**: Grup veya bireysel sohbet; `is_group` varsayılan `false`, `created_by_user_id` `auth.Users` tablosuna `RESTRICT` ile bağlı.
+- **ConversationMember**: Üyelik satırı; `role` varsayılan `participant` (0), `last_read_*` alanları okuma durumunu izler, `(conversation_id, user_id)` benzersiz indeksli.
+- **Message**: Sohbet mesajı; `deleted_for_all` varsayılan `false`, `sender_user_id` `auth.Users` ile `RESTRICT` bağlı, zaman bazlı indeks `(conversation_id, created_at, id)` ile keyset sıralı.
+- **MessageMedia**: Mesaj ekleri; zorunlu `url`, isteğe bağlı `width/height`, `message_id` üzerinde indeks.
+- **MessageReceipt**: Teslim/okundu kaydı; enum tabanlı `receipt_type`, `(message_id, user_id, receipt_type)` benzersiz indeksli.
+- Tüm zaman damgaları `SYSUTCDATETIME()` varsayılanıyla tutulur; şema `chat` altında, ilişkiler EF konfigurasyonlarındaki `Cascade/Restrict` davranışlarıyla hizalı.
+
 ## 5. wallet schema
 
 ### 5.1 wallet.Accounts
@@ -404,6 +413,20 @@ For guaranteed delivery.
 | retries | INT NOT NULL DEFAULT 0 |
 | created_at | DATETIME2(3) |
 | processed_at | DATETIME2(3) NULL |
+
+### 8.3 outbox.Events
+
+| Column | Type | Constraints |
+| --- | --- | --- |
+| id | BIGINT IDENTITY | PRIMARY KEY |
+| topic | NVARCHAR(128) | NOT NULL |
+| payload | NVARCHAR(MAX) | NOT NULL |
+| status | TINYINT | NOT NULL DEFAULT 0 (0:pending,1:sent,2:failed) |
+| retries | INT | NOT NULL DEFAULT 0 |
+| created_at | DATETIME2(3) | NOT NULL DEFAULT SYSUTCDATETIME() |
+| processed_at | DATETIME2(3) | NULL |
+
+Indexler: `IX_OutboxEvents_Status` ve `IX_OutboxEvents_Status_CreatedAt`. Bu tablo, domain eventlerinin garantili teslimi icin global outbox katmani olarak kullanilir; Application katmanindaki `IOutboxEventWriter` servisi tarafindan doldurulur.
 
 ## 9. admin schema
 

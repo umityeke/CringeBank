@@ -7,6 +7,12 @@ import '../../domain/repositories/tag_approval_repository.dart';
 
 class MockTagApprovalRepository implements TagApprovalRepository {
   MockTagApprovalRepository() {
+    _queueController = StreamController<List<TagApprovalEntry>>.broadcast(
+      onListen: _emitQueue,
+    );
+    _settingsController = StreamController<TagApprovalSettings>.broadcast(
+      onListen: _emitSettings,
+    );
     _emitQueue();
     _emitSettings();
   }
@@ -35,10 +41,8 @@ class MockTagApprovalRepository implements TagApprovalRepository {
 
   TagApprovalSettings _settings = const TagApprovalSettings(requireApproval: true);
 
-  final StreamController<List<TagApprovalEntry>> _queueController =
-      StreamController<List<TagApprovalEntry>>.broadcast();
-  final StreamController<TagApprovalSettings> _settingsController =
-      StreamController<TagApprovalSettings>.broadcast();
+  late final StreamController<List<TagApprovalEntry>> _queueController;
+  late final StreamController<TagApprovalSettings> _settingsController;
 
   @override
   Stream<List<TagApprovalEntry>> watchQueue() => _queueController.stream;

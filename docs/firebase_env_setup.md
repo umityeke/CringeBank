@@ -117,6 +117,10 @@ Functions Shell veya testler sırasında prod kaynaklarına yazmamak için şu a
 4. **Prod guard** — `functions/index.js` dosyasında emülatör dışında (yerel Functions Shell vb.) çalışıp prod'a erişmeyi engelleyen koruma bulunur. GCP üzerinde barındırılan ortam otomatik olarak izinlidir; yerelde bilinçli olarak prod'a bağlanmanız gerekirse `ALLOW_PROD=true` değişkenini siz set etmelisiniz.
 5. **Komutlarda demo proje kullanın** — Yanlışlıkla prod seçimini engellemek için `--project demo-cringebank` bayrağını veya `firebase use demo-cringebank` komutunu tercih edin.
 
+6. **Flutter entegrasyon testleri** — `integration_test/firebase_emulator_integration_test.dart` senaryoları emülatörle çalıştırmak için PowerShell oturumunda
+   `CRINGEBANK_USE_FIREBASE_EMULATOR=true`, `FIREBASE_AUTH_EMULATOR_HOST=localhost:9099` ve `FIRESTORE_EMULATOR_HOST=localhost:8787` değişkenlerini set edin veya `scripts/run_emulator_tests.ps1` scriptini kullanın. Uzaktan (canlı) testler için `scripts/run_remote_tests.ps1` ile
+   `CRINGEBANK_RUN_FIREBASE_REMOTE_TESTS=true`, `CRINGEBANK_REMOTE_EMAIL=<test_kullanıcısı>`, `CRINGEBANK_REMOTE_PASSWORD=<şifre>` değişkenlerini sağlayın.
+
 HTTP fonksiyonlarını test etmek için emülatör URL'lerini (`http://127.0.0.1:5001/demo-cringebank/...`) kullanın. Entegre testleri `firebase emulators:exec --project demo-cringebank "npm test"` ile izole şekilde çalıştırabilirsiniz.
 
 ---

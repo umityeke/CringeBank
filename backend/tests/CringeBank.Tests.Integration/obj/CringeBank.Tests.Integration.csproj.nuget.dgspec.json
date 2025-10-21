@@ -4,14 +4,151 @@
     "C:\\dev\\cringebank\\backend\\tests\\CringeBank.Tests.Integration\\CringeBank.Tests.Integration.csproj": {}
   },
   "projects": {
-    "C:\\dev\\cringebank\\backend\\tests\\CringeBank.Tests.Integration\\CringeBank.Tests.Integration.csproj": {
+    "C:\\dev\\cringebank\\backend\\src\\CringeBank.Application\\CringeBank.Application.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\dev\\cringebank\\backend\\tests\\CringeBank.Tests.Integration\\CringeBank.Tests.Integration.csproj",
-        "projectName": "CringeBank.Tests.Integration",
-        "projectPath": "C:\\dev\\cringebank\\backend\\tests\\CringeBank.Tests.Integration\\CringeBank.Tests.Integration.csproj",
+        "projectUniqueName": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Application\\CringeBank.Application.csproj",
+        "projectName": "CringeBank.Application",
+        "projectPath": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Application\\CringeBank.Application.csproj",
         "packagesPath": "C:\\Users\\Ümit YEKE\\.nuget\\packages\\",
-        "outputPath": "C:\\dev\\cringebank\\backend\\tests\\CringeBank.Tests.Integration\\obj\\",
+        "outputPath": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Application\\obj\\",
+        "projectStyle": "PackageReference",
+        "centralPackageVersionsManagementEnabled": true,
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Ümit YEKE\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net9.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net9.0": {
+            "targetAlias": "net9.0",
+            "projectReferences": {
+              "C:\\dev\\cringebank\\backend\\src\\CringeBank.Common\\CringeBank.Common.csproj": {
+                "projectPath": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Common\\CringeBank.Common.csproj"
+              },
+              "C:\\dev\\cringebank\\backend\\src\\CringeBank.Domain\\CringeBank.Domain.csproj": {
+                "projectPath": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Domain\\CringeBank.Domain.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "allWarningsAsErrors": true,
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net9.0": {
+          "targetAlias": "net9.0",
+          "dependencies": {
+            "FluentValidation": {
+              "target": "Package",
+              "version": "[11.9.0, )",
+              "versionCentrallyManaged": true
+            },
+            "FluentValidation.DependencyInjectionExtensions": {
+              "target": "Package",
+              "version": "[11.9.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Mapster": {
+              "target": "Package",
+              "version": "[7.4.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Scrutor": {
+              "target": "Package",
+              "version": "[5.0.1, )",
+              "versionCentrallyManaged": true
+            }
+          },
+          "centralPackageVersions": {
+            "Azure.Storage.Blobs": "12.24.0",
+            "coverlet.collector": "6.0.2",
+            "FirebaseAdmin": "2.4.0",
+            "FluentValidation": "11.9.0",
+            "FluentValidation.DependencyInjectionExtensions": "11.9.0",
+            "Google.Apis.Auth": "1.68.0",
+            "Mapster": "7.4.0",
+            "Microsoft.AspNetCore.Authentication.JwtBearer": "9.0.0",
+            "Microsoft.AspNetCore.OpenApi": "9.0.9",
+            "Microsoft.Data.SqlClient": "5.2.1",
+            "Microsoft.EntityFrameworkCore": "9.0.0",
+            "Microsoft.EntityFrameworkCore.Design": "9.0.0",
+            "Microsoft.EntityFrameworkCore.Relational": "9.0.0",
+            "Microsoft.EntityFrameworkCore.SqlServer": "9.0.0",
+            "Microsoft.EntityFrameworkCore.Tools": "9.0.0",
+            "Microsoft.Extensions.Configuration": "9.0.0",
+            "Microsoft.Extensions.Configuration.EnvironmentVariables": "9.0.0",
+            "Microsoft.Extensions.Configuration.FileExtensions": "9.0.0",
+            "Microsoft.Extensions.Configuration.Json": "9.0.0",
+            "Microsoft.Extensions.Configuration.UserSecrets": "9.0.0",
+            "Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore": "9.0.0",
+            "Microsoft.Extensions.Logging.Abstractions": "9.0.0",
+            "Microsoft.Extensions.Options": "9.0.0",
+            "Microsoft.NET.Test.Sdk": "17.12.0",
+            "OpenTelemetry.Exporter.Console": "1.8.1",
+            "OpenTelemetry.Exporter.OpenTelemetryProtocol": "1.8.1",
+            "OpenTelemetry.Extensions.Hosting": "1.8.1",
+            "OpenTelemetry.Instrumentation.AspNetCore": "1.8.1",
+            "OpenTelemetry.Instrumentation.Http": "1.8.1",
+            "Otp.NET": "1.4.0",
+            "Scrutor": "5.0.1",
+            "Serilog.AspNetCore": "8.0.1",
+            "Serilog.Settings.Configuration": "8.0.0",
+            "Serilog.Sinks.Console": "5.0.1",
+            "Serilog.Sinks.Seq": "5.2.2",
+            "Swashbuckle.AspNetCore": "6.5.0",
+            "System.IdentityModel.Tokens.Jwt": "7.5.1",
+            "xunit": "2.9.2",
+            "xunit.runner.visualstudio": "2.8.2"
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.305/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\dev\\cringebank\\backend\\src\\CringeBank.Common\\CringeBank.Common.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Common\\CringeBank.Common.csproj",
+        "projectName": "CringeBank.Common",
+        "projectPath": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Common\\CringeBank.Common.csproj",
+        "packagesPath": "C:\\Users\\Ümit YEKE\\.nuget\\packages\\",
+        "outputPath": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Common\\obj\\",
         "projectStyle": "PackageReference",
         "centralPackageVersionsManagementEnabled": true,
         "fallbackFolders": [
@@ -52,6 +189,442 @@
         "net9.0": {
           "targetAlias": "net9.0",
           "dependencies": {
+            "Microsoft.Extensions.Logging.Abstractions": {
+              "target": "Package",
+              "version": "[9.0.0, )",
+              "versionCentrallyManaged": true
+            }
+          },
+          "centralPackageVersions": {
+            "Azure.Storage.Blobs": "12.24.0",
+            "coverlet.collector": "6.0.2",
+            "FirebaseAdmin": "2.4.0",
+            "FluentValidation": "11.9.0",
+            "FluentValidation.DependencyInjectionExtensions": "11.9.0",
+            "Google.Apis.Auth": "1.68.0",
+            "Mapster": "7.4.0",
+            "Microsoft.AspNetCore.Authentication.JwtBearer": "9.0.0",
+            "Microsoft.AspNetCore.OpenApi": "9.0.9",
+            "Microsoft.Data.SqlClient": "5.2.1",
+            "Microsoft.EntityFrameworkCore": "9.0.0",
+            "Microsoft.EntityFrameworkCore.Design": "9.0.0",
+            "Microsoft.EntityFrameworkCore.Relational": "9.0.0",
+            "Microsoft.EntityFrameworkCore.SqlServer": "9.0.0",
+            "Microsoft.EntityFrameworkCore.Tools": "9.0.0",
+            "Microsoft.Extensions.Configuration": "9.0.0",
+            "Microsoft.Extensions.Configuration.EnvironmentVariables": "9.0.0",
+            "Microsoft.Extensions.Configuration.FileExtensions": "9.0.0",
+            "Microsoft.Extensions.Configuration.Json": "9.0.0",
+            "Microsoft.Extensions.Configuration.UserSecrets": "9.0.0",
+            "Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore": "9.0.0",
+            "Microsoft.Extensions.Logging.Abstractions": "9.0.0",
+            "Microsoft.Extensions.Options": "9.0.0",
+            "Microsoft.NET.Test.Sdk": "17.12.0",
+            "OpenTelemetry.Exporter.Console": "1.8.1",
+            "OpenTelemetry.Exporter.OpenTelemetryProtocol": "1.8.1",
+            "OpenTelemetry.Extensions.Hosting": "1.8.1",
+            "OpenTelemetry.Instrumentation.AspNetCore": "1.8.1",
+            "OpenTelemetry.Instrumentation.Http": "1.8.1",
+            "Otp.NET": "1.4.0",
+            "Scrutor": "5.0.1",
+            "Serilog.AspNetCore": "8.0.1",
+            "Serilog.Settings.Configuration": "8.0.0",
+            "Serilog.Sinks.Console": "5.0.1",
+            "Serilog.Sinks.Seq": "5.2.2",
+            "Swashbuckle.AspNetCore": "6.5.0",
+            "System.IdentityModel.Tokens.Jwt": "7.5.1",
+            "xunit": "2.9.2",
+            "xunit.runner.visualstudio": "2.8.2"
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.305/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\dev\\cringebank\\backend\\src\\CringeBank.Domain\\CringeBank.Domain.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Domain\\CringeBank.Domain.csproj",
+        "projectName": "CringeBank.Domain",
+        "projectPath": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Domain\\CringeBank.Domain.csproj",
+        "packagesPath": "C:\\Users\\Ümit YEKE\\.nuget\\packages\\",
+        "outputPath": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Domain\\obj\\",
+        "projectStyle": "PackageReference",
+        "centralPackageVersionsManagementEnabled": true,
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Ümit YEKE\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net9.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net9.0": {
+            "targetAlias": "net9.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "allWarningsAsErrors": true,
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net9.0": {
+          "targetAlias": "net9.0",
+          "centralPackageVersions": {
+            "Azure.Storage.Blobs": "12.24.0",
+            "coverlet.collector": "6.0.2",
+            "FirebaseAdmin": "2.4.0",
+            "FluentValidation": "11.9.0",
+            "FluentValidation.DependencyInjectionExtensions": "11.9.0",
+            "Google.Apis.Auth": "1.68.0",
+            "Mapster": "7.4.0",
+            "Microsoft.AspNetCore.Authentication.JwtBearer": "9.0.0",
+            "Microsoft.AspNetCore.OpenApi": "9.0.9",
+            "Microsoft.Data.SqlClient": "5.2.1",
+            "Microsoft.EntityFrameworkCore": "9.0.0",
+            "Microsoft.EntityFrameworkCore.Design": "9.0.0",
+            "Microsoft.EntityFrameworkCore.Relational": "9.0.0",
+            "Microsoft.EntityFrameworkCore.SqlServer": "9.0.0",
+            "Microsoft.EntityFrameworkCore.Tools": "9.0.0",
+            "Microsoft.Extensions.Configuration": "9.0.0",
+            "Microsoft.Extensions.Configuration.EnvironmentVariables": "9.0.0",
+            "Microsoft.Extensions.Configuration.FileExtensions": "9.0.0",
+            "Microsoft.Extensions.Configuration.Json": "9.0.0",
+            "Microsoft.Extensions.Configuration.UserSecrets": "9.0.0",
+            "Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore": "9.0.0",
+            "Microsoft.Extensions.Logging.Abstractions": "9.0.0",
+            "Microsoft.Extensions.Options": "9.0.0",
+            "Microsoft.NET.Test.Sdk": "17.12.0",
+            "OpenTelemetry.Exporter.Console": "1.8.1",
+            "OpenTelemetry.Exporter.OpenTelemetryProtocol": "1.8.1",
+            "OpenTelemetry.Extensions.Hosting": "1.8.1",
+            "OpenTelemetry.Instrumentation.AspNetCore": "1.8.1",
+            "OpenTelemetry.Instrumentation.Http": "1.8.1",
+            "Otp.NET": "1.4.0",
+            "Scrutor": "5.0.1",
+            "Serilog.AspNetCore": "8.0.1",
+            "Serilog.Settings.Configuration": "8.0.0",
+            "Serilog.Sinks.Console": "5.0.1",
+            "Serilog.Sinks.Seq": "5.2.2",
+            "Swashbuckle.AspNetCore": "6.5.0",
+            "System.IdentityModel.Tokens.Jwt": "7.5.1",
+            "xunit": "2.9.2",
+            "xunit.runner.visualstudio": "2.8.2"
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.305/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\dev\\cringebank\\backend\\src\\CringeBank.Infrastructure\\CringeBank.Infrastructure.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Infrastructure\\CringeBank.Infrastructure.csproj",
+        "projectName": "CringeBank.Infrastructure",
+        "projectPath": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Infrastructure\\CringeBank.Infrastructure.csproj",
+        "packagesPath": "C:\\Users\\Ümit YEKE\\.nuget\\packages\\",
+        "outputPath": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Infrastructure\\obj\\",
+        "projectStyle": "PackageReference",
+        "centralPackageVersionsManagementEnabled": true,
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Ümit YEKE\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net9.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net9.0": {
+            "targetAlias": "net9.0",
+            "projectReferences": {
+              "C:\\dev\\cringebank\\backend\\src\\CringeBank.Application\\CringeBank.Application.csproj": {
+                "projectPath": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Application\\CringeBank.Application.csproj"
+              },
+              "C:\\dev\\cringebank\\backend\\src\\CringeBank.Common\\CringeBank.Common.csproj": {
+                "projectPath": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Common\\CringeBank.Common.csproj"
+              },
+              "C:\\dev\\cringebank\\backend\\src\\CringeBank.Domain\\CringeBank.Domain.csproj": {
+                "projectPath": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Domain\\CringeBank.Domain.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "allWarningsAsErrors": true,
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net9.0": {
+          "targetAlias": "net9.0",
+          "dependencies": {
+            "Azure.Storage.Blobs": {
+              "target": "Package",
+              "version": "[12.24.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Microsoft.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[9.0.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Microsoft.EntityFrameworkCore.Design": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[9.0.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Microsoft.EntityFrameworkCore.Relational": {
+              "target": "Package",
+              "version": "[9.0.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Microsoft.EntityFrameworkCore.SqlServer": {
+              "target": "Package",
+              "version": "[9.0.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Microsoft.EntityFrameworkCore.Tools": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[9.0.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Microsoft.Extensions.Configuration": {
+              "target": "Package",
+              "version": "[9.0.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Microsoft.Extensions.Configuration.EnvironmentVariables": {
+              "target": "Package",
+              "version": "[9.0.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Microsoft.Extensions.Configuration.FileExtensions": {
+              "target": "Package",
+              "version": "[9.0.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Microsoft.Extensions.Configuration.Json": {
+              "target": "Package",
+              "version": "[9.0.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Microsoft.Extensions.Configuration.UserSecrets": {
+              "target": "Package",
+              "version": "[9.0.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Microsoft.Extensions.Options": {
+              "target": "Package",
+              "version": "[9.0.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Otp.NET": {
+              "target": "Package",
+              "version": "[1.4.0, )",
+              "versionCentrallyManaged": true
+            },
+            "System.IdentityModel.Tokens.Jwt": {
+              "target": "Package",
+              "version": "[7.5.1, )",
+              "versionCentrallyManaged": true
+            }
+          },
+          "centralPackageVersions": {
+            "Azure.Storage.Blobs": "12.24.0",
+            "coverlet.collector": "6.0.2",
+            "FirebaseAdmin": "2.4.0",
+            "FluentValidation": "11.9.0",
+            "FluentValidation.DependencyInjectionExtensions": "11.9.0",
+            "Google.Apis.Auth": "1.68.0",
+            "Mapster": "7.4.0",
+            "Microsoft.AspNetCore.Authentication.JwtBearer": "9.0.0",
+            "Microsoft.AspNetCore.OpenApi": "9.0.9",
+            "Microsoft.Data.SqlClient": "5.2.1",
+            "Microsoft.EntityFrameworkCore": "9.0.0",
+            "Microsoft.EntityFrameworkCore.Design": "9.0.0",
+            "Microsoft.EntityFrameworkCore.Relational": "9.0.0",
+            "Microsoft.EntityFrameworkCore.SqlServer": "9.0.0",
+            "Microsoft.EntityFrameworkCore.Tools": "9.0.0",
+            "Microsoft.Extensions.Configuration": "9.0.0",
+            "Microsoft.Extensions.Configuration.EnvironmentVariables": "9.0.0",
+            "Microsoft.Extensions.Configuration.FileExtensions": "9.0.0",
+            "Microsoft.Extensions.Configuration.Json": "9.0.0",
+            "Microsoft.Extensions.Configuration.UserSecrets": "9.0.0",
+            "Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore": "9.0.0",
+            "Microsoft.Extensions.Logging.Abstractions": "9.0.0",
+            "Microsoft.Extensions.Options": "9.0.0",
+            "Microsoft.NET.Test.Sdk": "17.12.0",
+            "OpenTelemetry.Exporter.Console": "1.8.1",
+            "OpenTelemetry.Exporter.OpenTelemetryProtocol": "1.8.1",
+            "OpenTelemetry.Extensions.Hosting": "1.8.1",
+            "OpenTelemetry.Instrumentation.AspNetCore": "1.8.1",
+            "OpenTelemetry.Instrumentation.Http": "1.8.1",
+            "Otp.NET": "1.4.0",
+            "Scrutor": "5.0.1",
+            "Serilog.AspNetCore": "8.0.1",
+            "Serilog.Settings.Configuration": "8.0.0",
+            "Serilog.Sinks.Console": "5.0.1",
+            "Serilog.Sinks.Seq": "5.2.2",
+            "Swashbuckle.AspNetCore": "6.5.0",
+            "System.IdentityModel.Tokens.Jwt": "7.5.1",
+            "xunit": "2.9.2",
+            "xunit.runner.visualstudio": "2.8.2"
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.305/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\dev\\cringebank\\backend\\tests\\CringeBank.Tests.Integration\\CringeBank.Tests.Integration.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\dev\\cringebank\\backend\\tests\\CringeBank.Tests.Integration\\CringeBank.Tests.Integration.csproj",
+        "projectName": "CringeBank.Tests.Integration",
+        "projectPath": "C:\\dev\\cringebank\\backend\\tests\\CringeBank.Tests.Integration\\CringeBank.Tests.Integration.csproj",
+        "packagesPath": "C:\\Users\\Ümit YEKE\\.nuget\\packages\\",
+        "outputPath": "C:\\dev\\cringebank\\backend\\tests\\CringeBank.Tests.Integration\\obj\\",
+        "projectStyle": "PackageReference",
+        "centralPackageVersionsManagementEnabled": true,
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\Ümit YEKE\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net9.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net9.0": {
+            "targetAlias": "net9.0",
+            "projectReferences": {
+              "C:\\dev\\cringebank\\backend\\src\\CringeBank.Infrastructure\\CringeBank.Infrastructure.csproj": {
+                "projectPath": "C:\\dev\\cringebank\\backend\\src\\CringeBank.Infrastructure\\CringeBank.Infrastructure.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "allWarningsAsErrors": true,
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net9.0": {
+          "targetAlias": "net9.0",
+          "dependencies": {
+            "Microsoft.Data.SqlClient": {
+              "target": "Package",
+              "version": "[5.2.1, )",
+              "versionCentrallyManaged": true
+            },
+            "Microsoft.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[9.0.0, )",
+              "versionCentrallyManaged": true
+            },
+            "Microsoft.EntityFrameworkCore.SqlServer": {
+              "target": "Package",
+              "version": "[9.0.0, )",
+              "versionCentrallyManaged": true
+            },
             "Microsoft.NET.Test.Sdk": {
               "target": "Package",
               "version": "[17.12.0, )",
@@ -74,13 +647,16 @@
             }
           },
           "centralPackageVersions": {
+            "Azure.Storage.Blobs": "12.24.0",
             "coverlet.collector": "6.0.2",
             "FirebaseAdmin": "2.4.0",
             "FluentValidation": "11.9.0",
             "FluentValidation.DependencyInjectionExtensions": "11.9.0",
             "Google.Apis.Auth": "1.68.0",
+            "Mapster": "7.4.0",
             "Microsoft.AspNetCore.Authentication.JwtBearer": "9.0.0",
             "Microsoft.AspNetCore.OpenApi": "9.0.9",
+            "Microsoft.Data.SqlClient": "5.2.1",
             "Microsoft.EntityFrameworkCore": "9.0.0",
             "Microsoft.EntityFrameworkCore.Design": "9.0.0",
             "Microsoft.EntityFrameworkCore.Relational": "9.0.0",
@@ -93,11 +669,21 @@
             "Microsoft.Extensions.Configuration.UserSecrets": "9.0.0",
             "Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore": "9.0.0",
             "Microsoft.Extensions.Logging.Abstractions": "9.0.0",
+            "Microsoft.Extensions.Options": "9.0.0",
             "Microsoft.NET.Test.Sdk": "17.12.0",
+            "OpenTelemetry.Exporter.Console": "1.8.1",
+            "OpenTelemetry.Exporter.OpenTelemetryProtocol": "1.8.1",
+            "OpenTelemetry.Extensions.Hosting": "1.8.1",
+            "OpenTelemetry.Instrumentation.AspNetCore": "1.8.1",
+            "OpenTelemetry.Instrumentation.Http": "1.8.1",
+            "Otp.NET": "1.4.0",
+            "Scrutor": "5.0.1",
             "Serilog.AspNetCore": "8.0.1",
             "Serilog.Settings.Configuration": "8.0.0",
             "Serilog.Sinks.Console": "5.0.1",
+            "Serilog.Sinks.Seq": "5.2.2",
             "Swashbuckle.AspNetCore": "6.5.0",
+            "System.IdentityModel.Tokens.Jwt": "7.5.1",
             "xunit": "2.9.2",
             "xunit.runner.visualstudio": "2.8.2"
           },

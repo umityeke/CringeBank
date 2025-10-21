@@ -239,7 +239,8 @@ void main() {
       await tester.pump();
 
       expect(find.text('Guvenlik dogrulamasi'), findsOneWidget);
-      expect(find.byIcon(Icons.verified_user_outlined), findsOneWidget);
+      expect(find.text('Ek guvenlik dogrulamasi'), findsOneWidget);
+      expect(find.byIcon(Icons.verified_user_outlined), findsNWidgets(2));
       expect(find.byType(TextField), findsNWidgets(3));
     });
 

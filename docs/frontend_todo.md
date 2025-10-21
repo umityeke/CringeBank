@@ -1,5 +1,11 @@
 # Frontend TODO (Flutter)
 
+## Durum Özeti (20 Ekim 2025)
+
+- Aktif geliştirme maddeleri tamamlandı; liste yalnızca referans amacıyla tutuluyor.
+- Yeni gereksinimler çıktığında `docs/uygulama_icindekiler.txt` içindeki “PROJE TODO DURUM ÖZETİ” bölümüyle eşgüdümlü şekilde buraya eklenecek.
+- Mevcut işler için herhangi bir açık görev bulunmuyor; QA/ürün onayı sonrası gelen ek talepler ayrı sprint girişleri olarak eklenecek.
+
 ## 1. Kayıt Paneli (Registration Flow)
 
 - [x] Kimlik ve şifre ekranlarını Flutter ile uygula (e-posta/telefon seçimi, şifre politikası doğrulamaları).
@@ -60,17 +66,18 @@
 
 ## 8. Test Stratejisi
 
-- [ ] Widget testleri: kayıt/login/feed/etiketleme ekranları için pozitif & negatif senaryolar (feed senaryoları tamamlandı).
+- [x] Widget testleri: kayıt/login/feed/etiketleme ekranları için pozitif & negatif senaryolar (kayıt/login akışları ve feed/etiketleme senaryoları pozitif-negatif testlerle kapsandı).
 - [x] Login akışı modern UI ile hizalandı ve widget testleri güncellendi.
-- [ ] Integration testleri: Firebase + mock backend senaryoları (happy path & hata durumları).
-- [ ] Golden/görsel testler: kritik ekranların tematik doğrulaması.
-- [ ] Telemetri ve rate-limit olayları için birim testleri (mock servislerle).
+- [x] Integration testleri: Mock backend senaryoları (login e-posta/parola akışı için happy path & hata durumları).
+- [x] Integration testleri: Firebase (emülatör/remote) senaryoları (happy path & hata durumları). _(Bkz. `integration_test/firebase_emulator_integration_test.dart`, emülatör için `CRINGEBANK_USE_FIREBASE_EMULATOR=true`, remote için `CRINGEBANK_RUN_FIREBASE_REMOTE_TESTS=true` ortam değişkenleriyle çalıştırılır.)_
+- [x] Golden/görsel testler: kritik ekranların tematik doğrulaması (login credentials + kilit ekranı golden eklendi).
+- [x] Telemetri ve rate-limit olayları için birim testleri (mock servislerle).
 
 ## 9. Dokümantasyon ve İzleme
 
-- [ ] Implementasyon ilerledikçe `uygulama içindekiler.txt` ve ilgili README’leri güncelle.
-- [ ] Yeni konfigürasyon değişkenleri için `env/.env.template` ve README yönergelerini eşitle.
-- [ ] Telemetri event şeması değişirse `docs/telemetry_events.md` ve redaction rehberini senkronize et.
+- [x] Implementasyon ilerledikçe `uygulama içindekiler.txt` ve ilgili README’leri güncelle. _(Bkz. `docs/uygulama_icindekiler.txt` ve README “Faydalı Kaynaklar”.)_
+- [x] Yeni konfigürasyon değişkenleri için `env/.env.template` ve README yönergelerini eşitle.
+- [x] Telemetri event şeması değişirse `docs/telemetry_events.md` ve redaction rehberini senkronize et. _(Yeni sürüm: `docs/telemetry_events.md`, `docs/telemetry_redaction_guide.md`.)_
 - [x] App Check test moduna ilişkin yönergeleri README ve `docs/devops/config-management.md` ile hizala.
 
 _TODO listesi güncel tutulacak; tamamlanan maddeler işaretlenecek, yeni ihtiyaçlar ortaya çıktıkça eklemeler yapılacak._

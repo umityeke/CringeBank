@@ -27,6 +27,7 @@ class CringeEntryService {
   final firebase_auth.FirebaseAuth _auth;
   final FirebaseStorage _storage;
   final FirebaseAnalytics? _analytics;
+  final bool _enableConnectivityMonitoring;
   bool _isDisposed = false;
   StreamSubscription<ConnectivityStatus>? _connectivitySubscription;
   static bool get _analyticsSupported {
@@ -49,17 +50,21 @@ class CringeEntryService {
     firebase_auth.FirebaseAuth? auth,
     FirebaseStorage? storage,
     FirebaseAnalytics? analytics,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _auth = auth ?? firebase_auth.FirebaseAuth.instance,
-       _storage = storage ?? FirebaseStorage.instance,
-       _analytics = _analyticsSupported
-           ? (analytics ?? FirebaseAnalytics.instance)
-           : null {
-    _connectivitySubscription = ConnectivityService.instance.statusStream
-        .listen(
-          _handleConnectivityStatus,
-          onError: (error) => print('⚠️ CONNECTIVITY LISTEN ERROR: $error'),
-        );
+    bool enableConnectivityMonitoring = true,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? firebase_auth.FirebaseAuth.instance,
+        _storage = storage ?? FirebaseStorage.instance,
+        _analytics = _analyticsSupported
+            ? (analytics ?? FirebaseAnalytics.instance)
+            : null,
+        _enableConnectivityMonitoring = enableConnectivityMonitoring {
+    if (_enableConnectivityMonitoring) {
+      _connectivitySubscription = ConnectivityService.instance.statusStream
+          .listen(
+            _handleConnectivityStatus,
+            onError: (error) => print('⚠️ CONNECTIVITY LISTEN ERROR: $error'),
+          );
+    }
   }
 
   @visibleForTesting
@@ -68,6 +73,7 @@ class CringeEntryService {
     firebase_auth.FirebaseAuth? auth,
     FirebaseStorage? storage,
     FirebaseAnalytics? analytics,
+    bool enableConnectivityMonitoring = true,
   }) {
     _instance?.dispose();
     _instance = CringeEntryService._(
@@ -75,6 +81,7 @@ class CringeEntryService {
       auth: auth,
       storage: storage,
       analytics: analytics,
+      enableConnectivityMonitoring: enableConnectivityMonitoring,
     );
   }
 

@@ -1,5 +1,5 @@
 {
-    "cmake.sourceDirectory": "C:/Users/Ümit YEKE/CRINGE-BANKASI-2/linux",
+    "cmake.sourceDirectory": "C:/dev/cringebank/linux",
     "cSpell.language": "en,tr",
     "cSpell.words": [
         "Bankası",
@@ -46,5 +46,6 @@
     "DockerRun.DisableDockerrc": true,
     "DockerRun.Containers": [
         "f288e8fff478"
-    ]
+    ],
+    "postman.settings.dotenv-detection-notification-visibility": false
 }

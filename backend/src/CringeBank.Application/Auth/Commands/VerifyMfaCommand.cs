@@ -1,0 +1,5 @@
+using CringeBank.Application.Abstractions.Commands;
+
+namespace CringeBank.Application.Auth.Commands;
+
+public sealed record VerifyMfaCommand(string Token, string Code) : ICommand<VerifyMfaResult>;

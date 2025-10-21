@@ -5,7 +5,7 @@ using CringeBank.Domain.Enums;
 
 namespace CringeBank.Domain.Entities;
 
-public sealed class Product : Entity, IAggregateRoot
+public sealed class Product : AggregateRoot
 {
     private readonly List<ProductImage> _images = new();
 
@@ -23,7 +23,7 @@ public sealed class Product : Entity, IAggregateRoot
         SellerType sellerType,
         Guid? sellerId,
         Guid? vendorId)
-        : base(id)
+    : base(id)
     {
         Title = title;
         Description = description;

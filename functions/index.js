@@ -14,6 +14,7 @@ const realtimeMirror = require('./realtime_mirror');
 const { createOnUserCreatedHandler, createOnUserDeletedHandler } = require('./user_sync_triggers');
 const { dailyWalletConsistencyCheck } = require('./scheduled/wallet_consistency_check');
 const { hourlyMetricsCollection } = require('./scheduled/metrics_collection');
+const { profileMirrorReconciliationJob } = require('./scheduled/profile_mirror_reconciliation');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -3012,4 +3013,5 @@ registerSqlGatewayCallables(exports);
 
 // Scheduled Functions (Monitoring & Alerts)
 exports.dailyWalletConsistencyCheck = dailyWalletConsistencyCheck;
+exports.profileMirrorReconciliationJob = profileMirrorReconciliationJob;
 exports.hourlyMetricsCollection = hourlyMetricsCollection;

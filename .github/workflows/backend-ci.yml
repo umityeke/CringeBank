@@ -1,0 +1,67 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - 'scripts/**'
+      - '.github/workflows/backend-ci.yml'
+      - 'Directory.Packages.props'
+      - 'docs/backend_error_budget.md'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'scripts/**'
+      - '.github/workflows/backend-ci.yml'
+      - 'Directory.Packages.props'
+      - 'docs/backend_error_budget.md'
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    env:
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+      DOTNET_NOLOGO: 'true'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        working-directory: backend
+        run: dotnet restore CringeBank.sln
+
+      - name: Build solution
+        working-directory: backend
+        run: dotnet build CringeBank.sln --configuration Release --no-restore
+
+      - name: Run unit tests
+        working-directory: backend
+        run: dotnet test tests/CringeBank.Tests.Unit/CringeBank.Tests.Unit.csproj --configuration Release --no-build
+
+      - name: Upload unit test coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-unit-coverage
+          path: backend/tests/CringeBank.Tests.Unit/TestResults/coverage/**
+          if-no-files-found: ignore
+
+      - name: Run integration tests
+        working-directory: backend
+        run: dotnet test tests/CringeBank.Tests.Integration/CringeBank.Tests.Integration.csproj --configuration Release --no-build
+
+      - name: Upload integration test coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-integration-coverage
+          path: backend/tests/CringeBank.Tests.Integration/TestResults/coverage/**
+          if-no-files-found: ignore
+
+      - name: Run backend smoke tests
+        run: pwsh ./scripts/smoke_tests.ps1 -Configuration Release

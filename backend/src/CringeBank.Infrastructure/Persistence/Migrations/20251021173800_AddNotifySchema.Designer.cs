@@ -4,6 +4,7 @@ using CringeBank.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CringeBank.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(CringeBankDbContext))]
-    partial class CringeBankDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251021173800_AddNotifySchema")]
+    partial class AddNotifySchema
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1980,7 +1983,7 @@ namespace CringeBank.Infrastructure.Persistence.Migrations
                     b.HasOne("CringeBank.Domain.Auth.Entities.AuthUser", "Recipient")
                         .WithMany()
                         .HasForeignKey("RecipientUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("CringeBank.Domain.Auth.Entities.AuthUser", "Sender")

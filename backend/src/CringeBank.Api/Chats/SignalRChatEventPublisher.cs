@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CringeBank.Application.Chats;
+using CringeBank.Application.Notifications;
 using Microsoft.AspNetCore.SignalR;
 
 namespace CringeBank.Api.Chats;
@@ -11,10 +12,12 @@ namespace CringeBank.Api.Chats;
 public sealed class SignalRChatEventPublisher : IChatEventPublisher
 {
     private readonly IHubContext<ChatHub> _hubContext;
+    private readonly IChatNotificationService _chatNotificationService;
 
-    public SignalRChatEventPublisher(IHubContext<ChatHub> hubContext)
+    public SignalRChatEventPublisher(IHubContext<ChatHub> hubContext, IChatNotificationService chatNotificationService)
     {
         _hubContext = hubContext ?? throw new ArgumentNullException(nameof(hubContext));
+        _chatNotificationService = chatNotificationService ?? throw new ArgumentNullException(nameof(chatNotificationService));
     }
 
     public Task PublishConversationCreatedAsync(ConversationResult conversation, CancellationToken cancellationToken = default)
@@ -46,8 +49,9 @@ public sealed class SignalRChatEventPublisher : IChatEventPublisher
             .Clients
             .Group(ChatHub.GetConversationGroupName(message.ConversationPublicId))
             .SendAsync("ChatMessageSent", payload, cancellationToken);
+        var notificationTask = _chatNotificationService.QueueAsync(message, cancellationToken);
 
-        await Task.WhenAll(userBroadcast, conversationBroadcast).ConfigureAwait(false);
+        await Task.WhenAll(userBroadcast, conversationBroadcast, notificationTask).ConfigureAwait(false);
     }
 
     public async Task PublishConversationReadAsync(MarkConversationReadResult result, CancellationToken cancellationToken = default)

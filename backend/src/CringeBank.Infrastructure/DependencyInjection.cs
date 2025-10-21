@@ -4,6 +4,7 @@ using CringeBank.Application.Admin;
 using CringeBank.Application.Auth;
 using CringeBank.Application.Authorization;
 using CringeBank.Application.Chats;
+using CringeBank.Application.Notifications;
 using CringeBank.Application.Outbox;
 using CringeBank.Application.Users;
 using CringeBank.Application.Wallet;
@@ -13,6 +14,7 @@ using System.Security.Cryptography;
 using CringeBank.Infrastructure.Auth;
 using CringeBank.Infrastructure.Authorization;
 using CringeBank.Infrastructure.Chats;
+using CringeBank.Infrastructure.Notifications;
 using CringeBank.Infrastructure.Outbox;
 using CringeBank.Infrastructure.Persistence;
 using CringeBank.Application.Feeds;
@@ -37,21 +39,30 @@ public static class DependencyInjection
     ArgumentNullException.ThrowIfNull(services);
     ArgumentNullException.ThrowIfNull(configuration);
 
-    var connectionString = configuration.GetConnectionString(ConnectionStringName);
-
-    if (string.IsNullOrWhiteSpace(connectionString))
+  var useInMemorySetting = configuration["Infrastructure:UseInMemoryDatabase"];
+  var useInMemory = bool.TryParse(useInMemorySetting, out var parsedUseInMemory) && parsedUseInMemory;
+    if (useInMemory)
     {
-      throw new InvalidOperationException(
-        "Connection string 'Sql' not found. Configure it via appsettings, secrets, or the CRINGEBANK__CONNECTIONSTRINGS__SQL environment variable.");
+      services.AddDbContext<CringeBankDbContext>(options => options.UseInMemoryDatabase("CringeBankTestDatabase"));
     }
+    else
+    {
+      var connectionString = configuration.GetConnectionString(ConnectionStringName);
 
-    services.AddDbContext<CringeBankDbContext>(options =>
-      options.UseSqlServer(connectionString, sql =>
+      if (string.IsNullOrWhiteSpace(connectionString))
       {
-        sql.MigrationsAssembly(typeof(CringeBankDbContext).Assembly.FullName);
-        sql.MigrationsHistoryTable("__EFMigrationsHistory", CringeBankDbContext.Schema);
-        sql.EnableRetryOnFailure();
-      }));
+        throw new InvalidOperationException(
+          "Connection string 'Sql' not found. Configure it via appsettings, secrets, or the CRINGEBANK__CONNECTIONSTRINGS__SQL environment variable.");
+      }
+
+      services.AddDbContext<CringeBankDbContext>(options =>
+        options.UseSqlServer(connectionString, sql =>
+        {
+          sql.MigrationsAssembly(typeof(CringeBankDbContext).Assembly.FullName);
+          sql.MigrationsHistoryTable("__EFMigrationsHistory", CringeBankDbContext.Schema);
+          sql.EnableRetryOnFailure();
+        }));
+    }
     services.AddMemoryCache();
 
     var rbacSection = configuration.GetSection("Rbac");
@@ -204,7 +215,8 @@ public static class DependencyInjection
     services.AddSingleton<IOptions<ProfileMediaStorageOptions>>(Options.Create(profileMediaOptions));
 
     services.AddScoped<ILoginAuditWriter, SqlLoginAuditWriter>();
-    services.AddScoped<IOutboxEventWriter, SqlOutboxEventWriter>();
+  services.AddScoped<IOutboxEventWriter, SqlOutboxEventWriter>();
+  services.AddScoped<IChatNotificationService, ChatNotificationService>();
     services.AddScoped<IUserSynchronizationService, UserSynchronizationService>();
   services.AddScoped<IUserReadRepository, UserReadRepository>();
   services.AddScoped<IAdminUserReadRepository, AdminUserReadRepository>();

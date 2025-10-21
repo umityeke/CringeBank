@@ -62,16 +62,16 @@
 - [x] Health check endpointlerini (`/health/live`, `/health/ready`) veri tabani ve harici sistem kontrolleri ile zenginlestir. (Tamamlandı: 2025-10-21 — SQL bağlantısı, Firebase Auth ve Firebase App Check için health check eklendi, `/health/ready` JSON çıktısı durum/kaynak bazında detay üretir.)
 - [x] Serilog'u Seq veya Application Insights sink'i ile entegre et ve minimal runtime konfigurasyonu yaz. (Tamamlandı: 2025-10-21 — Seq sink opsiyonel hale getirildi, `Telemetry:Seq` ayarlarıyla etkinleştirilip minimum seviye ve API anahtarı yapılandırılabiliyor.)
 - [x] OpenTelemetry veya Jaeger icin tracing pipeline'ini ekle. (Tamamlandı: 2025-10-21 — ASP.NET Core ve HttpClient için OpenTelemetry izleme eklendi, konsol/OTLP exporter konfigüre edilebilir hale getirildi, kaynak meta verileri environment bilgisiyle zenginleştirildi.)
-- [ ] Prometheus uyumlu metrik endpointi kur ve temel metrikleri expose et.
-- [ ] Error budget ve performans hedefleri icin dokuman hazirla; CI pipeline'ina smoke test raporlamasi ekle.
+- [x] Prometheus uyumlu metrik endpointi kur ve temel metrikleri expose et. (Tamamlandı: 2025-10-21 — OpenTelemetry Prometheus exporter ile `/metrics` uç noktası yayımlandı, ASP.NET/Core, HttpClient ve runtime metrikleri etkin.)
+- [x] Error budget ve performans hedefleri icin dokuman hazirla; CI pipeline'ina smoke test raporlamasi ekle. (Tamamlandı: 2025-10-21 — `docs/backend_error_budget.md` oluşturuldu, `.github/workflows/backend-ci.yml` ile smoke betiği (`scripts/smoke_tests.ps1`) CI'ya bağlandı.)
 
 ## 7. Entegrasyonlar ve Harici Sistemler
 
-- [ ] Firebase Auth'tan SQL user senkronizasyonu icin arka plan job'u yaz (user yoksa olustur, profil guncelle).
-- [ ] Firestore -> SQL public profil mirror kontrolu icin `functions` paketine bagli reconciliation job'u tasarla.
-- [ ] Payment/escrow stored procedure cagrilari icin HTTP -> SQL adapter katmanini test edilebilir hale getir.
-- [ ] Bildirim servisi (push/email) icin `notify` domain tablosunu ve event tetikleyicilerini olustur.
-- [ ] Telemetry endpointi ile backend loglari arasinda korelasyon (traceId propagation) sagla.
+- [x] Firebase Auth'tan SQL user senkronizasyonu icin arka plan job'u yaz (user yoksa olustur, profil guncelle). (Tamamlandı: 2025-10-21 — Firebase Admin list user API'si ile periyodik senkron job'u ve yapılandırılabilir seçenekler eklendi.)
+- [x] Firestore -> SQL public profil mirror kontrolu icin `functions` paketine bagli reconciliation job'u tasarla. (Tamamlandı: 2025-10-22 — `functions/scheduled/profile_mirror_reconciliation.js` eklendi, Slack uyarıları ve günlük kontrol akışı planlandı.)
+- [x] Payment/escrow stored procedure cagrilari icin HTTP -> SQL adapter katmanini test edilebilir hale getir. (Tamamlandı: 2025-10-21 — `cringe_store_functions` icin SQL gateway bagimliliklarini override edilebilir hale getirildi ve Jest ile adapter davranisi test edildi.)
+- [x] Bildirim servisi (push/email) icin `notify` domain tablosunu ve event tetikleyicilerini olustur. (Tamamlandı: 2025-10-21 — `notify.Notifications` ve `notify.Outbox` tabloları EF Core ile tanımlandı, chat mesajları için SignalR yayıncısı üzerinden bildirim üretimi + push/e-posta outbox kuyruğu tetiklendi, Unit/Integration testleri güncellendi.)
+- [x] Telemetry endpointi ile backend loglari arasinda korelasyon (traceId propagation) sagla. (Tamamlandı: 2025-10-22 — Serilog loglarına trace/span id zenginleştirmesi eklendi, `ProblemDetails` ve request logging trace kimlikleriyle senkronlandı.)
 
 ## 8. Test Stratejisi ve Otomasyon
 

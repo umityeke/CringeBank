@@ -2,6 +2,7 @@ namespace CringeBank.Api;
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Reflection;
@@ -24,6 +25,8 @@ using CringeBank.Api.Admin;
 using CringeBank.Api.Authentication;
 using CringeBank.Api.Authorization;
 using CringeBank.Api.Auth;
+using CringeBank.Api.Background;
+using CringeBank.Api.Logging;
 using CringeBank.Api.Chats;
 using CringeBank.Api.Feeds;
 using CringeBank.Api.Profiles;
@@ -58,6 +61,9 @@ using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using System.Threading.RateLimiting;
 using System.Text.Json;
+using OpenTelemetry;
+using OpenTelemetry.Extensions.Hosting;
+using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
@@ -139,6 +145,7 @@ public sealed partial class Program
                 .ReadFrom.Configuration(context.Configuration)
                 .ReadFrom.Services(services)
                 .Enrich.FromLogContext()
+                .Enrich.With<TraceContextEnricher>()
                 .WriteTo.Logger(cfg => cfg
                     .Filter.ByIncludingOnly(Matching.WithProperty("SecurityEvent", true))
                     .WriteTo.File(
@@ -176,7 +183,9 @@ public sealed partial class Program
         var services = builder.Services;
         var configuration = builder.Configuration;
 
-    ConfigureTracing(builder, services, configuration);
+        var openTelemetryBuilder = services.AddOpenTelemetry();
+        ConfigureTracing(builder, configuration, openTelemetryBuilder);
+        ConfigureMetrics(builder, configuration, openTelemetryBuilder);
 
         services.AddProblemDetails(options =>
         {
@@ -185,7 +194,38 @@ public sealed partial class Program
                 if (ctx.ProblemDetails.Status >= StatusCodes.Status500InternalServerError)
                 {
                     ctx.ProblemDetails.Title = "An unexpected error occurred.";
-                    ctx.ProblemDetails.Extensions["traceId"] = ctx.HttpContext.TraceIdentifier;
+                    var activity = Activity.Current;
+                    var traceId = activity?.TraceId.ToHexString();
+
+                    if (string.IsNullOrWhiteSpace(traceId))
+                    {
+                        traceId = ctx.HttpContext.TraceIdentifier;
+                    }
+                    else
+                    {
+                        ctx.HttpContext.TraceIdentifier = traceId;
+                    }
+
+                    ctx.ProblemDetails.Extensions["traceId"] = traceId;
+
+                    if (activity is not null)
+                    {
+                        var spanId = activity.SpanId.ToHexString();
+                        if (!string.IsNullOrWhiteSpace(spanId))
+                        {
+                            ctx.ProblemDetails.Extensions["spanId"] = spanId;
+                        }
+
+                        if (activity.ActivityTraceFlags != ActivityTraceFlags.None)
+                        {
+                            ctx.ProblemDetails.Extensions["traceFlags"] = activity.ActivityTraceFlags.ToString();
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(activity.TraceStateString))
+                        {
+                            ctx.ProblemDetails.Extensions["traceState"] = activity.TraceStateString;
+                        }
+                    }
                 }
             };
         });
@@ -284,7 +324,9 @@ public sealed partial class Program
             });
         });
 
-    services.AddScoped<FirebaseUserProfileFactory>();
+        services.AddScoped<FirebaseUserProfileFactory>();
+        services.Configure<FirebaseUserSynchronizationOptions>(configuration.GetSection("Workers:FirebaseUserSynchronization"));
+        services.AddHostedService<FirebaseUserSynchronizationWorker>();
         services.AddScoped<IChatEventPublisher, SignalRChatEventPublisher>();
 
         ConfigureAuthentication(services, configuration);
@@ -498,7 +540,48 @@ public sealed partial class Program
 
     private static void ConfigurePipeline(WebApplication app)
     {
-        app.UseSerilogRequestLogging();
+        app.UseSerilogRequestLogging(options =>
+        {
+            options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+            {
+                var activity = Activity.Current;
+                var traceId = activity?.TraceId.ToHexString();
+
+                if (string.IsNullOrWhiteSpace(traceId))
+                {
+                    traceId = httpContext.TraceIdentifier;
+                }
+                else
+                {
+                    httpContext.TraceIdentifier = traceId;
+                }
+
+                diagnosticContext.Set("TraceId", traceId);
+                diagnosticContext.Set("RequestId", httpContext.TraceIdentifier);
+
+                if (activity is null)
+                {
+                    return;
+                }
+
+                diagnosticContext.Set("SpanId", activity.SpanId.ToHexString());
+
+                if (activity.ParentSpanId != default)
+                {
+                    diagnosticContext.Set("ParentSpanId", activity.ParentSpanId.ToHexString());
+                }
+
+                if (activity.ActivityTraceFlags != ActivityTraceFlags.None)
+                {
+                    diagnosticContext.Set("TraceFlags", activity.ActivityTraceFlags.ToString());
+                }
+
+                if (!string.IsNullOrWhiteSpace(activity.TraceStateString))
+                {
+                    diagnosticContext.Set("TraceState", activity.TraceStateString);
+                }
+            };
+        });
 
         app.UseExceptionHandler();
         app.UseStatusCodePages();
@@ -511,8 +594,37 @@ public sealed partial class Program
         app.UseHttpsRedirection();
         app.UseAuthentication();
         app.UseCors("Default");
-    app.UseRateLimiter();
+        app.UseRateLimiter();
         app.UseAuthorization();
+
+        var metricsSection = app.Configuration.GetSection("Telemetry:Metrics");
+        var metricsEnabled = metricsSection.GetValue<bool?>("Enabled") ?? true;
+        var metricsExporter = metricsSection["Exporter"];
+        if (string.IsNullOrWhiteSpace(metricsExporter))
+        {
+            metricsExporter = "prometheus";
+        }
+
+        if (metricsEnabled && string.Equals(metricsExporter, "prometheus", StringComparison.OrdinalIgnoreCase))
+        {
+            var scrapeEndpointPath = metricsSection["ScrapeEndpointPath"];
+            if (string.IsNullOrWhiteSpace(scrapeEndpointPath))
+            {
+                scrapeEndpointPath = "/metrics";
+            }
+            else if (!scrapeEndpointPath.StartsWith('/'))
+            {
+                scrapeEndpointPath = "/" + scrapeEndpointPath.TrimStart('/');
+            }
+
+            var requireAuthorization = metricsSection.GetValue<bool?>("RequireAuthorization") ?? false;
+            var endpointBuilder = app.MapPrometheusScrapingEndpoint(scrapeEndpointPath);
+
+            if (requireAuthorization)
+            {
+                endpointBuilder.RequireAuthorization();
+            }
+        }
 
         var swaggerEnabled = app.Configuration.GetValue<bool?>("Swagger:Enabled") ?? app.Environment.IsDevelopment();
         if (swaggerEnabled)
@@ -1173,11 +1285,11 @@ public sealed partial class Program
         return context.Response.WriteAsync(json);
     }
 
-    private static void ConfigureTracing(WebApplicationBuilder builder, IServiceCollection services, ConfigurationManager configuration)
+    private static void ConfigureTracing(WebApplicationBuilder builder, ConfigurationManager configuration, IOpenTelemetryBuilder openTelemetryBuilder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(openTelemetryBuilder);
 
         var tracingSection = configuration.GetSection("Telemetry:Tracing");
         var enabled = tracingSection.GetValue<bool?>("Enabled") ?? true;
@@ -1211,36 +1323,167 @@ public sealed partial class Program
             serviceInstanceId = Environment.MachineName;
         }
 
-        services.AddOpenTelemetry()
-            .WithTracing(tracing =>
-            {
-                tracing
-                    .SetResourceBuilder(CreateServiceResource(serviceName, serviceNamespace, serviceVersion, serviceInstanceId, builder.Environment.EnvironmentName))
-                    .AddAspNetCoreInstrumentation(options =>
-                    {
-                        options.RecordException = true;
-                        options.Filter = httpContext => !httpContext.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase);
-                    })
-                    .AddHttpClientInstrumentation(options =>
-                    {
-                        options.RecordException = true;
-                    })
-                    .AddSource("CringeBank.Application");
-
-                var additionalSources = tracingSection.GetSection("Sources").Get<string[]>();
-                if (additionalSources is { Length: > 0 })
+        openTelemetryBuilder.WithTracing(tracing =>
+        {
+            tracing
+                .SetResourceBuilder(CreateServiceResource(serviceName, serviceNamespace, serviceVersion, serviceInstanceId, builder.Environment.EnvironmentName))
+                .AddAspNetCoreInstrumentation(options =>
                 {
-                    foreach (var source in additionalSources)
+                    options.RecordException = true;
+                    options.Filter = httpContext => !httpContext.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase);
+                })
+                .AddHttpClientInstrumentation(options =>
+                {
+                    options.RecordException = true;
+                })
+                .AddSource("CringeBank.Application");
+
+            var additionalSources = tracingSection.GetSection("Sources").Get<string[]>();
+            if (additionalSources is { Length: > 0 })
+            {
+                foreach (var source in additionalSources)
+                {
+                    if (!string.IsNullOrWhiteSpace(source))
                     {
-                        if (!string.IsNullOrWhiteSpace(source))
-                        {
-                            tracing.AddSource(source);
-                        }
+                        tracing.AddSource(source);
                     }
                 }
+            }
 
-                ConfigureTracingExporter(tracing, tracingSection);
+            ConfigureTracingExporter(tracing, tracingSection);
+        });
+    }
+
+    private static void ConfigureMetrics(WebApplicationBuilder builder, ConfigurationManager configuration, IOpenTelemetryBuilder openTelemetryBuilder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(openTelemetryBuilder);
+
+        var metricsSection = configuration.GetSection("Telemetry:Metrics");
+        var enabled = metricsSection.GetValue<bool?>("Enabled") ?? true;
+
+        if (!enabled)
+        {
+            return;
+        }
+
+        var exporter = metricsSection["Exporter"];
+        if (string.IsNullOrWhiteSpace(exporter))
+        {
+            exporter = "prometheus";
+        }
+
+        var includeAspNetCore = metricsSection.GetValue<bool?>("IncludeAspNetCore") ?? true;
+        var includeHttpClient = metricsSection.GetValue<bool?>("IncludeHttpClient") ?? true;
+        var includeRuntime = metricsSection.GetValue<bool?>("IncludeRuntime") ?? true;
+
+        var scrapeEndpointPath = metricsSection["ScrapeEndpointPath"];
+        if (string.IsNullOrWhiteSpace(scrapeEndpointPath))
+        {
+            scrapeEndpointPath = "/metrics";
+        }
+    else if (!scrapeEndpointPath.StartsWith('/'))
+        {
+            scrapeEndpointPath = "/" + scrapeEndpointPath.TrimStart('/');
+        }
+
+        var serviceName = metricsSection["ServiceName"];
+        if (string.IsNullOrWhiteSpace(serviceName))
+        {
+            serviceName = builder.Environment.ApplicationName ?? "CringeBank.Api";
+        }
+
+        var serviceNamespace = metricsSection["ServiceNamespace"];
+        if (string.IsNullOrWhiteSpace(serviceNamespace))
+        {
+            serviceNamespace = null;
+        }
+
+        var serviceVersion = metricsSection["ServiceVersion"];
+        if (string.IsNullOrWhiteSpace(serviceVersion))
+        {
+            serviceVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
+        }
+
+        var serviceInstanceId = metricsSection["ServiceInstanceId"];
+        if (string.IsNullOrWhiteSpace(serviceInstanceId))
+        {
+            serviceInstanceId = Environment.MachineName;
+        }
+
+        var additionalMeters = metricsSection.GetSection("Meters").Get<string[]>();
+
+        openTelemetryBuilder.WithMetrics(metrics =>
+        {
+            metrics.SetResourceBuilder(CreateServiceResource(serviceName, serviceNamespace, serviceVersion, serviceInstanceId, builder.Environment.EnvironmentName));
+
+            if (includeAspNetCore)
+            {
+                metrics.AddAspNetCoreInstrumentation();
+            }
+
+            if (includeHttpClient)
+            {
+                metrics.AddHttpClientInstrumentation();
+            }
+
+            if (includeRuntime)
+            {
+                metrics.AddRuntimeInstrumentation();
+            }
+
+            if (additionalMeters is { Length: > 0 })
+            {
+                foreach (var meter in additionalMeters)
+                {
+                    if (!string.IsNullOrWhiteSpace(meter))
+                    {
+                        metrics.AddMeter(meter);
+                    }
+                }
+            }
+
+            if (string.Equals(exporter, "otlp", StringComparison.OrdinalIgnoreCase))
+            {
+                metrics.AddOtlpExporter(options =>
+                {
+                    var endpoint = metricsSection["OtlpEndpoint"];
+                    if (!string.IsNullOrWhiteSpace(endpoint) && Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
+                    {
+                        options.Endpoint = uri;
+                    }
+
+                    var headers = metricsSection.GetSection("OtlpHeaders").Get<string[]>();
+                    if (headers is { Length: > 0 })
+                    {
+                        var normalized = headers
+                            .Select(header => header?.Trim())
+                            .Where(header => !string.IsNullOrWhiteSpace(header))
+                            .Select(header => header!)
+                            .ToArray();
+
+                        if (normalized.Length > 0)
+                        {
+                            options.Headers = string.Join(",", normalized);
+                        }
+                    }
+                });
+
+                return;
+            }
+
+            if (string.Equals(exporter, "console", StringComparison.OrdinalIgnoreCase))
+            {
+                metrics.AddConsoleExporter();
+                return;
+            }
+
+            metrics.AddPrometheusExporter(options =>
+            {
+                options.ScrapeEndpointPath = scrapeEndpointPath;
             });
+        });
     }
 
     private static ResourceBuilder CreateServiceResource(string serviceName, string? serviceNamespace, string serviceVersion, string serviceInstanceId, string environmentName)

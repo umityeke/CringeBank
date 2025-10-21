@@ -9,6 +9,7 @@ using CringeBank.Domain.Auth.Entities;
 using CringeBank.Domain.Chat.Entities;
 using CringeBank.Domain.Entities;
 using CringeBank.Domain.Social.Entities;
+using CringeBank.Domain.Notify.Entities;
 using CringeBank.Domain.Outbox.Entities;
 using CringeBank.Domain.Wallet.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -92,6 +93,10 @@ public sealed class CringeBankDbContext : DbContext
     public DbSet<WalletTransferAudit> WalletTransferAudits => Set<WalletTransferAudit>();
 
     public DbSet<WalletInAppPurchase> WalletInAppPurchases => Set<WalletInAppPurchase>();
+
+    public DbSet<Notification> Notifications => Set<Notification>();
+
+    public DbSet<NotificationOutboxMessage> NotificationOutboxMessages => Set<NotificationOutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

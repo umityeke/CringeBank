@@ -111,6 +111,29 @@ const SQL_ERROR_TRANSLATIONS = Object.freeze({
   },
 });
 
+const defaultSqlGatewayDependencies = Object.freeze({
+  executeProcedure,
+  getProcedure,
+  useSqlEscrowGateway: USE_SQL_ESCROW_GATEWAY,
+});
+
+let sqlGatewayOverrides = {};
+
+function setStoreGatewayTestOverrides(overrides = {}) {
+  sqlGatewayOverrides = { ...sqlGatewayOverrides, ...overrides };
+}
+
+function resetStoreGatewayTestOverrides() {
+  sqlGatewayOverrides = {};
+}
+
+function getSqlGatewayDependency(key) {
+  if (Object.prototype.hasOwnProperty.call(sqlGatewayOverrides, key)) {
+    return sqlGatewayOverrides[key];
+  }
+  return defaultSqlGatewayDependencies[key];
+}
+
 function isEscrowAdmin(context) {
   return hasAnyRole(context, ESCROW_ADMIN_ROLES);
 }
@@ -271,7 +294,7 @@ async function executeFirestoreFallback(operation, handler, context) {
 }
 
 async function withSqlGateway(operation, sqlHandler, firestoreHandler, context) {
-  if (!USE_SQL_ESCROW_GATEWAY) {
+  if (!getSqlGatewayDependency('useSqlEscrowGateway')) {
     if (typeof firestoreHandler !== 'function') {
       throw new functions.https.HttpsError('unavailable', 'sql_gateway_disabled');
     }
@@ -288,7 +311,7 @@ async function withSqlGateway(operation, sqlHandler, firestoreHandler, context) 
 }
 
 async function executeStoreGatewayProcedure(key, rawData, context) {
-  const definition = getProcedure(key);
+  const definition = getSqlGatewayDependency('getProcedure')(key);
 
   if (!definition) {
     throw new functions.https.HttpsError('failed-precondition', 'sql_gateway_definition_missing');
@@ -301,7 +324,8 @@ async function executeStoreGatewayProcedure(key, rawData, context) {
   const payload = definition.parseInput ? definition.parseInput(rawData, context) : rawData || {};
 
   try {
-    return await executeProcedure(key, payload, context);
+    const executor = getSqlGatewayDependency('executeProcedure');
+    return await executor(key, payload, context);
   } catch (error) {
     throw mapSqlGatewayError(error, key, context);
   }
@@ -925,3 +949,13 @@ exports.storeShareProduct = functions.region(region).https.onCall(async (data, c
     ...response,
   };
 });
+
+exports.__setStoreGatewayTestOverrides = setStoreGatewayTestOverrides;
+exports.__resetStoreGatewayTestOverrides = resetStoreGatewayTestOverrides;
+
+if (process.env.NODE_ENV === 'test') {
+  exports.__test = {
+    executeStoreGatewayProcedure,
+    withSqlGateway,
+  };
+}

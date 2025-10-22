@@ -75,17 +75,17 @@
 
 ## 8. Test Stratejisi ve Otomasyon
 
-- [ ] Unit testler: Domain ve Application katmani icin kapsama yuzdesi hedefi belirle (>=80%) ve raporlama ekle.
-- [ ] Integration testler: WebApplicationFactory kullanarak API entegrasyon testleri yaz, Azure SQL test veritabanina karsi calistir (CI icin ephemeral database stratejisi belirle).
-- [ ] Contract testler: Swagger schema'sini kullanarak Pact veya smoke test seti cikart.
-- [ ] Load test: k6 veya Azure Load Testing ile temel senaryolar icin script yaz.
-- [ ] CI pipeline'inda test dagilimini (unit, integration, load smoke) ayiran job yapisi kur.
+- [x] Unit testler: Domain ve Application katmani icin kapsama yuzdesi hedefi belirle (>=80%) ve raporlama ekle. (Tamamlandı: 2025-10-21 — `scripts/verify_unit_coverage.ps1` kapsama kapısını uygular, detaylar `docs/backend_testing.md` dokümanında.)
+- [x] Integration testler: WebApplicationFactory kullanarak API entegrasyon testleri yaz, Azure SQL test veritabanina karsi calistir (CI icin ephemeral database stratejisi belirle). (Tamamlandı: 2025-10-21 — `Testcontainers` tabanlı `IntegrationTestFixture` SQL konteyneri başlatıyor, `SessionBootstrapTests` HTTP + veri kalıcılığını doğruluyor.)
+- [x] Contract testler: Swagger schema'sini kullanarak Pact veya smoke test seti cikart. (Tamamlandı: 2025-10-21 — Swagger contract testi integration suite'e eklendi ve kritik endpoint patikaları normalize edilerek doğrulandı.)
+- [x] Load test: k6 veya Azure Load Testing ile temel senaryolar icin script yaz. (Tamamlandı: 2025-10-21 — k6 senaryosu `tools/load/k6_basic_scenarios.js` ile session bootstrap, timeline ve profil uç noktalarını yük altında doğruluyor.)
+- [x] CI pipeline'inda test dagilimini (unit, integration, load smoke) ayiran job yapisi kur. (Tamamlandı: 2025-10-21 — `.github/workflows/backend-ci.yml` artik unit, integration, smoke ve kosullu load job'lariyla calisiyor.)
 
 ## 9. DevOps ve Dagitim
 
-- [ ] GitHub Actions veya Azure DevOps pipeline'i ile build, test, publish adimlarini otomatiklestir.
-- [ ] Docker image build pipeline'i icin multi-stage Dockerfile yaz (base SDK + runtime).
-- [ ] Production ortamina deploy icin terraform veya bicep senaryosu (App Service + SQL + Key Vault) hazirla.
+- [x] GitHub Actions veya Azure DevOps pipeline'i ile build, test, publish adimlarini otomatiklestir. (Tamamlandı: 2025-10-22 — Backend CI workflow'una publish job'u eklendi, .NET publish çıktısı artefakt olarak arşivleniyor ve main branch için GHCR push otomasyonu devreye alındı.)
+- [x] Docker image build pipeline'i icin multi-stage Dockerfile yaz (base SDK + runtime). (Tamamlandı: 2025-10-22 — `backend/Dockerfile` çok aşamalı hale getirildi ve backend CI'ya Docker build job'u eklendi.)
+- [x] Production ortamina deploy icin terraform veya bicep senaryosu (App Service + SQL + Key Vault) hazirla. (Tamamlandı: 2025-10-22 — `.github/workflows/backend-infra-deploy.yml` manuel tetiklemeli Bicep dağıtımını yürütüyor, `infra/azure/deploy.sh` parametre paketini hazırlıyor.)
 - [ ] Blue/green veya canary deploy stratejisi icin yol haritasi hazirla.
 - [ ] Rollback prosedurunu otomatiklestiren script (migration revert + image rollback) ekle.
 
@@ -111,3 +111,9 @@
 - [ ] Logging ve monitoring alarmlarini (CPU, hata oranlari, gecikme) ayarla.
 - [ ] Uygulama ve veritabani backup stratejilerini dokumante et ve otomasyona bagla.
 - [ ] Post-deploy smoke test planini olustur ve sorumlularini ata.
+
+## 13. Tasarim ve UX
+
+- [x] Mevcut UI tasarimini olusturan renk, tipografi ve bilesen setini `docs/design/system_freeze.md` dokumaninda kilitle (Tamamlandı: 2025-10-21 — Freeze dokümanı yayımlandı, değişiklik onay akışı `change_control` dokümanı ile eşlenecek).
+- [x] Mizah/komedi persona onboarding ve ana akisi icin wireframe'leri mevcut tasarim bilesenleriyle hazirla (Tamamlandı: 2025-10-21 — `docs/design/wireframes/mizah_persona_onboarding.md` yayımlandı).
+- [x] Tasarim freeze sonrasinda degisiklik taleplerini degerlendirecek onay surecini tanimla (Tamamlandı: 2025-10-21 — `docs/design/change_control.md` süreci oluşturuldu).

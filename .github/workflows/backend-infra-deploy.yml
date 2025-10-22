@@ -1,0 +1,91 @@
+name: Backend Infra Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      subscriptionId:
+        description: 'Azure subscription ID'
+        required: true
+      resourceGroup:
+        description: 'Target resource group name'
+        required: true
+      location:
+        description: 'Azure region (defaults to resource group location when empty)'
+        required: false
+        default: ''
+      namePrefix:
+        description: 'Name prefix used for resources (e.g. cringebank)'
+        required: true
+      environment:
+        description: 'Deployment environment'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+        required: true
+      sqlAdministratorLogin:
+        description: 'Azure SQL administrator login name'
+        required: false
+        default: 'sqladminuser'
+      sqlAdAdminLogin:
+        description: 'Azure AD display name for SQL administrator'
+        required: true
+      sqlAdAdminObjectId:
+        description: 'Azure AD object ID for SQL administrator'
+        required: true
+      keyVaultAccessObjectIds:
+        description: 'Comma-separated Azure AD object IDs with Key Vault access'
+        required: false
+        default: ''
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      AZURE_SUBSCRIPTION_ID: ${{ inputs.subscriptionId }}
+      AZURE_RESOURCE_GROUP: ${{ inputs.resourceGroup }}
+      AZURE_LOCATION: ${{ inputs.location }}
+      AZURE_NAME_PREFIX: ${{ inputs.namePrefix }}
+      AZURE_ENVIRONMENT: ${{ inputs.environment }}
+      AZURE_SQL_LOGIN: ${{ inputs.sqlAdministratorLogin }}
+      AZURE_SQL_AD_LOGIN: ${{ inputs.sqlAdAdminLogin }}
+      AZURE_SQL_AD_OBJECTID: ${{ inputs.sqlAdAdminObjectId }}
+      AZURE_KV_ACCESS_IDS: ${{ inputs.keyVaultAccessObjectIds }}
+      SQL_ADMIN_PASSWORD: ${{ secrets.AZURE_SQL_ADMIN_PASSWORD }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set subscription
+        run: az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+
+      - name: Ensure resource group exists
+        run: |
+          if [ -n "$AZURE_LOCATION" ]; then
+            az group create --subscription "$AZURE_SUBSCRIPTION_ID" --name "$AZURE_RESOURCE_GROUP" --location "$AZURE_LOCATION"
+          else
+            echo "Skipping resource group creation (location not provided)."
+          fi
+
+      - name: Parse Key Vault access IDs
+        id: kv-access
+        run: |
+          if [ -n "$AZURE_KV_ACCESS_IDS" ]; then
+            kv_array=$(echo "$AZURE_KV_ACCESS_IDS" | tr ',' '\n' | sed '/^\s*$/d' | jq -R . | jq -s .)
+          else
+            kv_array='[]'
+          fi
+          echo "accessIds=$kv_array" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy Bicep template
+        working-directory: infra/azure
+        env:
+          KV_ACCESS_JSON: ${{ steps.kv-access.outputs.accessIds }}
+        run: bash deploy.sh

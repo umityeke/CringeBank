@@ -86,8 +86,8 @@
 - [x] GitHub Actions veya Azure DevOps pipeline'i ile build, test, publish adimlarini otomatiklestir. (Tamamlandı: 2025-10-22 — Backend CI workflow'una publish job'u eklendi, .NET publish çıktısı artefakt olarak arşivleniyor ve main branch için GHCR push otomasyonu devreye alındı.)
 - [x] Docker image build pipeline'i icin multi-stage Dockerfile yaz (base SDK + runtime). (Tamamlandı: 2025-10-22 — `backend/Dockerfile` çok aşamalı hale getirildi ve backend CI'ya Docker build job'u eklendi.)
 - [x] Production ortamina deploy icin terraform veya bicep senaryosu (App Service + SQL + Key Vault) hazirla. (Tamamlandı: 2025-10-22 — `.github/workflows/backend-infra-deploy.yml` manuel tetiklemeli Bicep dağıtımını yürütüyor, `infra/azure/deploy.sh` parametre paketini hazırlıyor.)
-- [ ] Blue/green veya canary deploy stratejisi icin yol haritasi hazirla.
-- [ ] Rollback prosedurunu otomatiklestiren script (migration revert + image rollback) ekle.
+- [x] Blue/green veya canary deploy stratejisi icin yol haritasi hazirla. (Tamamlandı: 2025-10-22 — `docs/backend_deployment.md` içine App Service slot tabanlı süreç ve `scripts/azure_appservice_slot_swap.ps1` betiği eklendi.)
+- [x] Rollback prosedurunu otomatiklestiren script (migration revert + image rollback) ekle. (Tamamlandı: 2025-10-22 — `scripts/rollback_backend_deploy.ps1` swap + container geri alma + isteğe bağlı migration rollback sağlıyor, dokümanda kullanım örneği mevcut.)
 
 ## 10. Veri Goc ve Mirror
 

@@ -111,14 +111,37 @@ dotnet ef database update --project src/CringeBank.Infrastructure/CringeBank.Inf
 2. Yayınlanan çıktı içindeki `appsettings.Production.json` dosyasını gerektiğinde düzenleyin (CORS vb.).
 3. Reverse-proxy (NGINX/IIS) üzerinden HTTPS yönlendirmesi yapılandırın.
 
-## 6. Operasyonel İzleme
+## 6. Blue/Green Dağıtım Stratejisi
+
+Blue/green yaklaşımında yeni sürüm staging slotuna alınır, doğrulamalar tamamlandıktan sonra production ile swap edilir:
+
+1. Yeni container imajını GHCR üzerinde yayınlayın (`ghcr.io/umityeke/cringebank-api:<build-id>`).
+2. Staging slotunun container imajını güncelleyin ve warmup/smoke testlerini çalıştırın.
+3. `scripts/azure_appservice_slot_swap.ps1` betiği ile staging slotunu production ile değiştirin.
+4. Swap sonrası `/health/ready` ve uçtan uca smoke testleri çalıştırarak metrikleri izleyin.
+
+> Azure CLI oturumu açık olduğunda aşağıdaki komut staging → production swap işlemini gerçekleştirir:
+>
+> ```powershell
+> ./scripts/azure_appservice_slot_swap.ps1 `
+>   -SubscriptionId <subscription-id> `
+>   -ResourceGroup rg-cringebank-backend `
+>   -AppServiceName cringebank-api `
+>   -SourceSlot staging `
+>   -TargetSlot production `
+>   -WarmupUrl "https://cringebank-api-staging.azurewebsites.net/health/ready"
+> ```
+>
+> Warmup isteği başarısız olursa betik swap işlemine devam eder ancak log çıktısında uyarı üretir. Swap sonrasında üretim trafiği üzerinde ek doğrulamalar yapmayı unutmayın.
+
+## 7. Operasyonel İzleme
 
 - `GET /health/live` ⇒ liveness
 - `GET /health/ready` ⇒ readiness + DB erişimi
 - Serilog log dosyaları `logs/api-log-*.txt` altında tutulur. Rotasyonun sorunsuz çalıştığını takip edin.
 - Önemli hatalar için Serilog'u ek sinklere (Seq, Application Insights) yönlendirin.
 
-## 7. Güvenlik Kontrolleri
+## 8. Güvenlik Kontrolleri
 
 - Azure AD tabanlı kimlik doğrulama, MFA zorunluluğu
 - Managed Identity ve rol bazlı erişim (db_datareader/db_datawriter)
@@ -127,7 +150,7 @@ dotnet ef database update --project src/CringeBank.Infrastructure/CringeBank.Inf
 - JWT anahtarını düzenli aralıklarla yenileyin
 - Migration yetkisini belirli servis hesaplarına sınırlandırın
 
-## 8. Sürüm Yükseltme Adımları
+## 9. Sürüm Yükseltme Adımları
 
 1. `dotnet ef migrations add <Name>` (geliştirme)
 2. Staging ortamında `dotnet ef database update`
@@ -136,11 +159,27 @@ dotnet ef database update --project src/CringeBank.Infrastructure/CringeBank.Inf
 5. `dotnet ef database update` (Production)
 6. Yayınlanan API'yı yeniden başlatın
 
-## 9. Geri Dönüş Planı
+## 10. Geri Dönüş Planı
 
 - Migration öncesi DB yedeklemesi
 - `dotnet ef database update <öncekiMigration>` ile rollback
 - Log dosyalarına göre hata analizi
+
+Ek olarak aşağıdaki betik swap + imaj geri alma + isteğe bağlı migration rollback adımlarını tek komutta çalıştırır:
+
+```powershell
+./scripts/rollback_backend_deploy.ps1 `
+  -SubscriptionId <subscription-id> `
+  -ResourceGroup rg-cringebank-backend `
+  -AppServiceName cringebank-api `
+  -RollbackTag <stable-tag> `
+  -SqlConnectionString "Server=tcp:<sql-server>.database.windows.net,1433;Database=CringeBank;Authentication=ActiveDirectoryDefault;Encrypt=True;" `
+  -TargetMigration <öncekiMigration>
+```
+
+- `RollbackTag` staging slotuna atanacak kararlı container etiketidir (örn. `stable` veya son başarılı build numarası).
+- `SqlConnectionString` ve `TargetMigration` parametreleri veritabanını belirtilen migration seviyesine çeker; migration revert gerekmiyorsa bu değerleri boş bırakın.
+- Betik swap işlemini staging → production yönünde gerçekleştirir; swap sonrasında smoke testleri manuel olarak tetikleyip telemetriyi takip edin.
 
 ---
 
